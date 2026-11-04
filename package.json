@@ -1,0 +1,1 @@
+{"description":"Atlasync — Every Atlassian Tool, One Sync. A Forge app for Codegeist 2026.","name":"atlasync","private":true,"scripts":{"build":"npm run build -w frontend","dev":"npm run dev -w frontend"},"version":"0.1.0","workspaces":["frontend","forge-app"]}

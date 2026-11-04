@@ -1,0 +1,25 @@
+# Forge app definition for Atlasync.
+# NOTE: app.id is a placeholder. `forge register` overwrites it with a real
+# ARI — never invent a real app id by hand.
+modules:
+  jira:projectPage:
+    - key: atlasync-project-page
+      resource: main
+      resolver:
+        function: resolver
+      title: Atlasync
+      layout: basic
+  function:
+    - key: resolver
+      handler: index.handler
+resources:
+  - key: main
+    path: static/atlasync
+permissions:
+  scopes:
+    - read:jira-work
+    - storage:app
+app:
+  id: ari:cloud:ecosystem::app/atlasync-placeholder
+  runtime:
+    name: nodejs24.x

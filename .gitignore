@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+forge-app/static/
+
+# Environment and secrets — never commit these
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Forge CLI local state
+.forge/

@@ -1,0 +1,42 @@
+/* Atlasync scaffold styles — intentionally minimal. */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #17100b;
+  background: #fbfaf8;
+}
+
+.shell {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+}
+
+.shell h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.shell header p {
+  margin: 0.25rem 0 0;
+  color: #5b4a3d;
+}
+
+.shell section {
+  margin-top: 2rem;
+  padding: 1.25rem;
+  background: #ffffff;
+  border: 1px solid #e5e4e2;
+  border-radius: 12px;
+}
+
+.shell footer {
+  margin-top: 2rem;
+  font-size: 0.875rem;
+  color: #8a7a6e;
+}
