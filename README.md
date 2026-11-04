@@ -4,7 +4,7 @@
 
 Atlasync is an Atlassian Forge app built for **Codegeist 2026**. It gives teams one synced view across every Atlassian tool they use — Jira, Confluence, Bitbucket, and Jira Service Management — so the context behind work is always in one place, instead of scattered across silos.
 
-**Status:** Initial scaffold (v0.1.0). No application features are implemented yet — this repository is a clean, minimal foundation ready for development.
+**Status:** Development environment initialized (v0.1.0). No application features are implemented yet — this repository is a clean, minimal foundation ready for development.
 
 ## Vision
 
@@ -85,8 +85,12 @@ atlasync/
 ### Prerequisites
 
 - Node.js 20+ (developed on Node 24) and npm
-- A free Atlassian Cloud developer site (only needed for Forge deploy/install, not for frontend work)
-- The Forge CLI (only needed for deploy/install, not for frontend work)
+- A free Atlassian Cloud developer site — only needed for Forge deploy/install, not for frontend work
+- The Forge CLI (`@forge/cli`) — only needed for deploy/install/lint, not for frontend work
+
+### Environment variables
+
+None. This project needs no `.env` file and no API tokens: the frontend talks to the Forge backend only through the bridge, and the backend uses Forge permissions and storage. Never commit a `.env` file or a token; Forge secrets (if ever needed) go through `forge variables`, not the repo.
 
 ### Install
 
@@ -101,16 +105,27 @@ This installs the root workspace plus `frontend/` and `forge-app/`.
 ```bash
 npm run dev        # start the Vite dev server for the frontend
 npm run build      # type-check + build the frontend into forge-app/static/atlasync
+npm run preview    # serve the production build locally (what Forge would serve)
+npm test           # resolver structure check (see below)
 ```
 
-The frontend builds with relative asset paths (`base: './'` in `vite.config.ts`), which Forge Custom UI requires.
+The frontend builds with relative asset paths (`base: './'` in `vite.config.ts`), which Forge Custom UI requires. The manifest resource points at the build output directory (`forge-app/static/atlasync`), which must contain `index.html` — that is the entry point Forge serves.
+
+### How the frontend talks to Forge
+
+The app shell calls the backend resolver through `@forge/bridge`'s `invoke` (currently `getStatus` only). Two rules from the official Forge docs, both followed here:
+
+1. **Bridge import is dynamic** (`await import('@forge/bridge')` inside an effect). A static import would break the app outside a Forge iframe; dynamic loading lets the same build render a standalone preview locally and the real connected view inside Forge.
+2. **No direct Atlassian API calls from the frontend.** All Atlassian access goes through the Forge resolver backend, which holds the permissions.
+
+Outside Forge, the shell renders a standalone note ("Forge bridge unavailable (expected outside Forge)") instead of failing — that fallback is deliberate, not an error.
 
 ### Forge (needs your Atlassian account)
 
-These steps are intentionally **not** run from this scaffold — they need the owner's Atlassian login and developer site:
+These steps are intentionally **not** run from this environment — they need the owner's Atlassian login and developer site:
 
 ```bash
-npm install -g @forge/cli
+npm install -g @forge/cli@latest
 forge login
 cd forge-app
 forge register      # replaces the placeholder app id in manifest.yml — never invent a real ARI
@@ -118,7 +133,30 @@ forge deploy        # build the frontend first (npm run build), then deploy
 forge install       # install the app on your dev site and pick the products
 ```
 
-After deploy, live Forge behavior (resolver reads, storage, scheduled triggers, MCP tools) can only be verified on a real Atlassian site.
+After deploy, live Forge behavior (resolver reads, storage, scheduled triggers, MCP tools) can only be verified on a real Atlassian site — never claim it works from a local build alone.
+
+### Verification
+
+Run these before committing:
+
+```bash
+npm install        # dependencies resolve
+npm run dev        # dev server answers (smoke-check the root URL)
+npm run build      # tsc type-check + Vite production build
+npm test           # resolver structure check (defines getStatus, exports handler)
+forge lint         # manifest schema check (stops at "Not logged in" without an Atlassian login — expected)
+```
+
+### A note on `npm test`
+
+`npm test` checks the resolver's structure without executing it, on purpose: `forge-app/src/index.js` follows the official Forge pattern (`import Resolver from '@forge/resolver'; new Resolver()`), which the Forge runtime resolves correctly but plain Node does not (Node lands on the package's CommonJS namespace object instead of the class, so executing it here throws a false failure). Live resolver behavior is verified only after `forge deploy` + install — never claimed from a local run.
+
+### Troubleshooting
+
+- **`forge lint` says "Not logged in":** expected without `forge login`. It still means no schema errors were reported before the login stop.
+- **"Forge bridge unavailable" in local preview:** expected. The bridge only exists inside a Forge iframe; the standalone note is the correct local behavior.
+- **Manifest `app.id` looks fake:** it is a placeholder by design. `forge register` replaces it; never hand-write a real ARI.
+- **Blank page after build:** check the built `index.html` uses relative `./assets/...` paths (Vite `base: './'`). Absolute paths break under Forge Custom UI.
 
 ## Scripts
 
@@ -127,6 +165,8 @@ After deploy, live Forge behavior (resolver reads, storage, scheduled triggers, 
 | `npm install` | Install all workspaces |
 | `npm run dev` | Start the frontend Vite dev server |
 | `npm run build` | Type-check and build the frontend (output: `forge-app/static/atlasync`) |
+| `npm run preview` | Serve the production build locally |
+| `npm test` | Resolver structure check (defines `getStatus`, exports handler) |
 
 ## Codegeist 2026
 
