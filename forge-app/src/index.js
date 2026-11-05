@@ -16,7 +16,21 @@ import {
 // never touches the Jira REST API directly, and no token or credential
 // ever enters this codebase — Forge holds the auth.
 
-const resolver = new Resolver();
+// Task 5.1: @forge/resolver@1.8.0 is a CommonJS module whose constructor
+// lives under `exports.default` (plus a `makeResolver` helper). Forge's
+// function bundler hands this file the module namespace object instead of
+// the default export, so plain `new Resolver()` threw
+// "out_namespaceObject is not a constructor" on the live install
+// (forge logs, 2026-11-05). Resolve defensively: a namespace object
+// yields its .default class; an already-resolved class passes through.
+const ResolverCtor = Resolver?.default ?? Resolver;
+if (typeof ResolverCtor !== 'function') {
+  throw new Error(
+    'Forge resolver constructor could not be resolved from @forge/resolver: expected a class under .default',
+  );
+}
+
+const resolver = new ResolverCtor();
 
 resolver.define('getStatus', () => ({
   ok: true,
@@ -36,7 +50,24 @@ resolver.define('getJiraIssues', async ({ payload }) => {
     });
 
     const status = typeof response.status === 'number' ? response.status : 500;
+    // Diagnostic only (Task 5.1 follow-up): the status number goes to
+    // Forge logs, never to the frontend. The frontend keeps its generic
+    // message by design; without this line a failing Jira request is
+    // indistinguishable from any other backend failure.
+    console.log('[atlasync] Jira search status:', status);
     if (status >= 400) {
+      // Diagnostic only (Task 5.1 follow-up): the status alone does not
+      // say why Jira rejects the request, and the 400 body carries no
+      // errorMessages array (verified 2026-11-05). Log the capped raw
+      // error body to Forge logs: an error response carries no issue
+      // data, and at most echoes our own request parameters. Never the
+      // full unbounded body, and never to the frontend.
+      try {
+        const errText = await response.text();
+        console.error('[atlasync] Jira error body:', errText ? errText.slice(0, 500) : '(empty)');
+      } catch {
+        console.error('[atlasync] Jira error body: (unreadable)');
+      }
       return { ok: false, error: mapJiraErrorStatus(status) };
     }
 
@@ -44,13 +75,17 @@ resolver.define('getJiraIssues', async ({ payload }) => {
     try {
       data = await response.json();
     } catch {
+      console.error('[atlasync] Jira search response was not JSON');
       return {
         ok: false,
         error: { kind: 'API_ERROR', message: 'Jira returned an unreadable response. Try again shortly.' },
       };
     }
     return { ok: true, issues: parseJiraSearchResponse(data) };
-  } catch {
+  } catch (error) {
+    // Log only the error class, never the message: messages can carry
+    // URLs or response fragments, and none of that may leave the server.
+    console.error('[atlasync] Jira request threw:', error instanceof Error ? error.name : typeof error);
     // Deliberately generic: the underlying error can carry URLs or
     // response fragments, and none of it may reach the frontend.
     return { ok: false, error: { kind: 'API_ERROR', message: 'Jira could not be reached. Try again shortly.' } };

@@ -15,8 +15,7 @@ type LiveState =
 // The Jira issues card: the first live surface in Atlasync.
 // Demo mode shows fixed sample issues (labeled as such). Live mode loads
 // real issues through the Forge backend — in the standalone preview that
-// correctly resolves to the "needs a Forge installation" state, never to
-// fake live data. Every other card on the dashboard stays mock.
+// resolves to a backend-unreachable state, never to fake live data. Every other card on the dashboard stays mock.
 function formatUpdated(iso: string): string {
   if (!iso) return '—';
   const date = new Date(iso);
@@ -110,13 +109,11 @@ export default function JiraIssuesCard() {
         <div>
           <div className="note-box">
             <span className={`pill ${live.error.kind === 'PERMISSION_DENIED' ? 'critical' : live.error.kind === 'RATE_LIMITED' ? 'high' : 'pending'}`}>
-              {live.error.kind === 'NOT_IN_FORGE'
-                ? 'Forge required'
-                : live.error.kind === 'PERMISSION_DENIED'
-                  ? 'Permission denied'
-                  : live.error.kind === 'RATE_LIMITED'
-                    ? 'Rate limited'
-                    : 'Could not load'}
+              {live.error.kind === 'PERMISSION_DENIED'
+                ? 'Permission denied'
+                : live.error.kind === 'RATE_LIMITED'
+                  ? 'Rate limited'
+                  : 'Could not load'}
             </span>
             <p style={{ margin: '10px 0 0' }}>{live.error.message}</p>
             {live.error.kind === 'PERMISSION_DENIED' && (

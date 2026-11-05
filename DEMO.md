@@ -63,10 +63,11 @@ issues** card toggles from **Demo data** to **Live Jira** and loads real
 issues (key, summary, status, priority, assignee, updated) through the
 Forge backend — read-only, at most 50 issues, newest first. The demo flow
 above works unchanged in the standalone preview with demo data; in Forge,
-the same card proves the live path. Live behavior has **not** been tested
-against a real Forge installation yet — that needs the owner's deploy +
-install (README, "Live Jira"). In the preview, Live correctly shows the
-**Forge required** state instead of fake live data.
+the same card proves the live path. Live behavior against a real Forge
+installation is verified (2026-11-05): after the Task 5.1 fixes, Live Jira
+returned HTTP 200 and rendered a real issues list. In
+the preview, Live shows a backend-unreachable state instead of fake live
+data.
 
 ## What live integrations are planned
 

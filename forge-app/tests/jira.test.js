@@ -156,11 +156,19 @@ describe('mapJiraErrorStatus', () => {
 });
 
 describe('buildSearchBody', () => {
-  it('requests only the small typed field set', () => {
+  it('requests only the small typed field set, referenced by key', () => {
     assert.deepEqual(buildSearchBody({ jql: 'project = ATLAS', maxResults: 10 }), {
       jql: 'project = ATLAS',
       maxResults: 10,
       fields: ['summary', 'status', 'priority', 'assignee', 'updated'],
+      fieldsByKeys: true,
     });
+  });
+});
+
+describe('DEFAULT_JQL', () => {
+  it('is bounded: a bare ORDER BY is rejected by Jira as unbounded (Task 5.1)', () => {
+    assert.match(DEFAULT_JQL, /ORDER BY updated DESC/);
+    assert.ok(!/^ORDER BY/i.test(DEFAULT_JQL.trim()), 'default JQL must have a WHERE clause');
   });
 });
