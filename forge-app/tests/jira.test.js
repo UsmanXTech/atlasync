@@ -156,11 +156,12 @@ describe('mapJiraErrorStatus', () => {
 });
 
 describe('buildSearchBody', () => {
-  it('requests only the small typed field set', () => {
+  it('requests only the small typed field set, referenced by key', () => {
     assert.deepEqual(buildSearchBody({ jql: 'project = ATLAS', maxResults: 10 }), {
       jql: 'project = ATLAS',
       maxResults: 10,
       fields: ['summary', 'status', 'priority', 'assignee', 'updated'],
+      fieldsByKeys: true,
     });
   });
 });

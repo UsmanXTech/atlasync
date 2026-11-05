@@ -44,7 +44,11 @@ export function validateJiraInput(payload) {
 }
 
 export function buildSearchBody({ jql, maxResults }) {
-  return { jql, maxResults, fields: [...JIRA_FIELDS] };
+  // fieldsByKeys is required: the new /search/jql endpoint treats `fields`
+  // entries as field IDs unless this flag is set, and our entries are keys
+  // (summary, status, ...). Without it Jira rejects the request with 400
+  // (proven by Forge logs, 2026-11-05).
+  return { jql, maxResults, fields: [...JIRA_FIELDS], fieldsByKeys: true };
 }
 
 // Normalizes one raw Jira issue to the small, typed payload the frontend
