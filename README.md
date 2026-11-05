@@ -4,7 +4,7 @@
 
 Atlasync is an Atlassian Forge app built for **Codegeist 2026**. It gives teams one synced view across every Atlassian tool they use — Jira, Confluence, Bitbucket, and Jira Service Management — so the context behind work is always in one place, instead of scattered across silos.
 
-**Status:** Development environment initialized (v0.1.0). No application features are implemented yet — this repository is a clean, minimal foundation ready for development.
+**Status:** Premium dashboard implemented on mock data (v0.2.0). No live Atlassian integrations yet — every number below comes from the sample dataset in `frontend/src/data/mock.ts`.
 
 ## Vision
 
@@ -62,7 +62,12 @@ Principles:
 ```text
 atlasync/
 ├── frontend/            # Vite + React + TypeScript (Forge Custom UI)
-│   └── src/             # App shell (no features yet)
+│   └── src/
+│       ├── components/  # Sidebar, Topbar, Card, Stat, Gauge, charts
+│       ├── views/       # Overview, Intelligence, Projects, Integrations,
+│       │                # Agents, Insights, Settings
+│       ├── data/        # types.ts + mock.ts (sample data layer)
+│       └── App.tsx      # Shell: nav, workspace, Forge bridge status
 ├── forge-app/
 │   ├── manifest.yml     # Forge app definition (placeholder id until `forge register`)
 │   └── src/index.js     # Resolver stub (getStatus only)
@@ -79,6 +84,37 @@ atlasync/
 ├── LICENSE
 └── .gitignore
 ```
+
+## Dashboard
+
+The frontend is a dark-first, premium enterprise dashboard (deep charcoal, thin borders, restrained electric-blue accents, Lucide icons, subtle animations). It is a real, interactive React UI — not a static mockup — running entirely on the mock data layer.
+
+### Views (sidebar)
+
+- **Overview** — project health, Jira issue statistics, active blockers (with working Resolve buttons), Confluence activity, Bitbucket PRs (status filters), JSM incidents, recent activity (Today/7D/30D range).
+- **Intelligence** — AI assistant panel. Ask the sample prompt *"Are we ready to release Atlas v2?"* (or the other presets, or your own text) and get a structured sample response: readiness percentage, critical blockers, risk assessment, relevant issues, suggested next actions. Every response is labeled mock data.
+- **Projects** — per-workspace project cards with health, progress, and status filters.
+- **Integrations** — per-tool connection cards with working connect/disconnect toggles and mock sync buttons.
+- **AI Agents** — agent cards with working enable/disable toggles.
+- **Insights** — weekly throughput charts (issues/docs/PRs) derived from the mock dataset.
+- **Settings** — workspace form and preference toggles (mock — nothing persists).
+
+### Interactive controls
+
+Workspace selector (filters projects, blockers, PRs, incidents, activity), global search across issues/PRs/docs/incidents, notifications with mark-all-read, and the Forge connection badge (green when connected inside Forge, "Preview mode" otherwise).
+
+### Mock data
+
+All dashboard content lives in `frontend/src/data/` (`types.ts` + `mock.ts`) and is clearly labeled **MOCK DATA** in the sidebar, the topbar badge area, and the AI panel. Stats on the Overview are derived from those arrays (workspace filters and Resolve buttons change them); only the small "vs last week" annotations are fixed display text.
+
+### Preview it
+
+```bash
+npm run dev      # dev server, then open the printed localhost URL
+npm run build && npm run preview   # production build preview
+```
+
+To see it inside Forge instead of preview mode, deploy and install the app on a dev site (see Forge section above) — the same build renders with the bridge connected.
 
 ## Development Setup
 

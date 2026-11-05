@@ -1,36 +1,38 @@
 import { useEffect, useState } from 'react';
+import Sidebar, { type ViewId } from './components/Sidebar';
+import Topbar, { type ForgeMode } from './components/Topbar';
+import Overview from './views/Overview';
+import Intelligence from './views/Intelligence';
+import Projects from './views/Projects';
+import Integrations from './views/Integrations';
+import Agents from './views/Agents';
+import Insights from './views/Insights';
+import Settings from './views/Settings';
+import { WORKSPACES } from './data/mock';
 
-// Minimal Forge-compatible app shell — scaffold only, no features yet.
-// Inside a Forge iframe it asks the backend resolver for status via the
-// bridge; outside Forge (local dev/preview) it renders a standalone note.
-
-interface ForgeStatus {
-  ok: boolean;
-  app: string;
-  version: string;
-}
-
-type Mode = 'loading' | 'forge' | 'standalone';
-
+// Atlasync dashboard shell. Navigation, workspace, and Forge-connection
+// state live here; each view renders from the mock data layer.
+// Inside a Forge iframe the bridge connects (status badge in the topbar);
+// outside Forge the same build renders in preview mode with mock data.
 export default function App() {
-  const [mode, setMode] = useState<Mode>('loading');
-  const [status, setStatus] = useState<ForgeStatus | null>(null);
+  const [view, setView] = useState<ViewId>('overview');
+  const [workspaceId, setWorkspaceId] = useState('hq');
+  const [forgeMode, setForgeMode] = useState<ForgeMode>('loading');
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const workspace = WORKSPACES.find((w) => w.id === workspaceId) ?? WORKSPACES[0];
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        // @forge/bridge only works inside a Forge iframe. A static import
-        // would break the app outside Forge, so it is loaded dynamically.
+        // Dynamic import: @forge/bridge only works inside a Forge iframe.
+        // A static import would break the app outside Forge.
         const { invoke } = await import('@forge/bridge');
-        const result = (await invoke('getStatus')) as ForgeStatus;
-        if (!cancelled) {
-          setStatus(result);
-          setMode('forge');
-        }
+        await invoke('getStatus');
+        if (!cancelled) setForgeMode('forge');
       } catch {
-        // Not running inside Forge (local dev/preview): standalone mode.
-        if (!cancelled) setMode('standalone');
+        if (!cancelled) setForgeMode('standalone');
       }
     })();
     return () => {
@@ -39,25 +41,24 @@ export default function App() {
   }, []);
 
   return (
-    <main className="shell">
-      <header>
-        <h1>Atlasync</h1>
-        <p>Every Atlassian Tool, One Sync</p>
-      </header>
-      <section>
-        {mode === 'loading' && <p>Connecting…</p>}
-        {mode === 'forge' && status && (
-          <p>
-            Forge connected — {status.app} v{status.version}.
-          </p>
-        )}
-        {mode === 'standalone' && (
-          <p>Standalone preview — Forge bridge unavailable (expected outside Forge).</p>
-        )}
-      </section>
-      <footer>
-        <p>Built for Codegeist 2026 · Build with context. Ship with confidence.</p>
-      </footer>
-    </main>
+    <div className="app">
+      <Sidebar view={view} onNavigate={setView} open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <div className="main">
+        <Topbar
+          workspaces={WORKSPACES}
+          workspace={workspace}
+          onWorkspace={setWorkspaceId}
+          forgeMode={forgeMode}
+          onMenu={() => setMenuOpen(true)}
+        />
+        {view === 'overview' && <Overview workspaceId={workspace.id} onNavigate={setView} />}
+        {view === 'intelligence' && <Intelligence />}
+        {view === 'projects' && <Projects workspaceId={workspace.id} />}
+        {view === 'integrations' && <Integrations />}
+        {view === 'agents' && <Agents />}
+        {view === 'insights' && <Insights />}
+        {view === 'settings' && <Settings workspace={workspace} />}
+      </div>
+    </div>
   );
 }
