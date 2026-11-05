@@ -1,6 +1,6 @@
 # Forge app definition for Atlasync.
-# NOTE: app.id is a placeholder. `forge register` overwrites it with a real
-# ARI — never invent a real app id by hand.
+# app.id is the registered Forge app id (assigned by `forge register`).
+# Never invent or hand-edit a real app id.
 modules:
   jira:projectPage:
     - key: atlasync-project-page
@@ -20,6 +20,6 @@ permissions:
     - read:jira-work
     - storage:app
 app:
-  id: ari:cloud:ecosystem::app/atlasync-placeholder
+  id: ari:cloud:ecosystem::app/63accaf9-e952-4554-af92-27b5b1b5d56d
   runtime:
     name: nodejs24.x
