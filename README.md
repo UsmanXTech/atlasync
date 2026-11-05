@@ -10,7 +10,7 @@
 
 Atlasync is an Atlassian Forge app built for **Codegeist 2026**. It gives teams one synced view across every Atlassian tool they use — Jira, Confluence, Bitbucket, and Jira Service Management — so the context behind work is always in one place, instead of scattered across silos.
 
-**Status:** Premium dashboard implemented on mock data (v0.2.0). No live Atlassian integrations yet — every number below comes from the sample dataset in `frontend/src/data/mock.ts`.
+**Status:** Premium dashboard on mock data (v0.2.0) + first live slice: read-only Jira issues inside Forge installs. Everything else still comes from the sample dataset in `frontend/src/data/mock.ts`.
 
 ## Vision
 
@@ -76,7 +76,7 @@ atlasync/
 │       └── App.tsx      # Shell: nav, workspace, Forge bridge status
 ├── forge-app/
 │   ├── manifest.yml     # Forge app definition (placeholder id until `forge register`)
-│   └── src/index.js     # Resolver stub (getStatus only)
+│   └── src/index.js     # Resolver (getStatus + read-only getJiraIssues)
 ├── integrations/        # One adapter per Atlassian tool (planned)
 │   ├── jira/
 │   ├── confluence/
@@ -93,11 +93,11 @@ atlasync/
 
 ## Dashboard
 
-The frontend is a dark-first, premium enterprise dashboard (deep charcoal, thin borders, restrained electric-blue accents, Lucide icons, subtle animations). It is a real, interactive React UI — not a static mockup — running entirely on the mock data layer.
+The frontend is a dark-first, premium enterprise dashboard (deep charcoal, thin borders, restrained electric-blue accents, Lucide icons, subtle animations). It is a real, interactive React UI — not a static mockup — running on the mock data layer, with the first live slice (read-only Jira issues) available inside a Forge installation — see Live Jira below.
 
 ### Views (sidebar)
 
-- **Overview** — project health, Jira issue statistics, active blockers (with working Resolve buttons), Confluence activity, Bitbucket PRs (status filters), JSM incidents, recent activity (Today/7D/30D range).
+- **Overview** — project health, Jira issue statistics, active blockers (with working Resolve buttons), Confluence activity, Bitbucket PRs (status filters), JSM incidents, recent activity (Today/7D/30D range), plus the Jira issues card with a Demo data / Live Jira toggle.
 - **Intelligence** — AI assistant panel. Ask the sample prompt *"Are we ready to release Atlas v2?"* (or the other presets, or your own text) and get a structured sample response: readiness percentage, critical blockers, risk assessment, relevant issues, suggested next actions. Every response is labeled mock data.
 - **Projects** — per-workspace project cards with health, progress, and status filters.
 - **Integrations** — per-tool connection cards with working connect/disconnect toggles and mock sync buttons.
@@ -120,7 +120,52 @@ npm run dev      # dev server, then open the printed localhost URL
 npm run build && npm run preview   # production build preview
 ```
 
-To see it inside Forge instead of preview mode, deploy and install the app on a dev site (see Forge section above) — the same build renders with the bridge connected.
+To see it inside Forge instead of preview mode, deploy and install the app on a dev site (see Live Jira below) — the same build renders with the bridge connected.
+
+## Live Jira (read-only)
+
+The first real integration: the Overview **Jira issues** card can load actual Jira issues through the Forge backend. This is the first vertical slice — Forge authentication → Jira API → resolver → frontend → real issue data.
+
+### Deploy and install
+
+These steps need the owner's Atlassian account and a free developer site:
+
+```bash
+npm install -g @forge/cli@latest
+forge login
+cd forge-app
+forge register      # replaces the placeholder app id in manifest.yml
+npm run build       # build the frontend first (from the repo root)
+forge deploy
+forge install       # pick your dev site and the Jira product
+```
+
+### Required permissions
+
+- **App scope (already in the manifest, no new scopes):** `read:jira-work`.
+- **User permission (enforced by Jira itself):** the signed-in user needs **Browse Projects** permission on the Jira projects being read, plus a Jira license on the site. Calls run via `asUser()`, so Jira enforces that user's own access — the app never sees projects the user cannot see.
+- **No writes, no tokens:** the integration is read-only, requests at most 50 issues (default 25, newest first), and no credential ever enters the codebase — Forge holds the authentication.
+
+### How to enable live mode
+
+In a Forge-installed app, open **Overview → Jira issues** and switch the toggle from **Demo data** to **Live Jira**. It loads automatically; **Refresh** re-loads, **Back to demo data** returns to samples. In the standalone preview the same toggle shows the expected **Forge required** state — that is correct behavior, not an app error.
+
+### What is live vs mock
+
+| Surface | Data |
+|---|---|
+| Jira issues card, Live mode | **Live** — key, summary, status, priority, assignee, updated timestamp, via the `getJiraIssues` resolver |
+| Jira aggregates, blockers, Confluence, Bitbucket, JSM, AI answers, Insights, agents, integration sync states | **Mock** — sample data from `frontend/src/data/mock.ts`, labeled as such |
+
+Mock Bitbucket, Confluence, and JSM records are never labeled live.
+
+### Limitations and troubleshooting
+
+- **Live behavior has NOT been tested against a real Forge installation yet** — the preview verifies demo mode and every error state, but a live Jira response needs the owner's deploy + install (above).
+- **Permission denied** in Live mode → the signed-in user lacks Browse Projects permission; ask the Jira admin, or check the site's project permissions.
+- **Rate limited** → Jira throttled the request; wait a moment and press **Retry** (no automatic retry loop).
+- **Forge required** in the preview → expected: the app is running standalone, not inside Forge.
+- Custom JQL is supported by the resolver (`getJiraIssues` accepts an optional `jql`, max 500 chars) but is not exposed in the UI yet; the UI uses the default query (recently updated, newest first).
 
 ## Development Setup
 
@@ -155,7 +200,7 @@ The frontend builds with relative asset paths (`base: './'` in `vite.config.ts`)
 
 ### How the frontend talks to Forge
 
-The app shell calls the backend resolver through `@forge/bridge`'s `invoke` (currently `getStatus` only). Two rules from the official Forge docs, both followed here:
+The app shell calls the backend resolver through `@forge/bridge`'s `invoke` (currently `getStatus` for the connection check and `getJiraIssues` for live Jira issues). Two rules from the official Forge docs, both followed here:
 
 1. **Bridge import is dynamic** (`await import('@forge/bridge')` inside an effect). A static import would break the app outside a Forge iframe; dynamic loading lets the same build render a standalone preview locally and the real connected view inside Forge.
 2. **No direct Atlassian API calls from the frontend.** All Atlassian access goes through the Forge resolver backend, which holds the permissions.
@@ -185,7 +230,7 @@ Run these before committing:
 npm install        # dependencies resolve
 npm run dev        # dev server answers (smoke-check the root URL)
 npm run build      # tsc type-check + Vite production build
-npm test           # resolver structure check (defines getStatus, exports handler)
+npm test           # resolver structure check (defines getStatus + getJiraIssues, exports handler) + Jira unit tests
 forge lint         # manifest schema check (stops at "Not logged in" without an Atlassian login — expected)
 ```
 
@@ -208,7 +253,7 @@ forge lint         # manifest schema check (stops at "Not logged in" without an 
 | `npm run dev` | Start the frontend Vite dev server |
 | `npm run build` | Type-check and build the frontend (output: `forge-app/static/atlasync`) |
 | `npm run preview` | Serve the production build locally |
-| `npm test` | Resolver structure check (defines `getStatus`, exports handler) |
+| `npm test` | Resolver structure check (defines `getStatus` + `getJiraIssues`, exports handler) + Jira unit tests |
 
 ## Codegeist 2026
 

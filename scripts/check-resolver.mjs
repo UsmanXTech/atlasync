@@ -26,8 +26,13 @@ assert.match(
 );
 assert.match(
   source,
+  /define\('getJiraIssues'/,
+  "resolver must define a 'getJiraIssues' function",
+);
+assert.match(
+  source,
   /export const handler = resolver\.getDefinitions\(\)/,
   'resolver must export handler via getDefinitions()',
 );
 
-console.log('resolver check passed: getStatus defined, handler exported');
+console.log('resolver check passed: getStatus + getJiraIssues defined, handler exported');

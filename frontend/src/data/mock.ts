@@ -12,6 +12,7 @@ import type {
   InsightPoint,
   Integration,
   IssueBucket,
+  LiveIssue,
   NotificationItem,
   Project,
   PullRequest,
@@ -176,4 +177,15 @@ export const INSIGHTS_WEEKLY: InsightPoint[] = [
   { label: 'W4', issues: 63, docs: 29, prs: 14 },
   { label: 'W5', issues: 47, docs: 26, prs: 11 },
   { label: 'W6', issues: 58, docs: 31, prs: 13 },
+];
+
+// Sample issues for the Jira card's Demo mode. Same shape as the live
+// payload, same Atlas story — but fixed sample data, never presented
+// as live. The live list replaces this only inside a Forge installation.
+export const SAMPLE_JIRA_ISSUES: LiveIssue[] = [
+  { key: 'ATLAS-482', summary: 'Checkout timeout under load', status: 'In Progress', priority: 'Highest', assignee: 'Sara Khan', updated: '2026-11-05T07:00:00.000+0500' },
+  { key: 'ATLAS-491', summary: 'Cart totals refactor blocked on API contract', status: 'To Do', priority: 'High', assignee: 'Omar Farooq', updated: '2026-11-04T15:30:00.000+0500' },
+  { key: 'SYNC-77', summary: 'Retry logic for payment webhook', status: 'In Review', priority: 'Medium', assignee: 'Omar Farooq', updated: '2026-11-04T11:20:00.000+0500' },
+  { key: 'MOB-118', summary: 'Push gateway certificate expiry', status: 'To Do', priority: 'Highest', assignee: 'Ali Raza', updated: '2026-11-03T09:45:00.000+0500' },
+  { key: 'MOB-121', summary: 'Offline sync conflict resolution', status: 'In Progress', priority: 'Medium', assignee: null, updated: '2026-11-02T17:10:00.000+0500' },
 ];
