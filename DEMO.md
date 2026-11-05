@@ -46,17 +46,31 @@ a single decision. A generic dashboard tour hides that; this question shows it.
 
 ## What is currently mocked
 
-- All projects, issues, blockers, docs, PRs, incidents, and activity
+- All projects, blockers, docs, PRs, incidents, and activity
   (`frontend/src/data/mock.ts`).
+- Jira issues everywhere **except** the Overview Jira card's Live mode
+  (see below) — the aggregates, blockers, and AI answers still use samples.
 - All AI answers, including the Atlas v2 verdict — fixed sample responses,
   labeled "Sample response · Mock data". No AI service is called.
 - Integration "Demo connected" states, sync timestamps, and item counts.
 - Workspace switching, search, filters, toggles, and Resolve — real UI
   state over the mock dataset.
 
+## Live Jira (Forge only)
+
+The first live slice: in a Forge-installed app, the Overview **Jira
+issues** card toggles from **Demo data** to **Live Jira** and loads real
+issues (key, summary, status, priority, assignee, updated) through the
+Forge backend — read-only, at most 50 issues, newest first. The demo flow
+above works unchanged in the standalone preview with demo data; in Forge,
+the same card proves the live path. Live behavior has **not** been tested
+against a real Forge installation yet — that needs the owner's deploy +
+install (README, "Live Jira"). In the preview, Live correctly shows the
+**Forge required** state instead of fake live data.
+
 ## What live integrations are planned
 
-1. **Jira** (read) — issues, sprints, releases; per-issue blocker graph.
+1. **Jira** (read) — issues list is **live in Forge installs** (this slice); next: sprints, releases, per-issue blocker graph.
 2. **Bitbucket** (read) — PRs, reviewers, build statuses.
 3. **Confluence** (read) — spaces, pages, recent edits linked to issues.
 4. **JSM** (read) — incidents, severity, service health.
@@ -67,9 +81,14 @@ a single decision. A generic dashboard tour hides that; this question shows it.
 
 ## Known limitations
 
-- No live Atlassian data: deploy needs an Atlassian login and dev site
+- Live data is Jira issues only, and only inside a Forge installation:
+  deploy needs an Atlassian login and dev site
   (`forge login → register → deploy → install`).
-- The resolver exposes `getStatus` only; no sync reads yet.
+- The resolver exposes `getStatus` + read-only `getJiraIssues`; no sync
+  reads, no other tools, and no writes yet.
+- Live Jira behavior has NOT been tested against a real Forge install —
+  the preview verifies demo mode and every error state, not a live Jira
+  response.
 - `npm test` checks the resolver's structure, not live Forge execution
   (the official `new Resolver()` pattern resolves differently in plain Node).
 - Search is hidden below 640px width (mobile keeps nav + actions only).

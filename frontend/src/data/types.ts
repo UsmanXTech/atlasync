@@ -141,3 +141,16 @@ export interface InsightPoint {
   docs: number;
   prs: number;
 }
+
+// A live Jira issue as returned by the Forge resolver — the small, typed
+// payload the backend normalizes from the Jira REST response. Nullable
+// fields stay explicit nulls so the UI can render "Unassigned" /
+// "No priority" instead of guessing.
+export interface LiveIssue {
+  key: string;
+  summary: string;
+  status: string;
+  priority: string | null;
+  assignee: string | null;
+  updated: string;
+}

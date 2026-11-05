@@ -1,1 +1,1 @@
-{"dependencies":{"@forge/resolver":"^1.6.0"},"name":"atlasync-forge","private":true,"type":"module","version":"0.1.0"}
+{"dependencies":{"@forge/api":"^8.4.0","@forge/resolver":"^1.6.0"},"name":"atlasync-forge","private":true,"type":"module","version":"0.1.0"}

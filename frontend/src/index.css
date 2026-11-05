@@ -656,6 +656,47 @@ button { cursor: pointer; }
 .setting-row small { color: var(--muted); font-size: 0.78rem; }
 .saved-note { font-size: 0.82rem; color: var(--green); }
 
+/* ---------- Jira issues card ---------- */
+
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-2);
+  flex-shrink: 0;
+}
+.segmented button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.segmented button.active { background: var(--blue-soft); color: #fff; }
+
+.issue-key {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.note-box {
+  padding: 13px 14px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.row-actions { display: flex; gap: 8px; margin-top: 14px; }
+
 /* ---------- Responsive ---------- */
 
 .only-mobile { display: none; }

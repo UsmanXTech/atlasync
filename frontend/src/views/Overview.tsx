@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import Card from '../components/Card';
 import Gauge from '../components/Gauge';
+import JiraIssuesCard from '../components/JiraIssuesCard';
 import Stat from '../components/Stat';
 import { BarList } from '../components/Bars';
 import {
@@ -160,6 +161,10 @@ export default function Overview({ workspaceId, onNavigate }: OverviewProps) {
             ))}
           </div>
         </Card>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <JiraIssuesCard />
       </div>
 
       <div className="grid-3">
