@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Card from '../components/Card';
 import type { Workspace } from '../data/types';
 
@@ -10,8 +10,18 @@ export default function Settings({ workspace }: { workspace: Workspace }) {
   const [toggles, setToggles] = useState(DEFAULTS);
   const [saved, setSaved] = useState(false);
 
+  // Settings is mounted across workspace switches. Reinitialize the demo form
+  // when its workspace changes so the name/preferences never leak between
+  // workspaces and the visible form matches the selected workspace.
+  useEffect(() => {
+    setName(workspace.name);
+    setTimezone('Asia/Karachi');
+    setToggles(DEFAULTS);
+    setSaved(false);
+  }, [workspace.id, workspace.name]);
+
   const flip = (key: keyof typeof DEFAULTS) => {
-    setToggles({ ...toggles, [key]: !toggles[key] });
+    setToggles((current) => ({ ...current, [key]: !current[key] }));
     setSaved(false);
   };
 
