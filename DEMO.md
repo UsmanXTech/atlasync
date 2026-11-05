@@ -64,8 +64,8 @@ issues (key, summary, status, priority, assignee, updated) through the
 Forge backend — read-only, at most 50 issues, newest first. The demo flow
 above works unchanged in the standalone preview with demo data; in Forge,
 the same card proves the live path. Live behavior against a real Forge
-installation is not yet verified working — the first live test (2026-11-05)
-exposed a resolver crash fixed in Task 5.1; see README ("Live Jira"). In
+installation is verified (2026-11-05): after the Task 5.1 fixes, Live Jira
+returned HTTP 200 and rendered a real issues list. In
 the preview, Live shows a backend-unreachable state instead of fake live
 data.
 
