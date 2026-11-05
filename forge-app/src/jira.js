@@ -4,7 +4,12 @@
 // here ever sees a token, and no error message below includes response
 // details from Jira.
 
-export const DEFAULT_JQL = 'ORDER BY updated DESC';
+// Bounded by design: Jira's new /search/jql endpoint rejects unbounded
+// queries ("Unbounded JQL queries are not allowed here") — a bare
+// ORDER BY with no WHERE clause returns 400 (proven by Forge logs,
+// 2026-11-05). The 30-day window also matches the card's "recently
+// updated, newest first" purpose.
+export const DEFAULT_JQL = 'updated >= -30d ORDER BY updated DESC';
 export const DEFAULT_MAX_RESULTS = 25;
 export const MAX_MAX_RESULTS = 50;
 export const JIRA_FIELDS = ['summary', 'status', 'priority', 'assignee', 'updated'];
