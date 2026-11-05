@@ -56,6 +56,20 @@ resolver.define('getJiraIssues', async ({ payload }) => {
     // indistinguishable from any other backend failure.
     console.log('[atlasync] Jira search status:', status);
     if (status >= 400) {
+      // Diagnostic only (Task 5.1 follow-up): Jira's error body carries
+      // errorMessages naming the invalid part of our request. Log only
+      // that string array (capped) to Forge logs — never the full body,
+      // which could carry more than validation feedback, and never to
+      // the frontend.
+      try {
+        const errData = await response.json();
+        if (errData && Array.isArray(errData.errorMessages)) {
+          const messages = errData.errorMessages.filter((m) => typeof m === 'string').slice(0, 3);
+          if (messages.length > 0) console.error('[atlasync] Jira errorMessages:', messages.join(' | '));
+        }
+      } catch {
+        // Non-JSON error body: nothing further to report.
+      }
       return { ok: false, error: mapJiraErrorStatus(status) };
     }
 
