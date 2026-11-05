@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Bell,
@@ -21,6 +21,7 @@ import {
   PULL_REQUESTS,
 } from '../data/mock';
 import type { Workspace } from '../data/types';
+import type { ViewId } from './Sidebar';
 
 export type ForgeMode = 'loading' | 'forge' | 'standalone';
 
@@ -35,6 +36,7 @@ interface TopbarProps {
   workspaces: Workspace[];
   workspace: Workspace;
   onWorkspace: (id: string) => void;
+  onNavigate: (view: ViewId) => void;
   forgeMode: ForgeMode;
   onMenu: () => void;
 }
@@ -47,12 +49,25 @@ const KIND_ICONS: Record<string, typeof CircleDot> = {
   Incident: AlertTriangle,
 };
 
-export default function Topbar({ workspaces, workspace, onWorkspace, forgeMode, onMenu }: TopbarProps) {
+export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate, forgeMode, onMenu }: TopbarProps) {
   const [query, setQuery] = useState('');
   const [searchFocus, setSearchFocus] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notes, setNotes] = useState(NOTIFICATIONS);
+
+  // Escape closes any open dropdown — keyboard users are never trapped.
+  useEffect(() => {
+    if (!notifOpen && !profileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setNotifOpen(false);
+        setProfileOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [notifOpen, profileOpen]);
 
   const unread = notes.filter((n) => n.unread).length;
 
@@ -125,6 +140,9 @@ export default function Topbar({ workspaces, workspace, onWorkspace, forgeMode, 
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setSearchFocus(true)}
           onBlur={() => window.setTimeout(() => setSearchFocus(false), 150)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setQuery('');
+          }}
           placeholder="Search issues, PRs, docs, incidents…"
           aria-label="Global search"
         />
@@ -137,8 +155,19 @@ export default function Topbar({ workspaces, workspace, onWorkspace, forgeMode, 
             ) : (
               results.map((r) => {
                 const Icon = KIND_ICONS[r.kind] ?? CircleDot;
+                // Search results navigate to the view that shows the item —
+                // a result row must never be a dead click.
+                const target: ViewId = r.kind === 'Project' ? 'projects' : 'overview';
                 return (
-                  <button key={r.id} className="drop-row" onMouseDown={(e) => e.preventDefault()}>
+                  <button
+                    key={r.id}
+                    className="drop-row"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      onNavigate(target);
+                      setQuery('');
+                    }}
+                  >
                     <Icon size={15} />
                     <span>
                       <strong>{r.title}</strong>

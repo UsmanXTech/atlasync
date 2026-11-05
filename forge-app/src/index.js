@@ -10,7 +10,7 @@ const resolver = new Resolver();
 resolver.define('getStatus', () => ({
   ok: true,
   app: 'atlasync',
-  version: '0.1.0',
+  version: '0.2.0',
 }));
 
 export const handler = resolver.getDefinitions();

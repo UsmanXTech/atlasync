@@ -34,16 +34,18 @@ export default function Integrations() {
           <Card key={t.id} className="tool-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
               <h3>{t.tool}</h3>
+              {/* "Demo connected" on purpose: these tools are mocked. A bare
+                  "Connected" would imply a live Atlassian connection. */}
               <span className={`pill ${t.connected ? 'healthy' : 'blocked'}`}>
-                {t.connected ? 'Connected' : 'Disconnected'}
+                {t.connected ? 'Demo connected' : 'Not connected'}
               </span>
             </div>
             <p>{t.note}</p>
             <div style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>
-              Last sync: {syncing.includes(t.id) ? 'Syncing…' : t.lastSync} · {t.itemsSynced.toLocaleString()} items
+              Demo sync: {syncing.includes(t.id) ? 'Syncing…' : t.lastSync} · {t.itemsSynced.toLocaleString()} sample items
             </div>
             <div className="tool-foot">
-              <span>{t.connected ? 'Auto-sync daily' : 'Connect to start syncing'}</span>
+              <span>{t.connected ? 'Demo auto-sync daily' : 'Connect for demo sync'}</span>
               <span style={{ display: 'flex', gap: 8 }}>
                 <button className="btn btn-small" disabled={!t.connected || syncing.includes(t.id)} onClick={() => sync(t.id)}>
                   <RefreshCw size={13} /> {syncing.includes(t.id) ? 'Syncing…' : 'Sync now'}

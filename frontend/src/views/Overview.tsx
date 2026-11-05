@@ -76,7 +76,7 @@ export default function Overview({ workspaceId, onNavigate }: OverviewProps) {
     <div className="view">
       <div className="view-head">
         <h2>Overview</h2>
-        <p>Synced state across Jira, Confluence, Bitbucket, and JSM — sample data.</p>
+        <p>Sample synced state across Jira, Confluence, Bitbucket, and JSM.</p>
       </div>
 
       <div className="stat-grid">

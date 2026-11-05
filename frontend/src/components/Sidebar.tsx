@@ -58,6 +58,7 @@ export default function Sidebar({ view, onNavigate, open, onClose }: SidebarProp
             <button
               key={item.id}
               className={`nav-item ${view === item.id ? 'active' : ''}`}
+              aria-current={view === item.id ? 'page' : undefined}
               onClick={() => {
                 onNavigate(item.id);
                 onClose();

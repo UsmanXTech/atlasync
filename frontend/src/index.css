@@ -38,6 +38,30 @@ body {
 button, input, select { font: inherit; }
 button { cursor: pointer; }
 
+/* Visible keyboard focus everywhere — dark surfaces must not swallow it. */
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Skip link: hidden until a keyboard user tabs to it. */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 100;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 0.15s;
+}
+.skip-link:focus { top: 12px; }
+
 /* ---------- App shell ---------- */
 
 .app {

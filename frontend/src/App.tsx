@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Sidebar, { type ViewId } from './components/Sidebar';
 import Topbar, { type ForgeMode } from './components/Topbar';
+import ErrorBoundary from './components/ErrorBoundary';
 import Overview from './views/Overview';
 import Intelligence from './views/Intelligence';
 import Projects from './views/Projects';
@@ -42,22 +43,30 @@ export default function App() {
 
   return (
     <div className="app">
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
       <Sidebar view={view} onNavigate={setView} open={menuOpen} onClose={() => setMenuOpen(false)} />
       <div className="main">
         <Topbar
           workspaces={WORKSPACES}
           workspace={workspace}
           onWorkspace={setWorkspaceId}
+          onNavigate={setView}
           forgeMode={forgeMode}
           onMenu={() => setMenuOpen(true)}
         />
-        {view === 'overview' && <Overview workspaceId={workspace.id} onNavigate={setView} />}
-        {view === 'intelligence' && <Intelligence />}
-        {view === 'projects' && <Projects workspaceId={workspace.id} />}
-        {view === 'integrations' && <Integrations />}
-        {view === 'agents' && <Agents />}
-        {view === 'insights' && <Insights />}
-        {view === 'settings' && <Settings workspace={workspace} />}
+        <main id="main-content" tabIndex={-1}>
+          <ErrorBoundary key={view}>
+            {view === 'overview' && <Overview workspaceId={workspace.id} onNavigate={setView} />}
+            {view === 'intelligence' && <Intelligence />}
+            {view === 'projects' && <Projects workspaceId={workspace.id} />}
+            {view === 'integrations' && <Integrations />}
+            {view === 'agents' && <Agents />}
+            {view === 'insights' && <Insights />}
+            {view === 'settings' && <Settings workspace={workspace} />}
+          </ErrorBoundary>
+        </main>
       </div>
     </div>
   );

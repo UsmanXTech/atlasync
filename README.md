@@ -1,6 +1,12 @@
 # Atlasync — Every Atlassian Tool, One Sync
 
+![CI](https://github.com/UsmanXTech/atlasync/actions/workflows/ci.yml/badge.svg)
+
 > Build with context. Ship with confidence.
+
+> Demo guide for judges and reviewers: [DEMO.md](./DEMO.md) — the 60–90
+> second flow, the "Are we ready to release Atlas v2?" scenario, what is
+> mocked, and what live integrations are planned.
 
 Atlasync is an Atlassian Forge app built for **Codegeist 2026**. It gives teams one synced view across every Atlassian tool they use — Jira, Confluence, Bitbucket, and Jira Service Management — so the context behind work is always in one place, instead of scattered across silos.
 
