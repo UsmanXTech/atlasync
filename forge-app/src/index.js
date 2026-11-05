@@ -16,7 +16,21 @@ import {
 // never touches the Jira REST API directly, and no token or credential
 // ever enters this codebase — Forge holds the auth.
 
-const resolver = new Resolver();
+// Task 5.1: @forge/resolver@1.8.0 is a CommonJS module whose constructor
+// lives under `exports.default` (plus a `makeResolver` helper). Forge's
+// function bundler hands this file the module namespace object instead of
+// the default export, so plain `new Resolver()` threw
+// "out_namespaceObject is not a constructor" on the live install
+// (forge logs, 2026-11-05). Resolve defensively: a namespace object
+// yields its .default class; an already-resolved class passes through.
+const ResolverCtor = Resolver?.default ?? Resolver;
+if (typeof ResolverCtor !== 'function') {
+  throw new Error(
+    'Forge resolver constructor could not be resolved from @forge/resolver: expected a class under .default',
+  );
+}
+
+const resolver = new ResolverCtor();
 
 resolver.define('getStatus', () => ({
   ok: true,

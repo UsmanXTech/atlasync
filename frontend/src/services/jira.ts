@@ -8,11 +8,13 @@ import type { LiveIssue } from '../data/types';
 //
 // Error model: the resolver returns { ok: false } payloads for API-level
 // failures (permission denied, rate limited, ...). A failure at the
-// bridge stage itself means the app is not running inside a Forge iframe
-// — i.e. the standalone preview — and maps to NOT_IN_FORGE.
+// bridge stage itself means the Forge backend could not be reached:
+// in the standalone preview there is no backend, and on a real install
+// it means the resolver failed. It must never be reported as a missing
+// installation — that message misled a real live test (Task 5.1).
 
 export type JiraErrorKind =
-  | 'NOT_IN_FORGE'
+  | 'BACKEND_UNREACHABLE'
   | 'PERMISSION_DENIED'
   | 'RATE_LIMITED'
   | 'API_ERROR'
@@ -27,10 +29,9 @@ export type JiraIssuesResult =
   | { ok: true; issues: LiveIssue[] }
   | { ok: false; error: JiraError };
 
-const NOT_IN_FORGE: JiraError = {
-  kind: 'NOT_IN_FORGE',
-  message:
-    'Live Jira needs a Forge installation. This preview runs standalone — install the app on an Atlassian site to load real issues.',
+const BACKEND_UNREACHABLE: JiraError = {
+  kind: 'BACKEND_UNREACHABLE',
+  message: 'Live Jira could not reach the Forge backend. Try again shortly.',
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -90,7 +91,7 @@ export async function fetchLiveJiraIssues(maxResults = 25): Promise<JiraIssuesRe
     if (
       isRecord(result.error) &&
       typeof result.error.kind === 'string' &&
-      (['NOT_IN_FORGE', 'PERMISSION_DENIED', 'RATE_LIMITED', 'API_ERROR', 'INVALID_INPUT'] as const).includes(
+      (['BACKEND_UNREACHABLE', 'PERMISSION_DENIED', 'RATE_LIMITED', 'API_ERROR', 'INVALID_INPUT'] as const).includes(
         result.error.kind as JiraErrorKind,
       ) &&
       typeof result.error.message === 'string'
@@ -105,6 +106,6 @@ export async function fetchLiveJiraIssues(maxResults = 25): Promise<JiraIssuesRe
       error: { kind: 'API_ERROR', message: 'Jira could not be reached. Try again shortly.' },
     };
   } catch {
-    return { ok: false, error: NOT_IN_FORGE };
+    return { ok: false, error: BACKEND_UNREACHABLE };
   }
 }

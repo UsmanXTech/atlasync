@@ -148,7 +148,8 @@ forge install       # pick your dev site and the Jira product
 
 ### How to enable live mode
 
-In a Forge-installed app, open **Overview → Jira issues** and switch the toggle from **Demo data** to **Live Jira**. It loads automatically; **Refresh** re-loads, **Back to demo data** returns to samples. In the standalone preview the same toggle shows the expected **Forge required** state — that is correct behavior, not an app error.
+In a Forge-installed app, open **Overview → Jira issues** and switch the toggle from **Demo data** to **Live Jira**. It loads automatically; **Refresh** re-loads, **Back to demo data** returns to samples. In the standalone preview the same toggle shows a
+backend-unreachable state — that is correct behavior, not an app error.
 
 ### What is live vs mock
 
@@ -164,7 +165,7 @@ Mock Bitbucket, Confluence, and JSM records are never labeled live.
 - **Live behavior has NOT been tested against a real Forge installation yet** — the preview verifies demo mode and every error state, but a live Jira response needs the owner's deploy + install (above).
 - **Permission denied** in Live mode → the signed-in user lacks Browse Projects permission; ask the Jira admin, or check the site's project permissions.
 - **Rate limited** → Jira throttled the request; wait a moment and press **Retry** (no automatic retry loop).
-- **Forge required** in the preview → expected: the app is running standalone, not inside Forge.
+- **Could not load** (backend unreachable) in the preview → expected: the app is running standalone, not inside Forge.
 - Custom JQL is supported by the resolver (`getJiraIssues` accepts an optional `jql`, max 500 chars) but is not exposed in the UI yet; the UI uses the default query (recently updated, newest first).
 
 ## Development Setup
