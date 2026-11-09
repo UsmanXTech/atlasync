@@ -10,6 +10,7 @@ import Agents from './views/Agents';
 import Insights from './views/Insights';
 import Settings from './views/Settings';
 import { WORKSPACES } from './data/mock';
+import { useIntelligenceConversation } from './hooks/useIntelligenceConversation';
 
 // Atlasync application shell: persistent navigation and a viewport-fitted content region.
 // Live views retain their own loading, empty, and error states.
@@ -18,6 +19,9 @@ export default function App() {
   const [workspaceId, setWorkspaceId] = useState('hq');
   const [forgeMode, setForgeMode] = useState<ForgeMode>('loading');
   const [menuOpen, setMenuOpen] = useState(false);
+  // Lives above the view switch: the Intelligence answer must survive
+  // navigating away and back (the view unmounts on switch).
+  const intelligence = useIntelligenceConversation();
 
   const workspace = WORKSPACES.find((w) => w.id === workspaceId) ?? WORKSPACES[0];
 
@@ -57,7 +61,7 @@ export default function App() {
         <main id="main-content" tabIndex={-1}>
           <ErrorBoundary key={view}>
             {view === 'overview' && <Overview workspaceId={workspace.id} onNavigate={setView} />}
-            {view === 'intelligence' && <Intelligence />}
+            {view === 'intelligence' && <Intelligence conversation={intelligence} />}
             {view === 'projects' && <Projects />}
             {view === 'integrations' && <Integrations />}
             {view === 'agents' && <Agents onNavigate={setView} />}
