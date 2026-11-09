@@ -1,6 +1,5 @@
 import Resolver from '@forge/resolver';
 import api, { route } from '@forge/api';
-import { chat } from '@forge/llm';
 import {
   buildSearchBody,
   mapJiraErrorStatus,
@@ -236,6 +235,9 @@ resolver.define('askAtlasync', async ({ payload }) => {
     unavailableSources: [...new Set(sourceErrors)],
   };
   try {
+    // Load the Forge-only SDK lazily so plain Node unit tests can import
+    // the resolver without a Forge invocation runtime.
+    const { chat } = await import('@forge/llm');
     const response = await chat({
       model: 'claude-sonnet-5',
       max_completion_tokens: 1200,
