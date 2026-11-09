@@ -148,6 +148,9 @@ export interface InsightPoint {
 // "No priority" instead of guessing.
 export interface LiveIssue {
   key: string;
+  // Numeric Jira issue id (Task 6, Architecture A): the dev-status
+  // endpoint needs it; null for sample issues, which never call it.
+  id: string | null;
   summary: string;
   status: string;
   priority: string | null;

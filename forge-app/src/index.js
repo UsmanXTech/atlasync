@@ -6,6 +6,7 @@ import {
   parseJiraSearchResponse,
   validateJiraInput,
 } from './jira.js';
+import { parseDevStatusResponse, validateDevStatusInput } from './devstatus.js';
 
 // Atlasync Forge resolver.
 //
@@ -91,5 +92,54 @@ resolver.define('getJiraIssues', async ({ payload }) => {
     return { ok: false, error: { kind: 'API_ERROR', message: 'Jira could not be reached. Try again shortly.' } };
   }
 });
+
+// Task 6, Architecture A: read-only linked pull requests for one issue
+// through the Jira Development Status API — no Bitbucket scope, no
+// manifest change, no install change. The endpoint only returns PRs
+// when a Bitbucket workspace is linked to this Jira site through DVCS
+// and the PR references the issue key; until then it answers
+// successfully with an empty list (verified by the 2026-11-05 probe).
+resolver.define('getIssueDevStatus', async ({ payload }) => {
+  const input = validateDevStatusInput(payload);
+  if (!input.ok) return { ok: false, error: input.error };
+
+  try {
+    const response = await api.asUser().requestJira(
+      route`/rest/dev-status/1.0/issue/detail?issueId=${input.issueId}&applicationType=bitbucket&dataType=pullrequest`,
+      {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      },
+    );
+
+    const status = typeof response.status === 'number' ? response.status : 500;
+    console.log('[atlasync] Jira dev-status status:', status);
+    if (status >= 400) {
+      try {
+        const errText = await response.text();
+        console.error('[atlasync] Jira dev-status error body:', errText ? errText.slice(0, 500) : '(empty)');
+      } catch {
+        console.error('[atlasync] Jira dev-status error body: (unreadable)');
+      }
+      return { ok: false, error: mapJiraErrorStatus(status) };
+    }
+
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      console.error('[atlasync] Jira dev-status response was not JSON');
+      return {
+        ok: false,
+        error: { kind: 'API_ERROR', message: 'Jira returned an unreadable response. Try again shortly.' },
+      };
+    }
+    return { ok: true, ...parseDevStatusResponse(data) };
+  } catch (error) {
+    console.error('[atlasync] Jira dev-status request threw:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'Jira could not be reached. Try again shortly.' } };
+  }
+});
+
 
 export const handler = resolver.getDefinitions();

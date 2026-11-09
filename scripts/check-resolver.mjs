@@ -36,8 +36,13 @@ assert.match(
 );
 assert.match(
   source,
+  /define\('getIssueDevStatus'/,
+  "resolver must define a 'getIssueDevStatus' function (Task 6, Architecture A)",
+);
+assert.match(
+  source,
   /export const handler = resolver\.getDefinitions\(\)/,
   'resolver must export handler via getDefinitions()',
 );
 
-console.log('resolver check passed: defensive constructor resolution + getStatus + getJiraIssues defined, handler exported');
+console.log('resolver check passed: defensive constructor resolution + getStatus + getJiraIssues + getIssueDevStatus defined, handler exported');

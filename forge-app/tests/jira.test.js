@@ -19,6 +19,7 @@ import {
 
 const fullIssue = {
   key: 'ATLAS-482',
+  id: '10001',
   fields: {
     summary: 'Checkout timeout under load',
     status: { name: 'In Progress' },
@@ -32,12 +33,18 @@ describe('normalizeJiraIssue', () => {
   it('normalizes a complete issue', () => {
     assert.deepEqual(normalizeJiraIssue(fullIssue), {
       key: 'ATLAS-482',
+      id: '10001',
       summary: 'Checkout timeout under load',
       status: 'In Progress',
       priority: 'Highest',
       assignee: 'Sara Khan',
       updated: '2026-11-05T07:00:00.000+0500',
     });
+  });
+
+  it('maps a missing numeric id to null', () => {
+    const issue = normalizeJiraIssue({ key: 'ATLAS-3', fields: { summary: 'x' } });
+    assert.equal(issue.id, null);
   });
 
   it('maps missing assignee and priority to null', () => {

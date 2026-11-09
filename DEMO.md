@@ -69,6 +69,17 @@ returned HTTP 200 and rendered a real issues list. In
 the preview, Live shows a backend-unreachable state instead of fake live
 data.
 
+### Linked pull requests (Task 6, Architecture A)
+
+Each live issue can expand a **Linked pull requests** section, read
+through the Jira Development Status API (`getIssueDevStatus`, no
+Bitbucket scope, no manifest change). A PR only appears when a
+Bitbucket workspace is linked to the Jira site through DVCS and the PR
+references the issue key — until then the section honestly reports
+zero linked PRs and how to link one. Implemented on branch
+`feature/dev-status-bitbucket` (tests 27/27); deploy and live
+verification still pending at the time of writing.
+
 ## What live integrations are planned
 
 1. **Jira** (read) — issues list is **live in Forge installs** (this slice); next: sprints, releases, per-issue blocker graph.
