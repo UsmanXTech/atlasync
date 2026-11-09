@@ -1,10 +1,12 @@
 import type { InsightPoint, IssueBucket } from '../data/types';
 
 // Horizontal distribution bars (e.g. issues by status / priority).
-export function BarList({ items, tone = 'blue' }: { items: IssueBucket[]; tone?: 'blue' | 'green' | 'amber' }) {
+// `compact` narrows the label/count columns for side-by-side groups in a
+// narrow card — the track stays readable and the count carries precision.
+export function BarList({ items, tone = 'blue', compact = false }: { items: IssueBucket[]; tone?: 'blue' | 'green' | 'amber'; compact?: boolean }) {
   const max = Math.max(...items.map((i) => i.count), 1);
   return (
-    <div className="bar-list">
+    <div className={`bar-list${compact ? ' compact' : ''}`}>
       {items.map((item) => (
         <div className="bar-row" key={item.label}>
           <span className="bar-label">{item.label}</span>
