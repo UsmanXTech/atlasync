@@ -8,6 +8,7 @@ import JsmRequestsCard from '../components/JsmRequestsCard';
 import Stat from '../components/Stat';
 import { BarList } from '../components/Bars';
 import { ACTIVITY,BLOCKERS,INCIDENTS,ISSUES_BY_PRIORITY,ISSUES_BY_STATUS,PROJECTS,PULL_REQUESTS } from '../data/mock';
+import { overviewStatContext } from '../utils/overviewStats';
 import type { ActivityKind,PrStatus,WorkspaceId } from '../data/types';
 import type { ViewId } from '../components/Sidebar';
 const KIND_ICONS:Record<ActivityKind,typeof CircleDot>={jira:CircleDot,confluence:FileText,bitbucket:GitPullRequest,jsm:AlertTriangle,ai:Sparkles};
@@ -19,14 +20,15 @@ export default function Overview({workspaceId,onNavigate}:{workspaceId:Workspace
  const prs=useMemo(()=>{const list=PULL_REQUESTS.filter(p=>p.workspace===workspaceId);return prFilter==='all'?list:list.filter(p=>p.status===prFilter);},[workspaceId,prFilter]);
  const incidents=useMemo(()=>INCIDENTS.filter(i=>i.workspace===workspaceId),[workspaceId]);
  const activity=useMemo(()=>ACTIVITY.filter(a=>a.workspace===workspaceId&&a.daysAgo<=range),[workspaceId,range]);
- const openIssues=projects.reduce((sum,p)=>sum+p.openIssues,0),prsInReview=PULL_REQUESTS.filter(p=>p.workspace===workspaceId&&(p.status==='review'||p.status==='changes')).length,openIncidents=incidents.filter(i=>i.status!=='resolved').length;
+ const openIssues=projects.reduce((sum,p)=>sum+p.openIssues,0),awaitingPrs=PULL_REQUESTS.filter(p=>p.workspace===workspaceId&&(p.status==='review'||p.status==='changes')),prsInReview=awaitingPrs.length,openIncidents=incidents.filter(i=>i.status!=='resolved').length;
+ const statCtx=useMemo(()=>overviewStatContext(projects,blockers,awaitingPrs,incidents),[projects,blockers,awaitingPrs,incidents]);
  return <div className="view overview-view">
   <div className="view-head"><div><h2>Workspace overview</h2><p>Delivery snapshot across connected tools.</p></div><span className="mock-badge">SAMPLE METRICS · LIVE SOURCES BELOW</span></div>
   <div className="stat-grid">
-   <Stat label="Open issues" value={String(openIssues)} delta="Sample workspace metric" tone="flat" icon={ListTodo}/>
-   <Stat label="Active blockers" value={String(blockers.length)} delta="Sample workspace metric" tone="flat" icon={ShieldAlert}/>
-   <Stat label="PRs awaiting action" value={String(prsInReview)} delta="Sample workspace metric" tone="flat" icon={GitPullRequest}/>
-   <Stat label="Open incidents" value={String(openIncidents)} delta="Sample workspace metric" tone="flat" icon={AlertTriangle}/>
+   <Stat label="Open issues" value={String(openIssues)} delta={statCtx.issues.text} tone={statCtx.issues.tone} icon={ListTodo}/>
+   <Stat label="Active blockers" value={String(blockers.length)} delta={statCtx.blockers.text} tone={statCtx.blockers.tone} icon={ShieldAlert}/>
+   <Stat label="PRs awaiting action" value={String(prsInReview)} delta={statCtx.prs.text} tone={statCtx.prs.tone} icon={GitPullRequest}/>
+   <Stat label="Open incidents" value={String(openIncidents)} delta={statCtx.incidents.text} tone={statCtx.incidents.tone} icon={AlertTriangle}/>
   </div>
   <div className="overview-main-grid">
    <section className="overview-column">
