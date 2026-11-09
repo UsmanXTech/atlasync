@@ -78,8 +78,8 @@ export default function Overview({ workspaceId, onNavigate }: OverviewProps) {
   return (
     <div className="view">
       <div className="view-head">
-        <h2>Overview</h2>
-        <p>Live Jira, Confluence, and JSM reads are shown separately from the demo dashboard data below.</p>
+        <div><h2>Workspace overview</h2><p>Live source records alongside clearly labeled sample delivery metrics.</p></div>
+        <span className="mock-badge">DEMO METRICS · LIVE SOURCES</span>
       </div>
 
       <div className="stat-grid">
@@ -89,7 +89,7 @@ export default function Overview({ workspaceId, onNavigate }: OverviewProps) {
         <Stat label="Open incidents" value={String(openIncidents)} delta="1 Sev1 investigating" tone="bad" icon={AlertTriangle} />
       </div>
 
-      <div className="grid-2">
+      <div className="grid-2 overview-primary">
         <Card title="Release readiness" subtitle="Atlas v2 · AI assessment · Mock data">
           <div className="ai-teaser">
             <Gauge value={72} label="Ready" />
@@ -131,7 +131,7 @@ export default function Overview({ workspaceId, onNavigate }: OverviewProps) {
         </Card>
       </div>
 
-      <div className="grid-2">
+      <div className="grid-2 overview-secondary">
         <Card title="Jira issue statistics" subtitle="All workspaces · sample aggregate">
           <h4 style={{ margin: '0 0 10px', fontSize: '0.82rem', color: 'var(--muted)' }}>By status</h4>
           <BarList items={ISSUES_BY_STATUS} />
@@ -165,16 +165,13 @@ export default function Overview({ workspaceId, onNavigate }: OverviewProps) {
         </Card>
       </div>
 
-      <div style={{ marginBottom: 14 }}>
+      <div className="overview-live grid-3">
         <JiraIssuesCard />
-      </div>
-
-      <div className="grid-2" style={{ marginBottom: 14 }}>
         <ConfluencePagesCard />
         <JsmRequestsCard />
       </div>
 
-      <div className="grid-3">
+      <div className="grid-3 overview-activity">
         <Card title="Confluence activity" subtitle="Recently edited docs">
           <div className="row-list">
             {docs.map((d) => (
@@ -238,7 +235,7 @@ export default function Overview({ workspaceId, onNavigate }: OverviewProps) {
         </Card>
       </div>
 
-      <Card
+      <Card className="overview-recent"
         title="Recent activity"
         subtitle="Across all connected tools"
         action={
