@@ -32,7 +32,7 @@ export default function Projects() {
       <div className="filter-pills"><button className={kind==='all'?'selected':''} onClick={()=>setKind('all')}>All projects <span>{projects.length}</span></button>{types.map(t=><button key={t} className={kind===t?'selected':''} onClick={()=>setKind(t)}>{t}</button>)}</div>
       <span className="results-count">{filtered.length} shown</span>
     </div>
-    {error && <div className="inline-alert" role="alert">{error}</div>}
+    {error && <div className="inline-alert" role="alert"><strong>Jira connection issue</strong><span>{error}</span><button className="btn btn-small" onClick={() => void load()} disabled={loading}><RefreshCw size={13}/> Retry</button></div>}
     {loading && projects.length===0 && <div className="workspace-empty"><RefreshCw size={18}/>Loading Jira projects…</div>}
     {!loading && !error && projects.length===0 && <div className="workspace-empty"><FolderKanban size={22}/><strong>No visible Jira projects</strong><span>Projects appear here when your Atlassian account has permission to browse them.</span></div>}
     {projects.length>0 && <div className="project-board">{filtered.map((p,i)=><article className="project-tile" key={p.id}>
