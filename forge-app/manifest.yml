@@ -2,6 +2,10 @@
 # app.id is the registered Forge app id (assigned by `forge register`).
 # Never invent or hand-edit a real app id.
 modules:
+  llm:
+    - key: atlasync-llm
+      model:
+        - claude
   jira:projectPage:
     - key: atlasync-project-page
       resource: main
