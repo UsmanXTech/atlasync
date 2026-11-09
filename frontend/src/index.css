@@ -94,3 +94,62 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
 .issue-key{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.76rem;font-weight:750;color:var(--blue)}
 .note-box{padding:12px 13px;border-radius:10px;background:var(--panel-2);border:1px solid var(--border);font-size:.83rem;line-height:1.5;color:var(--muted)}
 .row-actions{display:flex;gap:8px;margin-top:12px}
+
+/* Reference-inspired Atlasync theme: calm light canvas, fine borders, compact panels. */
+:root{
+ --bg:#f5f6fa;--panel:#ffffff;--panel-2:#f8f9fc;--panel-3:#eef1f6;
+ --border:#e3e7ef;--border-2:#d4dbe7;--text:#202636;--muted:#687386;--faint:#8993a4;
+ --blue:#6257d9;--blue-soft:#efedff;--green:#159b83;--green-soft:#e5f7f2;
+ --amber:#b7791f;--amber-soft:#fff5df;--red:#d94b63;--red-soft:#fff0f2;
+ --radius:11px;color-scheme:light;
+}
+body{background:var(--bg);color:var(--text)}
+.app{background:var(--bg)}
+.sidebar{background:#fff;border-right-color:var(--border)}
+.brand{border-bottom-color:var(--border)}
+.brand-mark{background:linear-gradient(145deg,#7167e8,#5145c9);box-shadow:0 5px 14px #6257d91c}
+.brand-name small{color:#8b94a5}
+.nav-item{color:#697386}
+.nav-item:hover{background:#f5f6fb;color:#262d3d}
+.nav-item.active{background:#efedff;border-color:#e3dfff;color:#5145c9}
+.nav-item.active svg{color:#6257d9}
+.sidebar-foot{border-top-color:var(--border)}
+.sidebar-foot p{color:#929bad}
+.mock-badge{background:#fff4dc;color:#9a6715}
+.topbar{background:#fff;border-bottom-color:var(--border)}
+.select-wrap select,.search,.icon-btn,.profile-btn{background:#fff;border-color:var(--border);color:var(--text)}
+.search{color:#8791a2}.search input{color:var(--text)}.search input::placeholder{color:#9ba4b2}
+.search-drop,.drop-panel{background:#fff;border-color:var(--border);box-shadow:0 14px 38px #26334a18}
+.drop-row{color:var(--text)}.drop-row:hover{background:#f4f5fa}.drop-row small{color:var(--muted)}
+.drop-head button{color:var(--blue)}.notif-row.unread{background:var(--blue-soft)}
+.avatar{background:#efedff;color:#6257d9}
+.card,.stat{background:#fff;border-color:var(--border);box-shadow:0 1px 2px #25334a04}
+.card-head p,.stat-label{color:var(--muted)}
+.stat-icon{background:#f0efff;color:var(--blue)}
+.btn{background:#fff;border-color:var(--border-2);color:var(--text)}
+.btn:hover{border-color:#b8b0fa;background:#faf9ff}
+.btn-primary{background:#6257d9;border-color:#6257d9;color:#fff}
+.btn-primary:hover{background:#5145c9}
+.chip{border-color:var(--border);color:var(--muted)}
+.chip.active{background:var(--blue-soft);color:#5145c9;border-color:#d8d2ff}
+.pill.critical,.pill.sev1{background:var(--red-soft);color:var(--red)}
+.pill.high,.pill.sev2{background:var(--amber-soft);color:var(--amber)}
+.pill.medium,.pill.sev3{background:var(--blue-soft);color:var(--blue)}
+.pill.low,.pill.pending{background:var(--panel-3);color:var(--muted)}
+.pill.healthy,.pill.merged,.pill.resolved,.pill.pass{background:var(--green-soft);color:var(--green)}
+.pill.at-risk,.pill.review,.pill.open{background:var(--amber-soft);color:var(--amber)}
+.pill.blocked,.pill.changes,.pill.fail{background:var(--red-soft);color:var(--red)}
+.pill.approved,.pill.investigating{background:var(--blue-soft);color:var(--blue)}
+.gauge-track{stroke:#e9edf3}.bar-track,.progress{background:#edf0f5}
+.bar-fill.blue{background:#7167e8}.bar-fill.green{background:#20ad91}.bar-fill.amber{background:#e3a33d}
+.trend-grid{stroke:#e8ebf1}.trend-label{fill:#8a94a4}
+.data-row,.feed-item,.setting-row{border-bottom-color:var(--border)}
+.feed-icon,.ai-teaser .ai-icon{background:#efedff;color:#6257d9}
+.composer textarea,.field input,.field select{background:#fff;border-color:var(--border);color:var(--text)}
+.preset-btn{border-color:var(--border);color:var(--muted)}
+.segmented{background:#f3f4f8;border-color:var(--border)}
+.segmented button{color:var(--muted)}.segmented button.active{background:#fff;color:#5145c9;box-shadow:0 1px 3px #20263612}
+.note-box{background:#f8f9fc;border-color:var(--border);color:var(--muted)}
+.sidebar-scrim{background:#20263640}
+#main-content::-webkit-scrollbar-thumb,.sidebar::-webkit-scrollbar-thumb,.card::-webkit-scrollbar-thumb{background:#cbd2df}
+@media(max-width:900px){.sidebar{background:#fff;box-shadow:20px 0 60px #26334a1a}}
