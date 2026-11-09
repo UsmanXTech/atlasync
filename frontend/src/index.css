@@ -740,3 +740,9 @@ button { cursor: pointer; }
   .bar-row { grid-template-columns: 70px 1fr 26px; }
   .ai-teaser { flex-direction: column; }
 }
+
+
+/* Live integration state: keep source failures distinct from empty results. */
+.source-error { color: var(--danger, #ff7b7b); font-size: .84rem; }
+.source-empty, .source-footnote { color: var(--muted); font-size: .82rem; }
+.source-footnote { margin: 12px 0 0; }

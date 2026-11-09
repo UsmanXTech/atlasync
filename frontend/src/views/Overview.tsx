@@ -12,6 +12,8 @@ import {
 import Card from '../components/Card';
 import Gauge from '../components/Gauge';
 import JiraIssuesCard from '../components/JiraIssuesCard';
+import ConfluencePagesCard from '../components/ConfluencePagesCard';
+import JsmRequestsCard from '../components/JsmRequestsCard';
 import Stat from '../components/Stat';
 import { BarList } from '../components/Bars';
 import {
@@ -77,7 +79,7 @@ export default function Overview({ workspaceId, onNavigate }: OverviewProps) {
     <div className="view">
       <div className="view-head">
         <h2>Overview</h2>
-        <p>Sample synced state across Jira, Confluence, Bitbucket, and JSM.</p>
+        <p>Live Jira, Confluence, and JSM reads are shown separately from the demo dashboard data below.</p>
       </div>
 
       <div className="stat-grid">
@@ -165,6 +167,11 @@ export default function Overview({ workspaceId, onNavigate }: OverviewProps) {
 
       <div style={{ marginBottom: 14 }}>
         <JiraIssuesCard />
+      </div>
+
+      <div className="grid-2" style={{ marginBottom: 14 }}>
+        <ConfluencePagesCard />
+        <JsmRequestsCard />
       </div>
 
       <div className="grid-3">

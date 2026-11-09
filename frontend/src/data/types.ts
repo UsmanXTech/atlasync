@@ -157,3 +157,23 @@ export interface LiveIssue {
   assignee: string | null;
   updated: string;
 }
+
+
+// Live read-only Confluence page metadata.
+export interface LiveConfluencePage {
+  id: string;
+  title: string;
+  status: string;
+  spaceId: string | null;
+  updated: string;
+}
+
+// Live read-only Jira Service Management request metadata.
+export interface LiveJsmRequest {
+  key: string;
+  summary: string;
+  status: string;
+  requestType: string;
+  priority: string | null;
+  created: string;
+}

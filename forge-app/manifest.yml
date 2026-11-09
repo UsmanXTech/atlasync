@@ -18,6 +18,9 @@ resources:
 permissions:
   scopes:
     - read:jira-work
+    - read:confluence-content.all
+    - read:confluence-space.summary
+    - read:servicedesk-request
     - storage:app
 app:
   id: ari:cloud:ecosystem::app/63accaf9-e952-4554-af92-27b5b1b5d56d

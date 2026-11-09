@@ -7,6 +7,8 @@ import {
   validateJiraInput,
 } from './jira.js';
 import { parseDevStatusResponse, validateDevStatusInput } from './devstatus.js';
+import { parseConfluencePages, validateConfluenceInput } from './confluence.js';
+import { parseJsmRequests, validateJsmInput } from './jsm.js';
 
 // Atlasync Forge resolver.
 //
@@ -141,5 +143,50 @@ resolver.define('getIssueDevStatus', async ({ payload }) => {
   }
 });
 
+
+// Cross-tool live reads. Both are read-only and run as the current user,
+// so Atlassian's product permissions still apply. The UI never receives
+// raw API payloads or response bodies.
+resolver.define('getConfluencePages', async ({ payload }) => {
+  const input = validateConfluenceInput(payload);
+  if (!input.ok) return { ok: false, error: input.error };
+  try {
+    const response = await api.asUser().requestConfluence(
+      route`/wiki/api/v2/pages?limit=${input.limit}&sort=-modified-date`,
+      { method: 'GET', headers: { Accept: 'application/json' } },
+    );
+    const status = typeof response.status === 'number' ? response.status : 500;
+    if (status >= 400) return { ok: false, error: mapJiraErrorStatus(status) };
+    let data;
+    try { data = await response.json(); } catch {
+      return { ok: false, error: { kind: 'API_ERROR', message: 'Confluence returned an unreadable response. Try again shortly.' } };
+    }
+    return { ok: true, pages: parseConfluencePages(data) };
+  } catch (error) {
+    console.error('[atlasync] Confluence request threw:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'Confluence could not be reached. Check app access and try again.' } };
+  }
+});
+
+resolver.define('getJsmRequests', async ({ payload }) => {
+  const input = validateJsmInput(payload);
+  if (!input.ok) return { ok: false, error: input.error };
+  try {
+    const response = await api.asUser().requestJira(
+      route`/rest/servicedeskapi/request?limit=${input.limit}`,
+      { method: 'GET', headers: { Accept: 'application/json' } },
+    );
+    const status = typeof response.status === 'number' ? response.status : 500;
+    if (status >= 400) return { ok: false, error: mapJiraErrorStatus(status) };
+    let data;
+    try { data = await response.json(); } catch {
+      return { ok: false, error: { kind: 'API_ERROR', message: 'Jira Service Management returned an unreadable response. Try again shortly.' } };
+    }
+    return { ok: true, requests: parseJsmRequests(data) };
+  } catch (error) {
+    console.error('[atlasync] JSM request threw:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'Jira Service Management could not be reached. Check app access and try again.' } };
+  }
+});
 
 export const handler = resolver.getDefinitions();
