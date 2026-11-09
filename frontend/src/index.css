@@ -57,59 +57,11 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
 .segmented{display:flex;gap:2px;padding:2px;border:1px solid var(--border);border-radius:999px;background:var(--panel-2);flex-shrink:0}.segmented button{border:0;border-radius:999px;background:transparent;color:var(--muted);padding:5px 11px;font-size:.75rem;font-weight:650}.segmented button.active{background:var(--blue-soft);color:#fff}
 .issue-key{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.76rem;font-weight:750;color:var(--blue)}.note-box{padding:12px 13px;border-radius:10px;background:var(--panel-2);border:1px solid var(--border);font-size:.83rem;line-height:1.5;color:var(--muted)}.row-actions{display:flex;gap:8px;margin-top:12px}
 .only-mobile{display:none}
-/* ---------- Responsive ---------- */
-
-.only-mobile { display: none; }
-
-@media (max-width: 1080px) {
-  .stat-grid { grid-template-columns: repeat(2, 1fr); }
-  .grid-3 { grid-template-columns: 1fr 1fr; }
-  .project-grid, .tool-grid, .agent-grid { grid-template-columns: 1fr; }
-}
-
-@media (max-width: 900px) {
-  .app { grid-template-columns: 1fr; }
-  .sidebar {
-    position: fixed;
-    left: 0;
-    width: 264px;
-    transform: translateX(-105%);
-    transition: transform 0.25s ease;
-    box-shadow: 20px 0 60px rgba(0, 0, 0, 0.5);
-  }
-  .sidebar.open { transform: translateX(0); }
-  .sidebar-scrim {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.55);
-    z-index: 35;
-  }
-  .only-mobile { display: grid; }
-  .profile-name { display: none; }
-  .forge-badge { display: none; }
-  .topbar { padding: 13px 16px; }
-  .view { padding: 22px 16px 40px; }
-  .workspace-select > span { display: none; }
-}
-
-@media (max-width: 640px) {
-  .stat-grid, .grid-2, .grid-3 { grid-template-columns: 1fr; }
-  .search { display: none; }
-  .drop-panel { width: calc(100vw - 32px); right: -8px; }
-  .bar-row { grid-template-columns: 70px 1fr 26px; }
-  .ai-teaser { flex-direction: column; }
-}
-
-
-/* Live integration state: keep source failures distinct from empty results. */
-.source-error { color: var(--danger, #ff7b7b); font-size: .84rem; }
-.source-empty, .source-footnote { color: var(--muted); font-size: .82rem; }
-.source-footnote { margin: 12px 0 0; }
-
-.intelligence-answer { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.65; color: var(--text); margin: 0; }
-
-
+/* Responsive fitted shell and navigation drawer. */
+.only-mobile{display:none}
+@media(max-width:1080px){.stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-3,.project-grid,.tool-grid,.agent-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:900px){.app{grid-template-columns:1fr}.sidebar{position:fixed;left:0;top:0;width:264px;height:100dvh;transform:translateX(-105%);transition:transform .25s ease;box-shadow:20px 0 60px #0008}.sidebar.open{transform:translateX(0)}.sidebar-scrim{display:block;position:fixed;inset:0;background:#0009;z-index:35}.only-mobile{display:grid}.profile-name,.forge-badge{display:none}.topbar{padding:0 14px}.view{padding:18px 14px 22px}.workspace-select>span{display:none}}
+@media(max-width:640px){.main{grid-template-rows:58px minmax(0,1fr)}.stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-2,.grid-3,.overview-live,.overview-activity,.project-grid,.tool-grid,.agent-grid{grid-template-columns:1fr}.search{display:none}.drop-panel{width:calc(100vw - 32px);right:-8px}.view-head{align-items:flex-start;flex-direction:column}.overview-live>.card,.overview-activity>.card{max-height:260px}.overview-recent{max-height:260px}.ai-teaser{align-items:flex-start}}
 /* Fitted overview: fixed viewport, compact executive layout. */
 .overview-primary>.card,.overview-secondary>.card{min-width:0}
 .overview-primary .row-list{max-height:190px;overflow:auto}
