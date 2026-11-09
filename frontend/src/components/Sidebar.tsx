@@ -70,8 +70,8 @@ export default function Sidebar({ view, onNavigate, open, onClose }: SidebarProp
           ))}
         </nav>
         <div className="sidebar-foot">
-          <span className="mock-badge">MOCK DATA</span>
-          <p>Sample data for preview. No live Atlassian connection yet.</p>
+          <span className="mock-badge">LIVE + DEMO</span>
+          <p>Live source views are separated from clearly labeled preview metrics.</p>
         </div>
       </aside>
     </>
