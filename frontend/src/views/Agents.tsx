@@ -1,14 +1,10 @@
+import { BrainCircuit, ShieldCheck, ArrowUpRight } from 'lucide-react';
 import Card from '../components/Card';
 import type { ViewId } from '../components/Sidebar';
-export default function Agents({ onNavigate }: { onNavigate: (view: ViewId) => void }) {
-  return <div className="view">
-    <div className="view-head"><h2>AI Agents</h2><p>Atlasync Intelligence is the live Forge-hosted agent experience in this build.</p></div>
-    <Card className="agent-card">
-      <div style={{display:'flex',justifyContent:'space-between',gap:10}}><h3>Atlasync Release Intelligence</h3><span className="pill healthy">Read-only</span></div>
-      <p>Gathers bounded live Jira, Confluence, and JSM records as the current user, then uses Atlassian Forge LLMs to answer release-readiness and risk questions.</p>
-      <div className="cap">Source-aware · current-user permissions · no write actions · no external model API</div>
-      <div className="agent-foot"><span>Model: Claude Sonnet 5 via Forge LLM</span><button className="btn btn-primary" onClick={() => onNavigate('intelligence')}>Open Intelligence</button></div>
-    </Card>
-    <Card><h3>Not included in this live agent</h3><p className="source-footnote">Autonomous Rovo/MCP tool execution, Jira writes, scheduled actions, and agent memory are not enabled. The agent only analyzes source snapshots returned for the current request.</p></Card>
-  </div>;
+export default function Agents({onNavigate}:{onNavigate:(view:ViewId)=>void}){
+ return <div className="view workspace-view">
+  <div className="workspace-heading"><div><div className="eyebrow">WORKSPACE / AUTOMATION</div><h2>AI Agents</h2><p>Available agent experiences and their execution boundaries.</p></div></div>
+  <div className="agent-feature"><div className="agent-feature-icon"><BrainCircuit size={26}/></div><div className="agent-feature-copy"><div className="eyebrow">AVAILABLE NOW</div><h3>Atlasync Release Intelligence</h3><p>Analyzes bounded Jira, Confluence and JSM records as the current user, then answers delivery-readiness and risk questions.</p><div className="agent-tags"><span><ShieldCheck size={13}/> Permission-aware</span><span>Read-only</span><span>Forge-hosted LLM</span></div></div><button className="btn btn-primary" onClick={()=>onNavigate('intelligence')}>Open Intelligence <ArrowUpRight size={15}/></button></div>
+  <div className="agent-capabilities"><Card title="What it can do"><ul className="feature-list"><li>Summarize source records from connected Atlassian tools.</li><li>Answer release-readiness and cross-tool risk questions.</li><li>Report which sources were available for the current request.</li></ul></Card><Card title="Not enabled in this build"><ul className="feature-list muted-list"><li>Autonomous Rovo/MCP orchestration.</li><li>Jira or Bitbucket write actions.</li><li>Scheduled runs, persistent agent memory or background sync.</li></ul><p className="source-footnote">These capabilities require separate implementation, permissions and a user-data safety model.</p></Card></div>
+ </div>;
 }

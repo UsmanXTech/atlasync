@@ -11,10 +11,8 @@ import Insights from './views/Insights';
 import Settings from './views/Settings';
 import { WORKSPACES } from './data/mock';
 
-// Atlasync dashboard shell. Navigation, workspace, and Forge-connection
-// state live here; each view renders from the mock data layer.
-// Inside a Forge iframe the bridge connects (status badge in the topbar);
-// outside Forge the same build renders in preview mode with mock data.
+// Atlasync application shell: persistent navigation and a viewport-fitted content region.
+// Live views retain their own loading, empty, and error states.
 export default function App() {
   const [view, setView] = useState<ViewId>('overview');
   const [workspaceId, setWorkspaceId] = useState('hq');

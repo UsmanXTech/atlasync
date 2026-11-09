@@ -1,14 +1,4 @@
-import {
-  BarChart3,
-  Bot,
-  FolderKanban,
-  LayoutDashboard,
-  Plug,
-  Settings,
-  Sparkles,
-  X,
-  Zap,
-} from 'lucide-react';
+import { BarChart3, Bot, FolderKanban, LayoutDashboard, Plug, Settings, Sparkles, X, Zap } from 'lucide-react';
 
 export type ViewId =
   | 'overview'
@@ -47,7 +37,7 @@ export default function Sidebar({ view, onNavigate, open, onClose }: SidebarProp
           </span>
           <span className="brand-name">
             Atlasync
-            <small>ENTERPRISE</small>
+            <small>WORKSPACE</small>
           </span>
           <button className="icon-btn only-mobile" onClick={onClose} aria-label="Close menu">
             <X size={18} />
@@ -70,8 +60,7 @@ export default function Sidebar({ view, onNavigate, open, onClose }: SidebarProp
           ))}
         </nav>
         <div className="sidebar-foot">
-          <span className="mock-badge">MOCK DATA</span>
-          <p>Sample data for preview. No live Atlassian connection yet.</p>
+          <span className="sidebar-section-label">WORKSPACE</span>
         </div>
       </aside>
     </>
