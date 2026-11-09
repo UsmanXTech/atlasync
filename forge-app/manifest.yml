@@ -24,6 +24,7 @@ permissions:
     - read:jira-work
     - read:confluence-content.all
     - read:confluence-space.summary
+    - read:page:confluence
     - read:servicedesk-request
     - storage:app
 app:
