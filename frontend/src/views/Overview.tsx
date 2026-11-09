@@ -7,7 +7,7 @@ import ConfluencePagesCard from '../components/ConfluencePagesCard';
 import JsmRequestsCard from '../components/JsmRequestsCard';
 import Stat from '../components/Stat';
 import { BarList } from '../components/Bars';
-import { ACTIVITY,BLOCKERS,DOCS,INCIDENTS,ISSUES_BY_PRIORITY,ISSUES_BY_STATUS,PROJECTS,PULL_REQUESTS } from '../data/mock';
+import { ACTIVITY,BLOCKERS,INCIDENTS,ISSUES_BY_PRIORITY,ISSUES_BY_STATUS,PROJECTS,PULL_REQUESTS } from '../data/mock';
 import type { ActivityKind,PrStatus,WorkspaceId } from '../data/types';
 import type { ViewId } from '../components/Sidebar';
 const KIND_ICONS:Record<ActivityKind,typeof CircleDot>={jira:CircleDot,confluence:FileText,bitbucket:GitPullRequest,jsm:AlertTriangle,ai:Sparkles};
