@@ -61,3 +61,39 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}:focus-visible{o
 #main-content{scrollbar-width:thin;scrollbar-color:#cbd2df transparent}
 @media(max-height:760px) and (min-width:901px){.view{padding-top:12px;padding-bottom:12px}.overview-view{gap:7px}.overview-main-grid{gap:7px}.overview-column{gap:7px}.card{padding:10px}.stat{padding:9px}.stat-value{font-size:1.22rem}.project-tile{min-height:135px}.workspace-view{gap:9px}}
 @media(max-width:700px){.workspace-view{height:auto;min-height:100%;overflow:visible}.overview-column .overview-live-card>.card .row-list,.overview-column>.card>.row-list,.overview-column>.card>.feed{max-height:260px}.intelligence-view{height:100%;min-height:0}.settings-layout{flex:0 0 auto}}
+
+/* Strict screen-fit contract: the app frame never scrolls. */
+html,body,#root{width:100%;height:100%;min-width:0;min-height:0;overflow:hidden}
+.app{width:100vw;height:100vh;height:100dvh;max-width:100vw;max-height:100dvh;overflow:hidden}
+.main{width:100%;height:100%;min-width:0;min-height:0;overflow:hidden}
+#main-content{height:100%;min-height:0;min-width:0;overflow:hidden!important;overscroll-behavior:none;scrollbar-gutter:auto}
+.view{height:100%;min-height:0;max-height:100%;overflow:hidden}
+.workspace-view{height:100%;min-height:0;max-height:100%;overflow:hidden;flex:1 1 auto}
+.sidebar{min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
+.project-board{min-height:0;max-height:100%;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
+.intelligence-view{min-height:0;overflow:hidden}
+.intelligence-layout{min-height:0;overflow:hidden}
+.intelligence-primary,.intelligence-rail{min-height:0}
+.intelligence-primary>.card:last-child{min-height:0;overflow:hidden}
+.intelligence-primary>.card:last-child>.ai-answer{min-height:0;overflow-y:auto;overscroll-behavior:contain}
+/* The integration view keeps its title and connection summary pinned. */
+.workspace-view:has(.integration-summary){display:grid;grid-template-rows:auto auto minmax(0,1fr) minmax(0,.78fr) auto}
+.workspace-view:has(.integration-summary)>.integration-grid{min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;align-content:start}
+.workspace-view:has(.integration-summary)>.workspace-footnote{min-height:0}
+/* Insights and Settings keep the outer viewport fixed; only dense cards/forms scroll. */
+.workspace-view:has(.insight-hero){display:grid;grid-template-rows:auto auto auto minmax(0,1fr) auto}
+.workspace-view:has(.insight-hero)>.card{min-height:0;overflow:auto;overscroll-behavior:contain}
+.workspace-view:has(.settings-layout){display:grid;grid-template-rows:auto minmax(0,1fr)}
+.workspace-view:has(.settings-layout)>.settings-layout{min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;align-content:start}
+.workspace-view:has(.agent-feature){display:grid;grid-template-rows:auto auto minmax(0,1fr)}
+.workspace-view:has(.agent-feature)>.agent-capabilities{min-height:0;overflow:auto;overscroll-behavior:contain;align-content:start}
+@media(max-width:700px){
+  /* Mobile is still a fixed app frame; scroll is localized to the active content panel. */
+  .app,.main,#main-content{height:100dvh;max-height:100dvh;overflow:hidden!important}
+  .workspace-view:has(.integration-summary){grid-template-rows:auto auto minmax(0,1fr) minmax(0,.8fr) auto}
+  .workspace-view:has(.insight-hero){grid-template-rows:auto auto auto minmax(0,1fr) auto}
+  .workspace-view:has(.settings-layout)>.settings-layout{overflow-y:auto}
+  .workspace-view:has(.agent-feature)>.agent-capabilities{overflow-y:auto}
+  .overview-view{height:100%;min-height:0;overflow:hidden}
+  .overview-main-grid{min-height:0;overflow:auto;overscroll-behavior:contain}
+}
