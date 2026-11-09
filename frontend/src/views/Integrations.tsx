@@ -1,36 +1,27 @@
 import { useCallback, useState } from 'react';
+import { RefreshCw, CircleCheck, CircleAlert, PlugZap, GitPullRequest, BrainCircuit } from 'lucide-react';
 import Card from '../components/Card';
-import { RefreshCw } from 'lucide-react';
 import { fetchLiveJiraIssues } from '../services/jira';
 import { fetchConfluencePages } from '../services/confluence';
 import { fetchJsmRequests } from '../services/jsm';
 
-type Check = { state: 'idle' | 'checking' | 'ok' | 'error'; detail?: string; count?: number };
-export default function Integrations() {
-  const [jira, setJira] = useState<Check>({ state: 'idle' });
-  const [confluence, setConfluence] = useState<Check>({ state: 'idle' });
-  const [jsm, setJsm] = useState<Check>({ state: 'idle' });
-  const [checking, setChecking] = useState(false);
-  const check = useCallback(async () => {
-    setChecking(true);
-    setJira({ state: 'checking' }); setConfluence({ state: 'checking' }); setJsm({ state: 'checking' });
-    const [j, c, s] = await Promise.all([fetchLiveJiraIssues(1), fetchConfluencePages(1), fetchJsmRequests(1)]);
-    setJira(j.ok ? { state: 'ok', count: j.issues.length, detail: 'Jira issue API responded.' } : { state: 'error', detail: j.error.message });
-    setConfluence(c.ok ? { state: 'ok', count: c.pages.length, detail: 'Confluence API responded.' } : { state: 'error', detail: c.error.message });
-    setJsm(s.ok ? { state: 'ok', count: s.requests.length, detail: 'JSM API responded.' } : { state: 'error', detail: s.error.message });
-    setChecking(false);
-  }, []);
-  const card = (title: string, desc: string, state: Check) => <Card className="tool-card" key={title}>
-    <div style={{display:'flex',justifyContent:'space-between',gap:10}}><h3>{title}</h3><span className={`pill ${state.state === 'ok' ? 'healthy' : state.state === 'error' ? 'blocked' : 'pending'}`}>{state.state === 'ok' ? 'Reachable' : state.state === 'error' ? 'Unavailable' : state.state === 'checking' ? 'Checking…' : 'Not checked'}</span></div>
-    <p>{desc}</p><p className={state.state === 'error' ? 'source-error' : 'source-footnote'}>{state.detail ?? 'Run a read-only connection check.'}</p>
-    {state.state === 'ok' && <p className="source-footnote">Probe returned {state.count} visible record(s). This is not a full sync.</p>}
-  </Card>;
-  return <div className="view">
-    <div className="view-head"><h2>Integrations</h2><p>Real read-only checks. No fake connect/disconnect switches or demo sync counters.</p></div>
-    <div style={{display:'flex',justifyContent:'flex-end',marginBottom:14}}><button className="btn btn-primary" onClick={() => void check()} disabled={checking}><RefreshCw size={14}/>{checking ? 'Checking…' : 'Check live connections'}</button></div>
-    <div className="tool-grid">{card('Jira', 'Issue search using Forge asUser; Browse Projects permissions apply.', jira)}{card('Confluence', 'Page metadata using Forge asUser; space/content permissions apply.', confluence)}{card('Jira Service Management', 'Request list using Forge asUser; service-desk visibility applies.', jsm)}
-      <Card className="tool-card"><h3>Bitbucket pull requests</h3><span className="pill pending">Issue-linked only</span><p>PRs are retrieved through Jira Development Status, not a direct Bitbucket workspace API.</p><p className="source-footnote">Owner action required: link Bitbucket Cloud in Jira DVCS settings, then reference a Jira issue key from a PR.</p></Card>
-      <Card className="tool-card"><h3>Forge LLM</h3><span className="pill pending">Admin approval required</span><p>Atlasync Intelligence uses Atlassian-hosted Claude through Forge LLMs.</p><p className="source-footnote">The app update must be approved/reinstalled, and LLM usage is metered.</p></Card>
-    </div>
-  </div>;
+type Check={state:'idle'|'checking'|'ok'|'error';detail?:string;count?:number};
+export default function Integrations(){
+ const [jira,setJira]=useState<Check>({state:'idle'}),[confluence,setConfluence]=useState<Check>({state:'idle'}),[jsm,setJsm]=useState<Check>({state:'idle'}),[checking,setChecking]=useState(false);
+ const check=useCallback(async()=>{setChecking(true);setJira({state:'checking'});setConfluence({state:'checking'});setJsm({state:'checking'});
+ try{const [j,c,s]=await Promise.all([fetchLiveJiraIssues(1),fetchConfluencePages(1),fetchJsmRequests(1)]);
+ setJira(j.ok?{state:'ok',count:j.issues.length,detail:'Jira issue API responded.'}:{state:'error',detail:j.error.message});
+ setConfluence(c.ok?{state:'ok',count:c.pages.length,detail:'Confluence API responded.'}:{state:'error',detail:c.error.message});
+ setJsm(s.ok?{state:'ok',count:s.requests.length,detail:'JSM API responded.'}:{state:'error',detail:s.error.message});}
+ catch(e){const detail=e instanceof Error?e.message:'Connection check failed.';setJira({state:'error',detail});setConfluence({state:'error',detail});setJsm({state:'error',detail});}finally{setChecking(false);}},[]);
+ const sources=[{name:'Jira',desc:'Issues and project metadata',note:'Forge asUser · Browse Projects permissions',state:jira,icon:PlugZap},{name:'Confluence',desc:'Pages and space metadata',note:'Forge asUser · content and space permissions',state:confluence,icon:Layers3},{name:'Jira Service Management',desc:'Customer and service requests',note:'Forge asUser · service-desk permissions',state:jsm,icon:CircleCheck}];
+ return <div className="view workspace-view">
+  <div className="workspace-heading"><div><div className="eyebrow">WORKSPACE / CONNECTIONS</div><h2>Integrations</h2><p>Connection health and access to your Atlassian tools.</p></div><button className="btn btn-primary" onClick={()=>void check()} disabled={checking}><RefreshCw size={14}/>{checking?'Checking…':'Check connections'}</button></div>
+  <div className="integration-summary"><div><span className="summary-label">CONNECTED SOURCES</span><strong>{[jira,confluence,jsm].filter(x=>x.state==='ok').length}<small> / 3</small></strong></div><p>Checks make small read-only requests as the signed-in Atlassian user. A successful probe is not a full sync.</p></div>
+  <div className="integration-grid">{sources.map(s=><article className="integration-tile" key={s.name}><div className="integration-top"><span className="integration-icon"><s.icon size={20}/></span><span className={`connection-state ${s.state}`}>{s.state==='ok'?<><CircleCheck size={13}/> Reachable</>:s.state==='error'?<><CircleAlert size={13}/> Unavailable</>:s.state==='checking'?'Checking…':'Not checked'}</span></div><h3>{s.name}</h3><p>{s.desc}</p><small>{s.note}</small><div className="connection-detail">{s.state==='ok'?s.detail:s.state==='error'?s.detail:s.state==='checking'?'Waiting for Atlassian…':'Run a connection check to verify access.'}{s.state==='ok'&&<b>{s.count} record returned</b>}</div></article>)}</div>
+  <div className="integration-grid secondary-grid">
+   <article className="integration-tile"><div className="integration-top"><span className="integration-icon"><GitPullRequest size={20}/></span><span className="connection-state limited">Issue-linked</span></div><h3>Bitbucket</h3><p>Pull requests linked to Jira issues through Development Status.</p><small>No direct Bitbucket workspace OAuth configured.</small><div className="connection-detail">Owner action: link Bitbucket Cloud in Jira DVCS settings and reference a Jira issue key in a PR.</div></article>
+   <article className="integration-tile"><div className="integration-top"><span className="integration-icon"><BrainCircuit size={20}/></span><span className="connection-state limited">Admin approval</span></div><h3>Forge Intelligence</h3><p>Atlassian-hosted Claude analysis through Forge LLM.</p><small>Read-only, bounded current-user source snapshot.</small><div className="connection-detail">App upgrade approval/reinstall is required. Usage is metered by Atlassian.</div></article>
+  </div>
+ </div>;
 }
