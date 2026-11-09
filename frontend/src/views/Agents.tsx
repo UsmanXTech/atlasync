@@ -1,4 +1,4 @@
-import { Bot, BrainCircuit, ShieldCheck, Sparkles, ArrowUpRight } from 'lucide-react';
+import { BrainCircuit, ShieldCheck, ArrowUpRight } from 'lucide-react';
 import Card from '../components/Card';
 import type { ViewId } from '../components/Sidebar';
 export default function Agents({onNavigate}:{onNavigate:(view:ViewId)=>void}){
