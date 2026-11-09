@@ -9,12 +9,17 @@ import Stat from '../components/Stat';
 import { BarList } from '../components/Bars';
 import { ACTIVITY,BLOCKERS,INCIDENTS,ISSUES_BY_PRIORITY,ISSUES_BY_STATUS,PROJECTS,PULL_REQUESTS } from '../data/mock';
 import { overviewStatContext } from '../utils/overviewStats';
+import { computeReadiness, type ReadinessResult } from '../utils/readiness';
+import { fetchLiveJiraIssues } from '../services/jira';
 import type { ActivityKind,PrStatus,WorkspaceId } from '../data/types';
 import type { ViewId } from '../components/Sidebar';
 const KIND_ICONS:Record<ActivityKind,typeof CircleDot>={jira:CircleDot,confluence:FileText,bitbucket:GitPullRequest,jsm:AlertTriangle,ai:Sparkles};
 function ageLabel(days:number){if(days===0)return'Today';if(days===1)return'Yesterday';return `${days} days ago`;}
+type ReadinessState={status:'sample'}|{status:'loading'}|{status:'live';result:ReadinessResult}|{status:'error';message:string};
 export default function Overview({workspaceId,onNavigate}:{workspaceId:WorkspaceId;onNavigate:(view:ViewId)=>void}){
  const [resolved,setResolved]=useState<string[]>([]),[prFilter,setPrFilter]=useState<'all'|PrStatus>('all'),[range,setRange]=useState<0|7|30>(7);
+ const [readiness,setReadiness]=useState<ReadinessState>({status:'sample'});
+ const calcReadiness=async()=>{setReadiness({status:'loading'});const r=await fetchLiveJiraIssues(50);if(!r.ok){setReadiness({status:'error',message:r.error.message});return;}const result=computeReadiness(r.issues);if(!result){setReadiness({status:'error',message:'No Jira issues found for the default query (recently updated, newest first) — nothing to score.'});return;}setReadiness({status:'live',result});};
  const projects=useMemo(()=>PROJECTS.filter(p=>p.workspace===workspaceId),[workspaceId]);
  const blockers=useMemo(()=>BLOCKERS.filter(b=>b.workspace===workspaceId&&!resolved.includes(b.id)),[workspaceId,resolved]);
  const prs=useMemo(()=>{const list=PULL_REQUESTS.filter(p=>p.workspace===workspaceId);return prFilter==='all'?list:list.filter(p=>p.status===prFilter);},[workspaceId,prFilter]);
@@ -32,7 +37,7 @@ export default function Overview({workspaceId,onNavigate}:{workspaceId:Workspace
   </div>
   <div className="overview-main-grid">
    <section className="overview-column">
-    <Card className="overview-readiness" title="Release readiness" subtitle="Atlas v2 · sample assessment"><div className="ai-teaser"><Gauge value={72} label="Sample"/><div><p><strong>Demo-only estimate.</strong> Not calculated from live records.</p><button className="btn btn-primary" onClick={()=>onNavigate('intelligence')}>Ask Intelligence <ArrowRight size={14}/></button></div></div></Card>
+    <Card className="overview-readiness" title="Release readiness" subtitle={readiness.status==='live'?'Atlas v2 · live estimate from Jira':'Atlas v2 · sample assessment'}><div className="ai-teaser"><Gauge value={readiness.status==='live'?readiness.result.score:72} label={readiness.status==='live'?'Live':'Sample'}/><div>{readiness.status==='sample'&&<><p><strong>Demo-only estimate.</strong> Not calculated from live records.</p><div className="row-actions"><button className="btn btn-primary" onClick={()=>onNavigate('intelligence')}>Ask Intelligence <ArrowRight size={14}/></button><button className="btn" onClick={()=>void calcReadiness()}>Calculate from live Jira</button></div></>}{readiness.status==='loading'&&<p role="status">Reading live Jira issues…</p>}{readiness.status==='live'&&<><p><strong>Live estimate from the {readiness.result.total} most recently updated Jira issues.</strong> {readiness.result.summary}.</p><p className="source-footnote">−15 per open Highest (max −45) · −8 High (max −24) · −3 Medium (max −12) · −1 Low (max −5). Done issues don&apos;t lower the score.</p><div className="row-actions"><button className="btn btn-primary" onClick={()=>onNavigate('intelligence')}>Ask Intelligence <ArrowRight size={14}/></button><button className="btn" onClick={()=>setReadiness({status:'sample'})}>Back to sample</button></div></>}{readiness.status==='error'&&<><p className="source-error" role="alert">{readiness.message}</p><p>Showing the sample estimate instead.</p><div className="row-actions"><button className="btn" onClick={()=>void calcReadiness()}>Retry</button><button className="btn btn-primary" onClick={()=>onNavigate('intelligence')}>Ask Intelligence <ArrowRight size={14}/></button></div></>}</div></div></Card>
     <Card className="overview-distribution" title="Issue distribution" subtitle="Demo aggregate · not live analytics"><div className="overview-chart-block"><div className="chart-group"><h4>By status</h4><BarList items={ISSUES_BY_STATUS} compact/></div><div className="chart-group"><h4>By priority</h4><BarList items={ISSUES_BY_PRIORITY} tone="amber" compact/></div></div></Card>
     <Card title="Active blockers" subtitle="Sample data · local demo resolve actions"><div className="row-list">{blockers.map(b=><div className="data-row" key={b.id}><div className="row-main"><strong>{b.key} · {b.title}</strong><small>{b.owner} · {b.ageDays} days open</small></div><span className={`pill ${b.severity}`}>{b.severity}</span><button className="btn btn-small" onClick={()=>setResolved(v=>[...v,b.id])}>Resolve</button></div>)}{blockers.length===0&&<p className="source-empty">No demo blockers remaining.</p>}</div></Card>
    </section>
