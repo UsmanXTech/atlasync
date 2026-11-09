@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Send, Sparkles, Database, RotateCcw, ShieldCheck } from 'lucide-react';
 import Card from '../components/Card';
+import MarkdownText from '../components/Markdown';
 import { askAtlasync, type IntelligenceSources } from '../services/intelligence';
 const PRESETS=['Are we ready to release?','What are the biggest risks?','Summarize recent cross-tool activity.'];
 export default function Intelligence(){
@@ -17,7 +18,7 @@ export default function Intelligence(){
      {loading&&<p role="status" className="source-empty">Reading live records and preparing the analysis…</p>}
      {error&&<p role="alert" className="source-error">{error}</p>}
      {!loading&&!error&&!answer&&<div className="analysis-empty"><Sparkles size={22}/><strong>Your analysis appears here</strong><span>No sample response is presented as live AI output.</span></div>}
-     {answer&&<div className="ai-answer"><pre className="intelligence-answer">{answer}</pre><p className="source-footnote">AI output may be incomplete. Atlasync does not make release decisions or run write actions.</p></div>}
+     {answer&&<div className="ai-answer"><div className="intelligence-answer"><MarkdownText text={answer}/></div><p className="source-footnote">AI output may be incomplete. Atlasync does not make release decisions or run write actions.</p></div>}
     </Card>
    </section>
    <aside className="intelligence-rail"><Card title="Source coverage" subtitle="Included in latest answer"><div className="coverage-total"><Database size={17}/><strong>{sources? sources.jiraIssues+sources.confluencePages+sources.jsmRequests:'—'}</strong><span>records</span></div>{[{name:'Jira issues',value:sources?.jiraIssues},{name:'Confluence pages',value:sources?.confluencePages},{name:'JSM requests',value:sources?.jsmRequests}].map(x=><div className="coverage-row" key={x.name}><span>{x.name}</span><b>{x.value??'—'}</b></div>)}{sources?.unavailable.map(s=><p key={s} className="source-error">{s}</p>)}</Card><div className="intelligence-guard"><ShieldCheck size={17}/><div><strong>Permission-aware</strong><span>Records are retrieved as the current Atlassian user and kept within the bounded request context.</span></div></div><button className="btn" onClick={()=>{setAnswer('');setSources(null);setError(null);setPrompt(PRESETS[0]);}}><RotateCcw size={14}/> New analysis</button></aside>
