@@ -1,67 +1,42 @@
+import { useCallback, useEffect, useState } from 'react';
 import Card from '../components/Card';
 import Stat from '../components/Stat';
-import { TrendChart } from '../components/Bars';
-import { INSIGHTS_WEEKLY } from '../data/mock';
 import { BarChart3, FileText, GitPullRequest } from 'lucide-react';
+import { fetchLiveJiraIssues } from '../services/jira';
+import { fetchConfluencePages } from '../services/confluence';
+import { fetchJsmRequests } from '../services/jsm';
 
+type Counts = { jira: number; confluence: number; jsm: number; errors: string[] };
 export default function Insights() {
-  const totalIssues = INSIGHTS_WEEKLY.reduce((s, p) => s + p.issues, 0);
-  const totalDocs = INSIGHTS_WEEKLY.reduce((s, p) => s + p.docs, 0);
-  const totalPrs = INSIGHTS_WEEKLY.reduce((s, p) => s + p.prs, 0);
-  const busiest = INSIGHTS_WEEKLY.reduce((best, p) =>
-    p.issues + p.docs + p.prs > best.issues + best.docs + best.prs ? p : best,
-  );
-
-  return (
-    <div className="view">
-      <div className="view-head">
-        <h2>Insights</h2>
-        <p>Weekly throughput across tools — derived from the mock dataset, not live analytics.</p>
+  const [counts, setCounts] = useState<Counts | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    setLoading(true); setError(null); setCounts(null);
+    const [jira, confluence, jsm] = await Promise.all([fetchLiveJiraIssues(50), fetchConfluencePages(50), fetchJsmRequests(50)]);
+    const errors: string[] = [];
+    if (!jira.ok) errors.push(`Jira: ${jira.error.message}`);
+    if (!confluence.ok) errors.push(`Confluence: ${confluence.error.message}`);
+    if (!jsm.ok) errors.push(`JSM: ${jsm.error.message}`);
+    setCounts({ jira: jira.ok ? jira.issues.length : 0, confluence: confluence.ok ? confluence.pages.length : 0, jsm: jsm.ok ? jsm.requests.length : 0, errors });
+    setLoading(false);
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  return <div className="view">
+    <div className="view-head"><h2>Insights</h2><p>Live source coverage and current record counts. Historical trends require a safe snapshot system and are not fabricated.</p></div>
+    <div style={{display:'flex',justifyContent:'flex-end',marginBottom:14}}><button className="btn btn-small" onClick={() => void load()} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh metrics'}</button></div>
+    {loading && <Card><p role="status" className="source-empty">Reading live sources…</p></Card>}
+    {error && <Card><p role="alert" className="source-error">{error}</p></Card>}
+    {counts && <>
+      <div className="stat-grid" style={{gridTemplateColumns:'repeat(3,1fr)'}}>
+        <Stat label="Jira issues loaded" value={String(counts.jira)} delta="Current live sample · max 50" tone="flat" icon={BarChart3}/>
+        <Stat label="Confluence pages loaded" value={String(counts.confluence)} delta="Current live sample · max 50" tone="flat" icon={FileText}/>
+        <Stat label="JSM requests loaded" value={String(counts.jsm)} delta="Current live sample · max 50" tone="flat" icon={GitPullRequest}/>
       </div>
-
-      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        <Stat label="Issues closed · 6 weeks" value={String(totalIssues)} delta="Busiest week: W4" tone="flat" icon={BarChart3} />
-        <Stat label="Docs updated · 6 weeks" value={String(totalDocs)} delta="Steady upward trend" tone="up" icon={FileText} />
-        <Stat label="PRs touched · 6 weeks" value={String(totalPrs)} delta="Peak in W4" tone="flat" icon={GitPullRequest} />
-      </div>
-
-      <Card title="Weekly activity trend" subtitle="Issues, docs, and PRs per week">
-        <TrendChart points={INSIGHTS_WEEKLY} />
+      <Card title="Source health" subtitle="This refresh only">
+        {counts.errors.length === 0 ? <p className="source-empty">All three source APIs responded.</p> : counts.errors.map((e) => <p className="source-error" key={e}>{e}</p>)}
       </Card>
-
-      <div className="grid-2" style={{ marginTop: 14 }}>
-        <Card title="Top signals" subtitle="What the sample data says">
-          <div className="row-list">
-            <div className="data-row">
-              <div className="row-main">
-                <strong>Busiest week: {busiest.label}</strong>
-                <small>
-                  {busiest.issues} issues · {busiest.docs} docs · {busiest.prs} PRs
-                </small>
-              </div>
-            </div>
-            <div className="data-row">
-              <div className="row-main">
-                <strong>Docs keep climbing</strong>
-                <small>From 18 to 31 weekly updates across the period</small>
-              </div>
-            </div>
-            <div className="data-row">
-              <div className="row-main">
-                <strong>PR throughput follows issues</strong>
-                <small>High-issue weeks show proportionally more PR activity</small>
-              </div>
-            </div>
-          </div>
-        </Card>
-        <Card title="About these numbers" subtitle="Honest labeling">
-          <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.6, color: 'var(--muted)' }}>
-            These charts render the mock dataset in <code>src/data/mock.ts</code>. They demonstrate the
-            visualization layer only. Once real integrations land, the same components will render live
-            aggregates — no chart code changes needed, only the data source.
-          </p>
-        </Card>
-      </div>
-    </div>
-  );
+    </>}
+    {!counts && !loading && <Card><p className="source-empty">Refresh to retrieve live counts. Preview mode will show backend-unreachable messages instead of mock analytics.</p></Card>}
+  </div>;
 }

@@ -9,6 +9,7 @@ import {
 import { parseDevStatusResponse, validateDevStatusInput } from './devstatus.js';
 import { parseConfluencePages, validateConfluenceInput } from './confluence.js';
 import { parseJsmRequests, validateJsmInput } from './jsm.js';
+import { parseJiraProjects, validateProjectInput } from './projects.js';
 
 // Atlasync Forge resolver.
 //
@@ -253,6 +254,21 @@ resolver.define('askAtlasync', async ({ payload }) => {
   } catch (error) {
     console.error('[atlasync] Forge LLM request failed:', error instanceof Error ? error.name : typeof error);
     return { ok: false, error: { kind: 'API_ERROR', message: 'Atlasync Intelligence could not complete the analysis. Check Forge LLM access/credits and try again.' } };
+  }
+});
+
+resolver.define('getJiraProjects', async ({ payload }) => {
+  const input = validateProjectInput(payload);
+  if (!input.ok) return { ok: false, error: input.error };
+  try {
+    const response = await api.asUser().requestJira(route`/rest/api/3/project/search?maxResults=${input.limit}`, { headers: { Accept: 'application/json' } });
+    const status = typeof response.status === 'number' ? response.status : 500;
+    if (status >= 400) return { ok: false, error: mapJiraErrorStatus(status) };
+    try { return { ok: true, projects: parseJiraProjects(await response.json()) }; }
+    catch { return { ok: false, error: { kind: 'API_ERROR', message: 'Jira returned an unreadable project response.' } }; }
+  } catch (error) {
+    console.error('[atlasync] Jira projects request threw:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'Jira projects could not be reached. Try again shortly.' } };
   }
 });
 

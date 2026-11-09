@@ -177,3 +177,6 @@ export interface LiveJsmRequest {
   priority: string | null;
   created: string;
 }
+
+
+export interface LiveJiraProject { id: string; key: string; name: string; projectType: string }

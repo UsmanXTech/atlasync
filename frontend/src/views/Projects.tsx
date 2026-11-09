@@ -1,62 +1,30 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Card from '../components/Card';
-import { PROJECTS } from '../data/mock';
-import type { HealthStatus, WorkspaceId } from '../data/types';
+import { RefreshCw } from 'lucide-react';
+import { fetchLiveJiraProjects, type LiveJiraProject } from '../services/jira';
 
-type Filter = 'all' | HealthStatus;
-
-export default function Projects({ workspaceId }: { workspaceId: WorkspaceId }) {
-  const [filter, setFilter] = useState<Filter>('all');
-
-  const projects = useMemo(() => {
-    const list = PROJECTS.filter((p) => p.workspace === workspaceId);
-    return filter === 'all' ? list : list.filter((p) => p.health === filter);
-  }, [workspaceId, filter]);
-
-  return (
-    <div className="view">
-      <div className="view-head">
-        <h2>Projects</h2>
-        <p>Every project in this workspace, with health and progress — sample data.</p>
-      </div>
-
-      <div className="chip-row" style={{ marginBottom: 16 }}>
-        {(['all', 'healthy', 'at-risk', 'blocked'] as const).map((f) => (
-          <button key={f} className={`chip ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
-            {f === 'all' ? 'All projects' : f}
-          </button>
-        ))}
-      </div>
-
-      <div className="project-grid">
-        {projects.map((p) => (
-          <Card key={p.id} className="project-card">
-            <span className="key">{p.key}</span>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 4 }}>
-              <h3>{p.name}</h3>
-              <span className={`pill ${p.health}`}>{p.health}</span>
-            </div>
-            <p className="meta">
-              Owner: {p.owner} · Next: {p.nextMilestone} · {p.openIssues} open issues · {p.blockers} blockers
-            </p>
-            <div className="progress">
-              <div
-                className={p.health === 'healthy' ? 'good' : p.health === 'at-risk' ? 'warn' : 'bad'}
-                style={{ width: `${p.progress}%` }}
-              />
-            </div>
-            <div className="progress-label">
-              <span>Progress</span>
-              <span>{p.progress}%</span>
-            </div>
-          </Card>
-        ))}
-        {projects.length === 0 && (
-          <Card>
-            <p style={{ color: 'var(--muted)', fontSize: '0.88rem', margin: 0 }}>No projects in this filter.</p>
-          </Card>
-        )}
-      </div>
+export default function Projects() {
+  const [projects, setProjects] = useState<LiveJiraProject[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    const result = await fetchLiveJiraProjects(50);
+    if (result.ok) setProjects(result.projects); else setError(result.error.message);
+    setLoading(false);
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  return <div className="view">
+    <div className="view-head"><h2>Projects</h2><p>Live Jira project directory · filtered by the signed-in user's permissions.</p></div>
+    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+      <button className="btn btn-small" onClick={() => void load()} disabled={loading}><RefreshCw size={13}/>{loading ? 'Loading…' : 'Refresh projects'}</button>
     </div>
-  );
+    {error && <Card><p role="alert" className="source-error">{error}</p></Card>}
+    {loading && <Card><p role="status" className="source-empty">Loading Jira projects…</p></Card>}
+    {!loading && !error && projects.length === 0 && <Card><p className="source-empty">No Jira projects are visible to this account.</p></Card>}
+    <div className="project-grid">{projects.map((p) => <Card key={p.id} className="project-card">
+      <span className="key">{p.key}</span><h3>{p.name}</h3><p className="meta">Project type: {p.projectType}</p>
+      <p className="source-footnote">Live Jira metadata · no sample progress or health score is fabricated.</p>
+    </Card>)}</div>
+  </div>;
 }
