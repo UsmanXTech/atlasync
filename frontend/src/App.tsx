@@ -60,9 +60,9 @@ export default function App() {
           <ErrorBoundary key={view}>
             {view === 'overview' && <Overview workspaceId={workspace.id} onNavigate={setView} />}
             {view === 'intelligence' && <Intelligence />}
-            {view === 'projects' && <Projects workspaceId={workspace.id} />}
+            {view === 'projects' && <Projects />}
             {view === 'integrations' && <Integrations />}
-            {view === 'agents' && <Agents />}
+            {view === 'agents' && <Agents onNavigate={setView} />}
             {view === 'insights' && <Insights />}
             {view === 'settings' && <Settings workspace={workspace} />}
           </ErrorBoundary>

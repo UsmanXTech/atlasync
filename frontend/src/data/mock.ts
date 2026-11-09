@@ -183,9 +183,9 @@ export const INSIGHTS_WEEKLY: InsightPoint[] = [
 // payload, same Atlas story — but fixed sample data, never presented
 // as live. The live list replaces this only inside a Forge installation.
 export const SAMPLE_JIRA_ISSUES: LiveIssue[] = [
-  { key: 'ATLAS-482', summary: 'Checkout timeout under load', status: 'In Progress', priority: 'Highest', assignee: 'Sara Khan', updated: '2026-11-05T07:00:00.000+0500' },
-  { key: 'ATLAS-491', summary: 'Cart totals refactor blocked on API contract', status: 'To Do', priority: 'High', assignee: 'Omar Farooq', updated: '2026-11-04T15:30:00.000+0500' },
-  { key: 'SYNC-77', summary: 'Retry logic for payment webhook', status: 'In Review', priority: 'Medium', assignee: 'Omar Farooq', updated: '2026-11-04T11:20:00.000+0500' },
-  { key: 'MOB-118', summary: 'Push gateway certificate expiry', status: 'To Do', priority: 'Highest', assignee: 'Ali Raza', updated: '2026-11-03T09:45:00.000+0500' },
-  { key: 'MOB-121', summary: 'Offline sync conflict resolution', status: 'In Progress', priority: 'Medium', assignee: null, updated: '2026-11-02T17:10:00.000+0500' },
+  { key: 'ATLAS-482', id: null, summary: 'Checkout timeout under load', status: 'In Progress', priority: 'Highest', assignee: 'Sara Khan', updated: '2026-11-05T07:00:00.000+0500' },
+  { key: 'ATLAS-491', id: null, summary: 'Cart totals refactor blocked on API contract', status: 'To Do', priority: 'High', assignee: 'Omar Farooq', updated: '2026-11-04T15:30:00.000+0500' },
+  { key: 'SYNC-77', id: null, summary: 'Retry logic for payment webhook', status: 'In Review', priority: 'Medium', assignee: 'Omar Farooq', updated: '2026-11-04T11:20:00.000+0500' },
+  { key: 'MOB-118', id: null, summary: 'Push gateway certificate expiry', status: 'To Do', priority: 'Highest', assignee: 'Ali Raza', updated: '2026-11-03T09:45:00.000+0500' },
+  { key: 'MOB-121', id: null, summary: 'Offline sync conflict resolution', status: 'In Progress', priority: 'Medium', assignee: null, updated: '2026-11-02T17:10:00.000+0500' },
 ];

@@ -10,7 +10,7 @@
 
 Atlasync is an Atlassian Forge app built for **Codegeist 2026**. It gives teams one synced view across every Atlassian tool they use — Jira, Confluence, Bitbucket, and Jira Service Management — so the context behind work is always in one place, instead of scattered across silos.
 
-**Status:** Premium dashboard on mock data (v0.2.0) + first live slice: read-only Jira issues inside Forge installs. Everything else still comes from the sample dataset in `frontend/src/data/mock.ts`.
+**Status:** Premium Forge dashboard with live read-only Jira issues/projects, Confluence pages, JSM requests, Jira-linked Bitbucket PRs, and Forge-hosted Intelligence. Overview sample metrics remain demo data; Projects, Insights source counts, Integrations health checks, and Intelligence now use live reads.
 
 ## Vision
 
@@ -98,11 +98,11 @@ The frontend is a dark-first, premium enterprise dashboard (deep charcoal, thin 
 ### Views (sidebar)
 
 - **Overview** — project health, Jira issue statistics, active blockers (with working Resolve buttons), Confluence activity, Bitbucket PRs (status filters), JSM incidents, recent activity (Today/7D/30D range), plus the Jira issues card with a Demo data / Live Jira toggle.
-- **Intelligence** — AI assistant panel. Ask the sample prompt *"Are we ready to release Atlas v2?"* (or the other presets, or your own text) and get a structured sample response: readiness percentage, critical blockers, risk assessment, relevant issues, suggested next actions. Every response is labeled mock data.
-- **Projects** — per-workspace project cards with health, progress, and status filters.
-- **Integrations** — per-tool connection cards with working connect/disconnect toggles and mock sync buttons.
-- **AI Agents** — agent cards with working enable/disable toggles.
-- **Insights** — weekly throughput charts (issues/docs/PRs) derived from the mock dataset.
+- **Intelligence** — live Forge LLM assistant over bounded Jira, Confluence, and JSM records. It reports source coverage and is read-only; answers may be incomplete and are not release approvals.
+- **Projects** — live Jira project directory, filtered by the signed-in user's permissions.
+- **Integrations** — read-only connection probes for Jira, Confluence, and JSM, plus owner setup guidance for Jira-linked Bitbucket PRs and Forge LLM.
+- **AI Agents** — Atlasync Release Intelligence entry point; no autonomous writes or background agent actions.
+- **Insights** — current live record counts/source health. Historical trend charts are withheld until a privacy-safe snapshot system exists.
 - **Settings** — workspace form and preference toggles (mock — nothing persists).
 
 ### Interactive controls
@@ -111,7 +111,7 @@ Workspace selector (filters projects, blockers, PRs, incidents, activity), globa
 
 ### Mock data
 
-All dashboard content lives in `frontend/src/data/` (`types.ts` + `mock.ts`) and is clearly labeled **MOCK DATA** in the sidebar, the topbar badge area, and the AI panel. Stats on the Overview are derived from those arrays (workspace filters and Resolve buttons change them); only the small "vs last week" annotations are fixed display text.
+The sample dashboard data lives in `frontend/src/data/mock.ts`. Overview health cards, blocker lists, PR/incidents sample panels, and demo workspace state remain labeled as demo data. Live source cards do not mix sample rows into their live results. Stats on the Overview are derived from those arrays (workspace filters and Resolve buttons change them); only the small "vs last week" annotations are fixed display text.
 
 ### Preview it
 
@@ -270,3 +270,21 @@ Atlasync is built for [Codegeist 2026](https://codegeist2026.devpost.com/) ("Bui
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+
+## Cross-tool live reads and Forge Intelligence (PR #4)
+
+This branch adds the next read-only integration slice:
+
+- **Confluence pages:** current-user read through Forge `requestConfluence`.
+- **Jira Service Management requests:** current-user read through `/rest/servicedeskapi/request`.
+- **Atlasync Intelligence:** uses the Atlassian-hosted Forge LLM SDK (`@forge/llm`) to reason over a bounded snapshot (up to 10 Jira issues, 10 Confluence pages, and 10 JSM requests). It does not send source data to an external model provider.
+- **Linked Bitbucket PRs:** uses Jira Development Status API and requires the Jira DVCS workspace link.
+
+### App update required
+
+The manifest now requests `read:confluence-content.all`, `read:confluence-space.summary`, and `read:servicedesk-request`, and enables the Forge `llm` module with the Claude model family. Updating an existing Forge installation requires an administrator to review/approve the new app version and permissions. Forge LLM usage is metered; check Atlassian's current Forge LLM pricing before enabling Intelligence.
+
+### What is not live yet
+
+The remaining Projects, Insights, and Agent dashboard areas still use clearly marked demo data. Scheduled/background sync is not enabled: Forge scheduled functions run without a user identity, so they must not silently persist user-permission-filtered records into shared app storage. Live reads and Intelligence currently run in the requesting user's context.

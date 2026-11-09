@@ -1,48 +1,14 @@
-import { useState } from 'react';
 import Card from '../components/Card';
-import { AGENTS } from '../data/mock';
-import type { Agent } from '../data/types';
-
-export default function Agents() {
-  const [agents, setAgents] = useState<Agent[]>(AGENTS);
-
-  const toggle = (id: string) =>
-    setAgents(agents.map((a) => (a.id === id ? { ...a, enabled: !a.enabled } : a)));
-
-  const enabledCount = agents.filter((a) => a.enabled).length;
-
-  return (
-    <div className="view">
-      <div className="view-head">
-        <h2>AI Agents</h2>
-        <p>
-          {enabledCount} of {agents.length} agents enabled. These are mock agents — capabilities and run
-          counts are sample data.
-        </p>
-      </div>
-
-      <div className="agent-grid">
-        {agents.map((a) => (
-          <Card key={a.id} className="agent-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-              <h3>{a.name}</h3>
-              <button
-                className={`toggle ${a.enabled ? 'on' : ''}`}
-                onClick={() => toggle(a.id)}
-                aria-label={`${a.enabled ? 'Disable' : 'Enable'} ${a.name}`}
-              />
-            </div>
-            <p>{a.description}</p>
-            <div className="cap">{a.capability}</div>
-            <div className="agent-foot">
-              <span>
-                Last run: {a.lastRun} · {a.runsThisWeek} runs this week
-              </span>
-              <span className={`pill ${a.enabled ? 'healthy' : 'pending'}`}>{a.enabled ? 'Active' : 'Paused'}</span>
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
+import type { ViewId } from '../components/Sidebar';
+export default function Agents({ onNavigate }: { onNavigate: (view: ViewId) => void }) {
+  return <div className="view">
+    <div className="view-head"><h2>AI Agents</h2><p>Atlasync Intelligence is the live Forge-hosted agent experience in this build.</p></div>
+    <Card className="agent-card">
+      <div style={{display:'flex',justifyContent:'space-between',gap:10}}><h3>Atlasync Release Intelligence</h3><span className="pill healthy">Read-only</span></div>
+      <p>Gathers bounded live Jira, Confluence, and JSM records as the current user, then uses Atlassian Forge LLMs to answer release-readiness and risk questions.</p>
+      <div className="cap">Source-aware · current-user permissions · no write actions · no external model API</div>
+      <div className="agent-foot"><span>Model: Claude Sonnet 5 via Forge LLM</span><button className="btn btn-primary" onClick={() => onNavigate('intelligence')}>Open Intelligence</button></div>
+    </Card>
+    <Card><h3>Not included in this live agent</h3><p className="source-footnote">Autonomous Rovo/MCP tool execution, Jira writes, scheduled actions, and agent memory are not enabled. The agent only analyzes source snapshots returned for the current request.</p></Card>
+  </div>;
 }

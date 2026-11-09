@@ -148,9 +148,35 @@ export interface InsightPoint {
 // "No priority" instead of guessing.
 export interface LiveIssue {
   key: string;
+  // Numeric Jira issue id (Task 6, Architecture A): the dev-status
+  // endpoint needs it; null for sample issues, which never call it.
+  id: string | null;
   summary: string;
   status: string;
   priority: string | null;
   assignee: string | null;
   updated: string;
 }
+
+
+// Live read-only Confluence page metadata.
+export interface LiveConfluencePage {
+  id: string;
+  title: string;
+  status: string;
+  spaceId: string | null;
+  updated: string;
+}
+
+// Live read-only Jira Service Management request metadata.
+export interface LiveJsmRequest {
+  key: string;
+  summary: string;
+  status: string;
+  requestType: string;
+  priority: string | null;
+  created: string;
+}
+
+
+export interface LiveJiraProject { id: string; key: string; name: string; projectType: string }

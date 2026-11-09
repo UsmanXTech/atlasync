@@ -1,8 +1,6 @@
 # Atlasync — Demo Guide
 
-> **Demo build.** Everything below runs on sample data. No live Atlassian
-> connection exists yet — the dashboard says so on screen (MOCK DATA badge,
-> "Preview mode", "Demo connected", "Sample response").
+> **Mixed demo/live build.** The Overview's sample metrics and sample scenario remain mock data. Jira issues/projects, Confluence page metadata, JSM requests, linked PR lookups, and Forge LLM Intelligence are live-only inside an updated Forge install. Preview mode cannot access the Forge backend.
 
 ## The problem
 
@@ -52,7 +50,7 @@ a single decision. A generic dashboard tour hides that; this question shows it.
   (see below) — the aggregates, blockers, and AI answers still use samples.
 - All AI answers, including the Atlas v2 verdict — fixed sample responses,
   labeled "Sample response · Mock data". No AI service is called.
-- Integration "Demo connected" states, sync timestamps, and item counts.
+- Mock workspace preferences and sample dashboard state.
 - Workspace switching, search, filters, toggles, and Resolve — real UI
   state over the mock dataset.
 
@@ -69,7 +67,18 @@ returned HTTP 200 and rendered a real issues list. In
 the preview, Live shows a backend-unreachable state instead of fake live
 data.
 
-## What live integrations are planned
+### Linked pull requests (Task 6, Architecture A)
+
+Each live issue can expand a **Linked pull requests** section, read
+through the Jira Development Status API (`getIssueDevStatus`, no
+Bitbucket scope, no manifest change). A PR only appears when a
+Bitbucket workspace is linked to the Jira site through DVCS and the PR
+references the issue key — until then the section honestly reports
+zero linked PRs and how to link one. Implemented on branch
+`feature/dev-status-bitbucket` (tests 27/27); deploy and live
+verification still pending at the time of writing.
+
+## Live integration coverage
 
 1. **Jira** (read) — issues list is **live in Forge installs** (this slice); next: sprints, releases, per-issue blocker graph.
 2. **Bitbucket** (read) — PRs, reviewers, build statuses.

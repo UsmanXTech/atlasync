@@ -3,7 +3,7 @@ import { RefreshCw } from 'lucide-react';
 import Card from './Card';
 import { SAMPLE_JIRA_ISSUES } from '../data/mock';
 import type { LiveIssue } from '../data/types';
-import { fetchLiveJiraIssues, type JiraError } from '../services/jira';
+import { fetchIssueDevStatus, fetchLiveJiraIssues, type JiraError, type LinkedPullRequest } from '../services/jira';
 
 type Mode = 'demo' | 'live';
 type LiveState =
@@ -44,6 +44,89 @@ function IssueRow({ issue }: { issue: LiveIssue }) {
         </small>
       </div>
       <span className="pill pending">{issue.status}</span>
+    </div>
+  );
+}
+
+type PrState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'ready'; pullRequests: LinkedPullRequest[] }
+  | { status: 'error'; error: JiraError };
+
+// Live issue row with linked Bitbucket pull requests (Task 6,
+// Architecture A). The PR list loads on demand through the Forge
+// backend's dev-status call — read-only, and only when the issue
+// carries a numeric Jira id. An empty list is shown honestly: no
+// Bitbucket workspace is linked to this Jira site yet, so there is
+// nothing to link — the user links one in Jira's DVCS settings.
+function LiveIssueRow({ issue }: { issue: LiveIssue }) {
+  const [expanded, setExpanded] = useState(false);
+  const [prs, setPrs] = useState<PrState>({ status: 'idle' });
+
+  const loadPrs = async () => {
+    if (!issue.id) return;
+    setExpanded(true);
+    setPrs({ status: 'loading' });
+    const result = await fetchIssueDevStatus(issue.id);
+    setPrs(
+      result.ok
+        ? { status: 'ready', pullRequests: result.pullRequests }
+        : { status: 'error', error: result.error },
+    );
+  };
+
+  return (
+    <div>
+      <IssueRow issue={issue} />
+      {issue.id && (
+        <div className="row-actions" style={{ padding: '0 0 8px' }}>
+          <button
+            className="btn"
+            onClick={() => (expanded ? setExpanded(false) : void loadPrs())}
+            aria-expanded={expanded}
+          >
+            {expanded ? 'Hide linked PRs' : 'Linked pull requests'}
+          </button>
+        </div>
+      )}
+      {expanded && prs.status === 'loading' && (
+        <p role="status" style={{ color: 'var(--muted)', fontSize: '0.88rem', margin: '0 0 10px' }}>
+          Loading linked pull requests…
+        </p>
+      )}
+      {expanded && prs.status === 'error' && (
+        <p style={{ color: 'var(--muted)', fontSize: '0.88rem', margin: '0 0 10px' }}>
+          Could not load linked pull requests: {prs.error.message}
+        </p>
+      )}
+      {expanded && prs.status === 'ready' && prs.pullRequests.length === 0 && (
+        <p style={{ color: 'var(--muted)', fontSize: '0.88rem', margin: '0 0 10px' }}>
+          No linked pull requests — no Bitbucket workspace is linked to this Jira site yet. Link one in
+          Jira&apos;s DVCS settings and reference the issue key in a PR to see it here.
+        </p>
+      )}
+      {expanded && prs.status === 'ready' && prs.pullRequests.length > 0 && (
+        <div className="row-list" style={{ marginBottom: 10 }}>
+          {prs.pullRequests.map((pr, i) => (
+            <div className="data-row" key={pr.id ?? `${pr.name}-${i}`}>
+              <div className="row-main">
+                <strong>
+                  {pr.url ? (
+                    <a href={pr.url} target="_blank" rel="noreferrer">
+                      {pr.name}
+                    </a>
+                  ) : (
+                    pr.name
+                  )}
+                </strong>
+                <small>Bitbucket pull request</small>
+              </div>
+              <span className="pill pending">{pr.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -160,7 +243,7 @@ export default function JiraIssuesCard() {
           </div>
           <div className="row-list">
             {live.issues.map((issue) => (
-              <IssueRow key={issue.key} issue={issue} />
+              <LiveIssueRow key={issue.key} issue={issue} />
             ))}
           </div>
           <div className="row-actions">

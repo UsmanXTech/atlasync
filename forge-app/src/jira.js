@@ -73,7 +73,16 @@ export function normalizeJiraIssue(raw) {
   const summary =
     typeof fields.summary === 'string' && fields.summary !== '' ? fields.summary : '(no summary)';
   const updated = typeof fields.updated === 'string' ? fields.updated : '';
-  return { key: raw.key, summary, status, priority, assignee, updated };
+  // The numeric Jira issue id is needed by the dev-status endpoint
+  // (Task 6, Architecture A): it rejects issue keys with "An invalid ID".
+  // It is Jira's own record id, not a credential, and null when absent.
+  const id =
+    typeof raw.id === 'string' && raw.id !== ''
+      ? raw.id
+      : typeof raw.id === 'number' && Number.isFinite(raw.id)
+        ? String(raw.id)
+        : null;
+  return { key: raw.key, id, summary, status, priority, assignee, updated };
 }
 
 export function parseJiraSearchResponse(data) {
