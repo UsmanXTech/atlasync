@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Send, Sparkles, Database, RotateCcw } from 'lucide-react';
+import { Send, Sparkles, Database, RotateCcw, ShieldCheck } from 'lucide-react';
 import Card from '../components/Card';
 import { askAtlasync, type IntelligenceSources } from '../services/intelligence';
 const PRESETS=['Are we ready to release?','What are the biggest risks?','Summarize recent cross-tool activity.'];
