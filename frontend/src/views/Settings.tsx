@@ -1,5 +1,5 @@
 import { useEffect,useState } from 'react';
-import { Building2, BellRing, Clock3, Save, RotateCcw, ShieldCheck } from 'lucide-react';
+import { Save, RotateCcw, ShieldCheck } from 'lucide-react';
 import Card from '../components/Card';
 import type { Workspace } from '../data/types';
 const DEFAULTS={dailySync:true,incidentAlerts:true,weeklyDigest:false,aiSummaries:true};
