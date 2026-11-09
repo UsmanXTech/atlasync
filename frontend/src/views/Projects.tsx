@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FolderKanban, RefreshCw, Search, Layers3 } from 'lucide-react';
-import Card from '../components/Card';
 import { fetchLiveJiraProjects, type LiveJiraProject } from '../services/jira';
 
 export default function Projects() {
