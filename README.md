@@ -270,3 +270,21 @@ Atlasync is built for [Codegeist 2026](https://codegeist2026.devpost.com/) ("Bui
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+
+## Cross-tool live reads and Forge Intelligence (PR #4)
+
+This branch adds the next read-only integration slice:
+
+- **Confluence pages:** current-user read through Forge `requestConfluence`.
+- **Jira Service Management requests:** current-user read through `/rest/servicedeskapi/request`.
+- **Atlasync Intelligence:** uses the Atlassian-hosted Forge LLM SDK (`@forge/llm`) to reason over a bounded snapshot (up to 10 Jira issues, 10 Confluence pages, and 10 JSM requests). It does not send source data to an external model provider.
+- **Linked Bitbucket PRs:** uses Jira Development Status API and requires the Jira DVCS workspace link.
+
+### App update required
+
+The manifest now requests `read:confluence-content.all`, `read:confluence-space.summary`, and `read:servicedesk-request`, and enables the Forge `llm` module with the Claude model family. Updating an existing Forge installation requires an administrator to review/approve the new app version and permissions. Forge LLM usage is metered; check Atlassian's current Forge LLM pricing before enabling Intelligence.
+
+### What is not live yet
+
+The remaining Projects, Insights, and Agent dashboard areas still use clearly marked demo data. Scheduled/background sync is not enabled: Forge scheduled functions run without a user identity, so they must not silently persist user-permission-filtered records into shared app storage. Live reads and Intelligence currently run in the requesting user's context.
