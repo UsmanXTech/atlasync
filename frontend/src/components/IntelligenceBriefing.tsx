@@ -33,7 +33,8 @@ export default function IntelligenceBriefing() {
     const [jira, confluence, jsm] = await Promise.all([
       fetchLiveJiraIssues(25), fetchConfluencePages(20), fetchJsmRequests(20),
     ]);
-    if (!jira.ok && !confluence.ok && !jsm.ok) {
+    const failures = [jira, confluence, jsm].filter((result) => !result.ok);
+    if (failures.length === 3 && failures.every((result) => !result.ok && result.error.kind === 'BACKEND_UNREACHABLE')) {
       setState({ status: 'unavailable', message: 'Live briefing appears when installed in Forge. This standalone preview does not contain live Atlassian records.' });
       return;
     }
