@@ -1,12 +1,9 @@
 import { useRef, useState } from 'react';
 import { askAtlasync, type IntelligenceSources } from '../services/intelligence';
 import { RequestGeneration } from '../utils/requestGeneration';
+import { INTELLIGENCE_PRESETS } from '../utils/intelligencePresets';
 
-export const INTELLIGENCE_PRESETS = [
-  'Are we ready to release?',
-  'What are the biggest risks?',
-  'Summarize recent cross-tool activity.',
-];
+export { INTELLIGENCE_PRESETS };
 
 export interface IntelligenceConversation {
   prompt: string;
