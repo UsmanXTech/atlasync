@@ -1,6 +1,7 @@
-import { Save, RotateCcw, ShieldCheck } from 'lucide-react';
+import { Save, RotateCcw, ShieldCheck, Info } from 'lucide-react';
 import Card from '../components/Card';
 import { SETTINGS_ROWS } from '../utils/settingsState';
+import { APP_INFO_ROWS, APP_DEPLOY_NOTE } from '../utils/appInfo';
 import type { SettingsState } from '../hooks/useSettingsState';
 
 // Presentational only: the form state lives in useSettingsState (called in
@@ -76,6 +77,23 @@ export default function Settings({ settings }: { settings: SettingsState }) {
               </div>
             ))}
           </div>
+        </Card>
+        <Card
+          title="About Atlasync"
+          subtitle="App, deployment and data split — the facts behind this install"
+          className="span-full"
+        >
+          <div className="about-grid">
+            {APP_INFO_ROWS.map(({ label, value }) => (
+              <div className="about-row" key={label}>
+                <span>{label}</span>
+                <p>{value}</p>
+              </div>
+            ))}
+          </div>
+          <p className="about-note">
+            <Info size={13} /> {APP_DEPLOY_NOTE}
+          </p>
         </Card>
       </div>
       <div className="settings-notice">
