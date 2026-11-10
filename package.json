@@ -6,7 +6,7 @@
     "build": "npm run build -w frontend",
     "dev": "npm run dev -w frontend",
     "preview": "npm run preview -w frontend",
-    "test": "node scripts/check-resolver.mjs && node --test forge-app/tests/jira.test.js forge-app/tests/devstatus.test.js forge-app/tests/confluence.test.js forge-app/tests/jsm.test.js forge-app/tests/projects.test.js forge-app/tests/resolver-init.test.js"
+    "test": "node scripts/check-resolver.mjs && node --test forge-app/tests/jira.test.js forge-app/tests/devstatus.test.js forge-app/tests/confluence.test.js forge-app/tests/jsm.test.js forge-app/tests/projects.test.js forge-app/tests/resolver-init.test.js frontend/src/utils/requestGeneration.test.ts"
   },
   "version": "0.2.0",
   "workspaces": [
