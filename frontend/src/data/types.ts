@@ -5,6 +5,12 @@
 
 export type WorkspaceId = 'hq' | 'platform';
 
+// A workspace is a DEMO-DATA grouping only. It scopes the labelled sample
+// sections (Overview demo panels, demo search results) and nothing else.
+// It NEVER scopes live data: live Jira issues/projects, Confluence pages
+// and JSM requests are permission-filtered by the current Atlassian user
+// and are shown in full regardless of the selected workspace. Any UI that
+// shows the selector or a workspace name must say so (see Topbar).
 export interface Workspace {
   id: WorkspaceId;
   name: string;

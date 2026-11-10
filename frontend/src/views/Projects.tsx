@@ -41,6 +41,6 @@ export default function Projects() {
       <div className="tile-bottom"><span><Layers3 size={13}/> {p.projectType || 'Jira project'}</span><span className="project-index">{String(i+1).padStart(2,'0')}</span></div>
     </article>)}</div>}
     {projects.length>0 && filtered.length===0 && <div className="workspace-empty">No projects match this filter.</div>}
-    <div className="workspace-footnote">Live Jira metadata · no invented owners, progress, or health scores. Maximum 50 projects per refresh.</div>
+    <div className="workspace-footnote">Live Jira metadata · no invented owners, progress, or health scores. Maximum 50 projects per refresh. The demo workspace selection does not scope live projects — every project visible to you is shown.</div>
   </div>;
 }

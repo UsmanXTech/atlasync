@@ -195,8 +195,8 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
         <Menu size={20} />
       </button>
 
-      <label className="workspace-select">
-        <span>Workspace</span>
+      <label className="workspace-select" title="Demo data grouping — does not scope live Jira, Confluence or JSM data.">
+        <span>Demo workspace</span>
         <span className="select-wrap">
           <select
             value={workspace.id}
