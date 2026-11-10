@@ -11,6 +11,7 @@ import Insights from './views/Insights';
 import Settings from './views/Settings';
 import { WORKSPACES } from './data/mock';
 import { useIntelligenceConversation } from './hooks/useIntelligenceConversation';
+import { useSettingsState } from './hooks/useSettingsState';
 
 // Atlasync application shell: persistent navigation and a viewport-fitted content region.
 // Live views retain their own loading, empty, and error states.
@@ -24,6 +25,11 @@ export default function App() {
   const intelligence = useIntelligenceConversation();
 
   const workspace = WORKSPACES.find((w) => w.id === workspaceId) ?? WORKSPACES[0];
+
+  // Same pattern as Intelligence: the Settings form state must survive
+  // navigating away and back (the view unmounts on switch). Switching
+  // demo workspace still resets it to that workspace's defaults.
+  const settings = useSettingsState(workspace);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,7 +72,7 @@ export default function App() {
             {view === 'integrations' && <Integrations />}
             {view === 'agents' && <Agents onNavigate={setView} conversation={intelligence} />}
             {view === 'insights' && <Insights />}
-            {view === 'settings' && <Settings workspace={workspace} />}
+            {view === 'settings' && <Settings settings={settings} />}
           </ErrorBoundary>
         </main>
       </div>
