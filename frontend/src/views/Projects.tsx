@@ -28,7 +28,7 @@ export default function Projects() {
   return <div className="view workspace-view projects-view">
     <div className="workspace-heading">
       <div><div className="eyebrow">WORKSPACE / DELIVERY</div><h2>Projects</h2><p>Your Jira project portfolio, filtered by your current Atlassian permissions.</p></div>
-      <button className="btn btn-primary" onClick={() => void load()} disabled={loading}><RefreshCw size={14}/>{loading ? 'Refreshing…' : 'Refresh projects'}</button>
+      <div className="workspace-heading-actions">{!error && projects.length > 0 && <span className="pill healthy">Jira connected</span>}<button className="btn btn-primary" onClick={() => void load()} disabled={loading}><RefreshCw size={14}/>{loading ? 'Refreshing…' : 'Refresh projects'}</button></div>
     </div>
     {!loadFailed && <div className="workspace-toolbar">
       <label className="workspace-search"><Search size={15}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Find a project…" aria-label="Filter projects"/></label>
@@ -40,8 +40,8 @@ export default function Projects() {
     {loading && projects.length===0 && <div className="workspace-empty"><RefreshCw size={18}/>Loading Jira projects…</div>}
     {!loading && !error && projects.length===0 && <div className="workspace-empty"><FolderKanban size={22}/><strong>No visible Jira projects</strong><span>Projects appear here when your Atlassian account has permission to browse them.</span></div>}
     {projects.length>0 && <div className="project-board">{filtered.map((p,i)=><article className="project-tile" key={p.id}>
-      <div className="tile-top"><span className="project-mark"><FolderKanban size={17}/></span><span className="pill healthy">Jira connected</span></div>
-      <div className="project-key">{p.key}</div><h3>{p.name}</h3><p className="project-description">Live Jira project · {p.projectType || 'Project'}</p>
+      <div className="tile-top"><span className="project-mark"><FolderKanban size={17}/></span></div>
+      <div className="project-key">{p.key}</div><h3>{p.name}</h3>
       <div className="tile-bottom"><span><Layers3 size={13}/> {p.projectType || 'Jira project'}</span><span className="project-index">{String(i+1).padStart(2,'0')}</span></div>
     </article>)}</div>}
     {projects.length>0 && filtered.length===0 && <div className="workspace-empty">No projects match this filter.</div>}
