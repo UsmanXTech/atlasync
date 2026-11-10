@@ -3,6 +3,8 @@ import { RefreshCw } from 'lucide-react';
 import Card from './Card';
 import { fetchConfluencePages } from '../services/confluence';
 import type { LiveConfluencePage } from '../data/types';
+import { formatUpdated } from '../utils/formatUpdated';
+import { confluenceStatusTone } from '../utils/confluenceStatus';
 
 // The Confluence card: live pages through the Forge backend, read-only.
 // Loading and error states are explicit in the card body (Nielsen H1/H9):
@@ -23,6 +25,12 @@ export default function ConfluencePagesCard() {
   useEffect(() => {
     void load();
   }, [load]);
+  // Row metadata speaks the user's language (Nielsen H2), not the API's:
+  // the page id and the internal space id are identifiers no reader
+  // needs, while the last-updated date the service already fetches is
+  // the metadata that tells whether a page is fresh. The status pill
+  // carries a tone (current = live, trashed = removed) instead of the
+  // bare unstyled pill; its text stays Confluence's own status word.
   return (
     <Card
       title="Live Confluence pages"
@@ -59,12 +67,9 @@ export default function ConfluencePagesCard() {
           <div className="data-row" key={page.id}>
             <div className="row-main">
               <strong>{page.title}</strong>
-              <small>
-                Page ID {page.id}
-                {page.spaceId ? ` · Space ${page.spaceId}` : ''}
-              </small>
+              {page.updated && <small>Updated {formatUpdated(page.updated)}</small>}
             </div>
-            <span className="pill">{page.status}</span>
+            <span className={`pill ${confluenceStatusTone(page.status)}`}>{page.status}</span>
           </div>
         ))}
       </div>
