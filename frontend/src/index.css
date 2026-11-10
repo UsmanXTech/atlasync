@@ -123,4 +123,18 @@ html,body,#root{width:100%;height:100%;min-width:0;min-height:0;overflow:hidden}
   .workspace-view:has(.agent-feature)>.agent-capabilities{overflow-y:auto}
   .overview-view{height:100%;min-height:0;overflow:hidden}
   .overview-main-grid{min-height:0;overflow:auto;overscroll-behavior:contain}
+  /* Mobile frame fix: #main-content{height:100%} resolves to the full 844px
+     .main height instead of the 786px grid row below the 58px topbar, so
+     the bottom 58px of every view is clipped (the New analysis button sits
+     in that dead zone even at max scroll). height:auto lets the grid item
+     stretch to its row instead. */
+  #main-content{height:auto}
+  /* Intelligence: the view itself scrolls as one page (same pattern as
+     Integrations). Without this, the strict screen-fit rules above win on
+     mobile — the layout stays overflow:hidden and the Analysis card
+     collapses to its 30px header (min-height:0 + flex:1), so the empty
+     state / answer and the New analysis button are unreachable. */
+  .workspace-view:has(.intelligence-layout){overflow-y:auto;overscroll-behavior:contain}
+  .workspace-view:has(.intelligence-layout)>.intelligence-layout{flex:none;overflow:visible}
+  .intelligence-primary>.card:last-child{flex:none;min-height:210px}
 }
