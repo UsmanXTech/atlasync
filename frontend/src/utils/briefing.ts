@@ -1,5 +1,5 @@
 import type { LiveIssue } from '../data/types';
-import { computeReadiness, type ReadinessResult } from './readiness';
+import { computeReadiness, type ReadinessResult } from './readiness.ts';
 
 const DONE = new Set(['done', 'closed', 'resolved', 'complete', 'completed', 'cancelled', 'canceled']);
 const PRIORITY: Record<string, number> = { highest: 5, critical: 5, blocker: 5, high: 4, major: 4, medium: 3, normal: 3, low: 2, minor: 2, lowest: 1 };
@@ -31,7 +31,14 @@ export function computeBriefingDigest(issues: LiveIssue[], now = new Date()): Br
   const priority = (value: string | null) => PRIORITY[(value ?? '').trim().toLowerCase()] ?? 0;
   const blockers = [...open]
     .filter((issue) => priority(issue.priority) >= PRIORITY.high)
-    .sort((a, b) => priority(b.priority) - priority(a.priority) || Date.parse(a.updated) - Date.parse(b.updated))
+    .sort((a, b) => {
+      const priorityDifference = priority(b.priority) - priority(a.priority);
+      if (priorityDifference !== 0) return priorityDifference;
+      const aDate = Date.parse(a.updated), bDate = Date.parse(b.updated);
+      if (!Number.isFinite(aDate)) return Number.isFinite(bDate) ? 1 : 0;
+      if (!Number.isFinite(bDate)) return -1;
+      return aDate - bDate;
+    })
     .slice(0, 5)
     .map(toItem);
   const staleItems = [...open]
