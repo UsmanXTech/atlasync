@@ -26,7 +26,7 @@ import type { ViewId } from './Sidebar';
 import { fetchLiveJiraIssues } from '../services/jira';
 import { fetchConfluencePages } from '../services/confluence';
 import { fetchJsmRequests } from '../services/jsm';
-import { LiveSearchLoader, type LiveSearchSources } from '../utils/liveSearch';
+import { LiveSearchLoader, type LiveSearchSnapshot, type LiveSourceFetchers, type LiveSourceKey } from '../utils/liveSearch';
 
 export type ForgeMode = 'loading' | 'forge' | 'standalone';
 
@@ -57,6 +57,32 @@ const KIND_ICONS: Record<string, typeof CircleDot> = {
   Request: LifeBuoy,
 };
 
+const LIVE_SOURCE_LABELS: Record<LiveSourceKey, string> = {
+  issues: 'Jira',
+  pages: 'Confluence',
+  requests: 'JSM',
+};
+
+// One fetcher per live source, normalized to the loader's { ok, data }
+// shape. A source that fails returns { ok: false } instead of throwing,
+// so the loader can record the failure per source.
+function liveSourceFetchers(): LiveSourceFetchers {
+  return {
+    issues: async () => {
+      const result = await fetchLiveJiraIssues(25);
+      return result.ok ? { ok: true as const, data: result.issues } : { ok: false as const };
+    },
+    pages: async () => {
+      const result = await fetchConfluencePages(20);
+      return result.ok ? { ok: true as const, data: result.pages } : { ok: false as const };
+    },
+    requests: async () => {
+      const result = await fetchJsmRequests(20);
+      return result.ok ? { ok: true as const, data: result.requests } : { ok: false as const };
+    },
+  };
+}
+
 export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate, forgeMode, onMenu }: TopbarProps) {
   const [query, setQuery] = useState('');
   const [searchFocus, setSearchFocus] = useState(false);
@@ -68,10 +94,14 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
   // once (on the first real query) and cached for the session; every later
   // query filters the cache. In the standalone preview there is no Forge
   // backend, so live search stays off and only labelled demo results show.
+  // Each source tracks its own state: a source that fails is named in the
+  // dropdown with its own Retry, and the retry refetches only that source.
   const [liveIssues, setLiveIssues] = useState<LiveIssue[]>([]);
   const [livePages, setLivePages] = useState<LiveConfluencePage[]>([]);
   const [liveRequests, setLiveRequests] = useState<LiveJsmRequest[]>([]);
-  const [liveState, setLiveState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [liveState, setLiveState] = useState<'idle' | 'loading' | 'ready' | 'partial' | 'error'>('idle');
+  const [liveFailed, setLiveFailed] = useState<LiveSourceKey[]>([]);
+  const [liveRetrying, setLiveRetrying] = useState<LiveSourceKey[]>([]);
 
   // The fetch lifecycle lives in LiveSearchLoader (utils/liveSearch.ts):
   // the effect only *starts* the one-time fetch and never cancels it.
@@ -85,36 +115,44 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
     liveLoaderRef.current = new LiveSearchLoader();
   }
 
+  // Apply a loader snapshot to the component: the successful sources'
+  // records become searchable, the failed sources are named, and the
+  // overall state is 'ready' only when nothing failed — 'partial' when
+  // some sources loaded and some failed, 'error' when none loaded.
+  const applyLiveSnapshot = useCallback((snapshot: LiveSearchSnapshot) => {
+    setLiveIssues(snapshot.sources.issues);
+    setLivePages(snapshot.sources.pages);
+    setLiveRequests(snapshot.sources.requests);
+    setLiveFailed(snapshot.failed);
+    const loadedCount =
+      snapshot.sources.issues.length + snapshot.sources.pages.length + snapshot.sources.requests.length;
+    if (snapshot.failed.length === 0) setLiveState('ready');
+    else if (loadedCount === 0) setLiveState('error');
+    else setLiveState('partial');
+  }, []);
+
   const startLiveFetch = useCallback(() => {
     const loader = liveLoaderRef.current;
-    if (!loader || loader.hasSources || loader.isFetching) return;
+    if (!loader || loader.isFetching) return;
     setLiveState('loading');
-    loader
-      .ensure(async (): Promise<LiveSearchSources> => {
-        const [issues, pages, requests] = await Promise.all([
-          fetchLiveJiraIssues(25),
-          fetchConfluencePages(20),
-          fetchJsmRequests(20),
-        ]);
-        if (!issues.ok && !pages.ok && !requests.ok) {
-          throw new Error('live search failed');
-        }
-        return {
-          issues: issues.ok ? issues.issues : [],
-          pages: pages.ok ? pages.pages : [],
-          requests: requests.ok ? requests.requests : [],
-        };
-      })
-      .then(
-        (sources) => {
-          setLiveIssues(sources.issues);
-          setLivePages(sources.pages);
-          setLiveRequests(sources.requests);
-          setLiveState('ready');
-        },
-        () => setLiveState('error'),
-      );
-  }, []);
+    loader.ensure(liveSourceFetchers()).then(applyLiveSnapshot);
+  }, [applyLiveSnapshot]);
+
+  // Retry one failed source: the loader refetches only sources that have
+  // not loaded, so the good sources are never fetched again and the
+  // retried source merges into the cache on success.
+  const retryLiveSource = useCallback(
+    (key: LiveSourceKey) => {
+      const loader = liveLoaderRef.current;
+      if (!loader || loader.isFetching) return;
+      setLiveRetrying((prev) => [...prev, key]);
+      loader.ensure(liveSourceFetchers()).then((snapshot) => {
+        applyLiveSnapshot(snapshot);
+        setLiveRetrying((prev) => prev.filter((k) => k !== key));
+      });
+    },
+    [applyLiveSnapshot],
+  );
 
   useEffect(() => {
     if (forgeMode !== 'forge' || query.trim().length < 2) return;
@@ -172,7 +210,7 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
   // under their own "Live" heading, never mixed into demo rows.
   const liveResults = useMemo<SearchResult[]>(() => {
     const q = query.trim().toLowerCase();
-    if (q.length < 2 || liveState !== 'ready') return [];
+    if (q.length < 2 || (liveState !== 'ready' && liveState !== 'partial')) return [];
     const out: SearchResult[] = [];
     for (const issue of liveIssues) {
       if (`${issue.key} ${issue.summary}`.toLowerCase().includes(q)) {
@@ -266,7 +304,26 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
                     </button>
                   </p>
                 )}
-                {liveState === 'ready' && liveResults.length === 0 && <p className="drop-empty">No live matches.</p>}
+                {liveState === 'partial' &&
+                  liveFailed.map((key) => (
+                    <p key={key} className="drop-empty">
+                      {LIVE_SOURCE_LABELS[key]} search failed.{' '}
+                      {liveRetrying.includes(key) ? (
+                        'Retrying…'
+                      ) : (
+                        <button className="link-btn" onClick={() => retryLiveSource(key)}>
+                          Retry {LIVE_SOURCE_LABELS[key]}
+                        </button>
+                      )}
+                    </p>
+                  ))}
+                {(liveState === 'ready' || liveState === 'partial') && liveResults.length === 0 && (
+                  <p className="drop-empty">
+                    {liveState === 'partial'
+                      ? 'No live matches in the sources that loaded.'
+                      : 'No live matches.'}
+                  </p>
+                )}
                 {liveResults.map((r) => {
                   const Icon = KIND_ICONS[r.kind] ?? CircleDot;
                   return (
