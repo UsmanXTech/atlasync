@@ -54,3 +54,13 @@ test('briefing puts blockers with unknown update dates after dated blockers', ()
   ], now);
   assert.deepEqual(digest.blockers.map((item) => item.key), ['ATL-OLD', 'ATL-NEW', 'ATL-UNKNOWN']);
 });
+
+test('briefing sorts work with an unknown updated date last in stale work', () => {
+  const digest = computeBriefingDigest([
+    issue('ATL-1', 'Low', 'Open', ''),
+    issue('ATL-2', 'Low', 'Open', '2026-11-09T12:00:00.000Z'),
+    issue('ATL-3', 'Low', 'Open', '2026-11-01T00:00:00.000Z'),
+  ], now);
+  assert.deepEqual(digest.staleItems.map((item) => item.key), ['ATL-3', 'ATL-2', 'ATL-1']);
+  assert.equal(digest.staleItems[2].ageDays, null);
+});

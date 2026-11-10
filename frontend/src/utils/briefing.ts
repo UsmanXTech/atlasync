@@ -44,8 +44,10 @@ export function computeBriefingDigest(issues: LiveIssue[], now = new Date()): Br
   const staleItems = [...open]
     .sort((a, b) => {
       const aDate = Date.parse(a.updated), bDate = Date.parse(b.updated);
-      if (!Number.isFinite(aDate)) return Number.isFinite(bDate) ? -1 : 0;
-      if (!Number.isFinite(bDate)) return 1;
+      // Unknown age sorts last: an issue with no usable updated date is
+      // not provably old, so it must not top the "oldest work" list.
+      if (!Number.isFinite(aDate)) return Number.isFinite(bDate) ? 1 : 0;
+      if (!Number.isFinite(bDate)) return -1;
       return aDate - bDate;
     })
     .slice(0, 5)
