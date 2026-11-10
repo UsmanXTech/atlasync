@@ -4,6 +4,7 @@ import Card from './Card';
 import { SAMPLE_JIRA_ISSUES } from '../data/mock';
 import type { LiveIssue } from '../data/types';
 import { fetchIssueDevStatus, fetchLiveJiraIssues, type JiraError, type LinkedPullRequest } from '../services/jira';
+import { formatUpdated } from '../utils/formatUpdated';
 
 type Mode = 'demo' | 'live';
 type LiveState =
@@ -16,18 +17,6 @@ type LiveState =
 // Demo mode shows fixed sample issues (labeled as such). Live mode loads
 // real issues through the Forge backend — in the standalone preview that
 // resolves to a backend-unreachable state, never to fake live data. Every other card on the dashboard stays mock.
-function formatUpdated(iso: string): string {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 function IssueRow({ issue }: { issue: LiveIssue }) {
   return (
     <div className="data-row">
