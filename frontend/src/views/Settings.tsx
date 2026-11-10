@@ -23,7 +23,7 @@ export default function Settings({ settings }: { settings: SettingsState }) {
       <div className="settings-layout">
         <Card
           title="Demo workspace profile"
-          subtitle="Local preview values — the demo workspace never scopes live data"
+          subtitle="The demo workspace never scopes live data"
         >
           <div className="settings-form">
             <div className="field">
@@ -97,8 +97,8 @@ export default function Settings({ settings }: { settings: SettingsState }) {
         </Card>
       </div>
       <div className="settings-notice">
-        <ShieldCheck size={16} /> These controls are not persisted. No automatic sync, alerts or
-        email jobs are enabled by changing them.
+        <ShieldCheck size={16} /> No automatic sync, alerts or email jobs are enabled by
+        changing them.
       </div>
     </div>
   );
