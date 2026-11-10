@@ -254,6 +254,9 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
             {forgeMode === 'forge' && (
               <>
                 <p className="drop-section">Live</p>
+                <p className="drop-note">
+                  Recent records only — 25 Jira issues · 20 Confluence pages · 20 JSM requests.
+                </p>
                 {liveState === 'loading' && <p className="drop-empty">Searching live sources…</p>}
                 {liveState === 'error' && (
                   <p className="drop-empty">
@@ -348,6 +351,7 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
                   <Check size={14} /> Mark all read
                 </button>
               </div>
+              <p className="drop-note">Sample notifications — read state is local only.</p>
               {notes.map((n) => (
                 <div key={n.id} className={`notif-row ${n.unread ? 'unread' : ''}`}>
                   <strong>{n.title}</strong>
