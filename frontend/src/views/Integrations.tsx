@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RefreshCw, CircleCheck, CircleAlert, PlugZap, GitPullRequest, BrainCircuit, Layers3 } from 'lucide-react';
+import { RefreshCw, CircleCheck, CircleAlert, PlugZap, GitPullRequest, BrainCircuit, Layers3, LifeBuoy } from 'lucide-react';
 import { fetchLiveJiraIssues } from '../services/jira';
 import { fetchConfluencePages } from '../services/confluence';
 import { fetchJsmRequests } from '../services/jsm';
@@ -21,7 +21,7 @@ export default function Integrations(){
  catch(e){if(!mountedRef.current)return;const detail=e instanceof Error?e.message:'Connection check failed.';setJira({state:'error',detail});setConfluence({state:'error',detail});setJsm({state:'error',detail});}finally{if(mountedRef.current){setChecking(false);setLastChecked(new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));}}},[]);
  useEffect(()=>{if(autoCheckRef.current)return;autoCheckRef.current=true;void check();},[check]);
  const checks=[jira,confluence,jsm],okCount=checks.filter(x=>x.state==='ok').length,anyChecking=checks.some(x=>x.state==='checking'),allIdle=checks.every(x=>x.state==='idle');
- const sources=[{name:'Jira',desc:'Issues and project metadata',note:'Forge asUser · Browse Projects permissions',check:jira,icon:PlugZap},{name:'Confluence',desc:'Pages and space metadata',note:'Forge asUser · content and space permissions',check:confluence,icon:Layers3},{name:'Jira Service Management',desc:'Customer and service requests',note:'Forge asUser · service-desk permissions',check:jsm,icon:CircleCheck}];
+ const sources=[{name:'Jira',desc:'Issues and project metadata',note:'Forge asUser · Browse Projects permissions',check:jira,icon:PlugZap},{name:'Confluence',desc:'Pages and space metadata',note:'Forge asUser · content and space permissions',check:confluence,icon:Layers3},{name:'Jira Service Management',desc:'Customer and service requests',note:'Forge asUser · service-desk permissions',check:jsm,icon:LifeBuoy}];
  return <div className="view workspace-view">
   <div className="workspace-heading"><div><div className="eyebrow">WORKSPACE / CONNECTIONS</div><h2>Integrations</h2><p>Connection health and access to your Atlassian tools.</p></div><button className="btn btn-primary" onClick={()=>void check()} disabled={checking}><RefreshCw size={14}/>{checking?'Checking…':'Check connections'}</button></div>
   <div className="integration-summary"><div><span className="summary-label">CONNECTED SOURCES</span><strong><span className="summary-number">{anyChecking?'…':allIdle?'–':okCount}</span><small> / 3</small></strong><span className="summary-status">{anyChecking?'Checking connections…':allIdle?'Not checked yet':lastChecked?`Last checked ${lastChecked}`:'Checked'}</span></div><p>Checks make small read-only requests as the signed-in Atlassian user. A successful probe is not a full sync.</p></div>
