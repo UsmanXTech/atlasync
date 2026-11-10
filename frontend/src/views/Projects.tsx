@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FolderKanban, RefreshCw, Search, Layers3 } from 'lucide-react';
+import { AlertTriangle, FolderKanban, RefreshCw, Search, Layers3 } from 'lucide-react';
 import { fetchLiveJiraProjects, type LiveJiraProject } from '../services/jira';
 
 export default function Projects() {
@@ -22,17 +22,21 @@ export default function Projects() {
     const text = `${p.key} ${p.name} ${p.projectType}`.toLowerCase();
     return text.includes(query.trim().toLowerCase()) && (kind === 'all' || p.projectType === kind);
   }), [projects, query, kind]);
+  // Failed with nothing loaded: the toolbar filters loaded projects, so it is
+  // dead controls in this state — the error block below carries the Retry.
+  const loadFailed = error !== null && projects.length === 0;
   return <div className="view workspace-view projects-view">
     <div className="workspace-heading">
       <div><div className="eyebrow">WORKSPACE / DELIVERY</div><h2>Projects</h2><p>Your Jira project portfolio, filtered by your current Atlassian permissions.</p></div>
       <button className="btn btn-primary" onClick={() => void load()} disabled={loading}><RefreshCw size={14}/>{loading ? 'Refreshing…' : 'Refresh projects'}</button>
     </div>
-    <div className="workspace-toolbar">
+    {!loadFailed && <div className="workspace-toolbar">
       <label className="workspace-search"><Search size={15}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Find a project…" aria-label="Filter projects"/></label>
       <div className="filter-pills"><button className={kind==='all'?'selected':''} onClick={()=>setKind('all')}>All projects <span>{projects.length}</span></button>{types.map(t=><button key={t} className={kind===t?'selected':''} onClick={()=>setKind(t)}>{t}</button>)}</div>
       <span className="results-count">{filtered.length} shown</span>
-    </div>
-    {error && <div className="inline-alert" role="alert">{error}</div>}
+    </div>}
+    {error && projects.length > 0 && <div className="inline-alert" role="alert">{error}</div>}
+    {loadFailed && <div className="workspace-empty workspace-empty-fill" role="alert"><AlertTriangle size={22} className="error-icon"/><strong>Couldn&apos;t load Jira projects</strong><span>{error}</span><button className="btn btn-primary" onClick={() => void load()} disabled={loading}><RefreshCw size={14}/>{loading ? 'Retrying…' : 'Retry'}</button></div>}
     {loading && projects.length===0 && <div className="workspace-empty"><RefreshCw size={18}/>Loading Jira projects…</div>}
     {!loading && !error && projects.length===0 && <div className="workspace-empty"><FolderKanban size={22}/><strong>No visible Jira projects</strong><span>Projects appear here when your Atlassian account has permission to browse them.</span></div>}
     {projects.length>0 && <div className="project-board">{filtered.map((p,i)=><article className="project-tile" key={p.id}>
