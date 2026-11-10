@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Bell,
@@ -26,6 +26,7 @@ import type { ViewId } from './Sidebar';
 import { fetchLiveJiraIssues } from '../services/jira';
 import { fetchConfluencePages } from '../services/confluence';
 import { fetchJsmRequests } from '../services/jsm';
+import { LiveSearchLoader, type LiveSearchSources } from '../utils/liveSearch';
 
 export type ForgeMode = 'loading' | 'forge' | 'standalone';
 
@@ -72,31 +73,53 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
   const [liveRequests, setLiveRequests] = useState<LiveJsmRequest[]>([]);
   const [liveState, setLiveState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
 
-  useEffect(() => {
-    const q = query.trim();
-    if (forgeMode !== 'forge' || q.length < 2 || liveState !== 'idle') return;
-    let cancelled = false;
+  // The fetch lifecycle lives in LiveSearchLoader (utils/liveSearch.ts):
+  // the effect only *starts* the one-time fetch and never cancels it.
+  // The previous version listed `liveState` as an effect dependency and
+  // cancelled the in-flight fetch in its cleanup, so
+  // `setLiveState('loading')` re-ran the effect, the new run exited on
+  // the guard, and the first fetch's response was discarded — the
+  // dropdown stuck in "Searching live sources…" forever.
+  const liveLoaderRef = useRef<LiveSearchLoader | null>(null);
+  if (liveLoaderRef.current === null) {
+    liveLoaderRef.current = new LiveSearchLoader();
+  }
+
+  const startLiveFetch = useCallback(() => {
+    const loader = liveLoaderRef.current;
+    if (!loader || loader.hasSources || loader.isFetching) return;
     setLiveState('loading');
-    void (async () => {
-      const [issues, pages, requests] = await Promise.all([
-        fetchLiveJiraIssues(25),
-        fetchConfluencePages(20),
-        fetchJsmRequests(20),
-      ]);
-      if (cancelled) return;
-      if (!issues.ok && !pages.ok && !requests.ok) {
-        setLiveState('error');
-        return;
-      }
-      if (issues.ok) setLiveIssues(issues.issues);
-      if (pages.ok) setLivePages(pages.pages);
-      if (requests.ok) setLiveRequests(requests.requests);
-      setLiveState('ready');
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [query, forgeMode, liveState]);
+    loader
+      .ensure(async (): Promise<LiveSearchSources> => {
+        const [issues, pages, requests] = await Promise.all([
+          fetchLiveJiraIssues(25),
+          fetchConfluencePages(20),
+          fetchJsmRequests(20),
+        ]);
+        if (!issues.ok && !pages.ok && !requests.ok) {
+          throw new Error('live search failed');
+        }
+        return {
+          issues: issues.ok ? issues.issues : [],
+          pages: pages.ok ? pages.pages : [],
+          requests: requests.ok ? requests.requests : [],
+        };
+      })
+      .then(
+        (sources) => {
+          setLiveIssues(sources.issues);
+          setLivePages(sources.pages);
+          setLiveRequests(sources.requests);
+          setLiveState('ready');
+        },
+        () => setLiveState('error'),
+      );
+  }, []);
+
+  useEffect(() => {
+    if (forgeMode !== 'forge' || query.trim().length < 2) return;
+    startLiveFetch();
+  }, [query, forgeMode, startLiveFetch]);
 
   // Escape closes any open dropdown — keyboard users are never trapped.
   useEffect(() => {
@@ -235,7 +258,7 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
                 {liveState === 'error' && (
                   <p className="drop-empty">
                     Live search unavailable right now.{' '}
-                    <button className="link-btn" onClick={() => setLiveState('idle')}>
+                    <button className="link-btn" onClick={startLiveFetch}>
                       Retry
                     </button>
                   </p>
