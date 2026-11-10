@@ -1,4 +1,5 @@
 import type { LiveIssue } from '../data/types';
+import { backendUnreachableError, serviceUnreachableMessage, UNEXPECTED_RESPONSE_MESSAGE } from './errors';
 
 // Jira data service — the frontend's only path to Jira data.
 //
@@ -29,10 +30,7 @@ export type JiraIssuesResult =
   | { ok: true; issues: LiveIssue[] }
   | { ok: false; error: JiraError };
 
-const BACKEND_UNREACHABLE: JiraError = {
-  kind: 'BACKEND_UNREACHABLE',
-  message: 'Live Jira could not reach the Forge backend. Try again shortly.',
-};
+const BACKEND_UNREACHABLE: JiraError = backendUnreachableError('Jira');
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -89,14 +87,14 @@ export async function fetchIssueDevStatus(issueId: string): Promise<DevStatusRes
     if (!isRecord(result) || typeof result.ok !== 'boolean') {
       return {
         ok: false,
-        error: { kind: 'API_ERROR', message: 'The Forge backend returned an unexpected response. Try again shortly.' },
+        error: { kind: 'API_ERROR', message: UNEXPECTED_RESPONSE_MESSAGE },
       };
     }
     if (result.ok) {
       if (!Array.isArray(result.pullRequests)) {
         return {
           ok: false,
-          error: { kind: 'API_ERROR', message: 'The Forge backend returned an unexpected response. Try again shortly.' },
+          error: { kind: 'API_ERROR', message: UNEXPECTED_RESPONSE_MESSAGE },
         };
       }
       const pullRequests: LinkedPullRequest[] = [];
@@ -121,7 +119,7 @@ export async function fetchIssueDevStatus(issueId: string): Promise<DevStatusRes
     }
     return {
       ok: false,
-      error: { kind: 'API_ERROR', message: 'Jira could not be reached. Try again shortly.' },
+      error: { kind: 'API_ERROR', message: serviceUnreachableMessage('Jira') },
     };
   } catch {
     return { ok: false, error: BACKEND_UNREACHABLE };
@@ -141,7 +139,7 @@ export async function fetchLiveJiraIssues(maxResults = 25): Promise<JiraIssuesRe
         ok: false,
         error: {
           kind: 'API_ERROR',
-          message: 'The Forge backend returned an unexpected response. Try again shortly.',
+          message: UNEXPECTED_RESPONSE_MESSAGE,
         },
       };
     }
@@ -151,7 +149,7 @@ export async function fetchLiveJiraIssues(maxResults = 25): Promise<JiraIssuesRe
           ok: false,
           error: {
             kind: 'API_ERROR',
-            message: 'The Forge backend returned an unexpected response. Try again shortly.',
+            message: UNEXPECTED_RESPONSE_MESSAGE,
           },
         };
       }
@@ -177,7 +175,7 @@ export async function fetchLiveJiraIssues(maxResults = 25): Promise<JiraIssuesRe
     }
     return {
       ok: false,
-      error: { kind: 'API_ERROR', message: 'Jira could not be reached. Try again shortly.' },
+      error: { kind: 'API_ERROR', message: serviceUnreachableMessage('Jira') },
     };
   } catch {
     return { ok: false, error: BACKEND_UNREACHABLE };
@@ -190,13 +188,13 @@ export async function fetchLiveJiraProjects(limit = 25): Promise<JiraProjectsRes
   try {
     const { invoke } = await import('@forge/bridge');
     const result: unknown = await invoke('getJiraProjects', { limit });
-    if (!isRecord(result) || typeof result.ok !== 'boolean') return { ok: false, error: { kind: 'API_ERROR', message: 'Unexpected response from Forge.' } };
+    if (!isRecord(result) || typeof result.ok !== 'boolean') return { ok: false, error: { kind: 'API_ERROR', message: UNEXPECTED_RESPONSE_MESSAGE } };
     if (result.ok) {
-      if (!Array.isArray(result.projects)) return { ok: false, error: { kind: 'API_ERROR', message: 'Unexpected Jira project response.' } };
+      if (!Array.isArray(result.projects)) return { ok: false, error: { kind: 'API_ERROR', message: UNEXPECTED_RESPONSE_MESSAGE } };
       const projects: LiveJiraProject[] = result.projects.filter(isRecord).flatMap((p) => typeof p.id === 'string' && typeof p.key === 'string' && typeof p.name === 'string' ? [{ id: p.id, key: p.key, name: p.name, projectType: typeof p.projectType === 'string' ? p.projectType : 'Unknown' }] : []);
       return { ok: true, projects };
     }
     const error = isRecord(result.error) ? result.error : {};
-    return { ok: false, error: { kind: typeof error.kind === 'string' ? error.kind as JiraErrorKind : 'API_ERROR', message: typeof error.message === 'string' ? error.message : 'Jira projects could not be loaded.' } };
+    return { ok: false, error: { kind: typeof error.kind === 'string' ? error.kind as JiraErrorKind : 'API_ERROR', message: typeof error.message === 'string' ? error.message : serviceUnreachableMessage('Jira') } };
   } catch { return { ok: false, error: BACKEND_UNREACHABLE }; }
 }
