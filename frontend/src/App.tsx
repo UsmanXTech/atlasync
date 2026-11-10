@@ -64,7 +64,7 @@ export default function App() {
             {view === 'intelligence' && <Intelligence conversation={intelligence} />}
             {view === 'projects' && <Projects />}
             {view === 'integrations' && <Integrations />}
-            {view === 'agents' && <Agents onNavigate={setView} />}
+            {view === 'agents' && <Agents onNavigate={setView} conversation={intelligence} />}
             {view === 'insights' && <Insights />}
             {view === 'settings' && <Settings workspace={workspace} />}
           </ErrorBoundary>
