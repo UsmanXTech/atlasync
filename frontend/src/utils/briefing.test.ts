@@ -45,3 +45,12 @@ test('briefing does not invent an age when Jira updated timestamp is missing', (
   const digest = computeBriefingDigest([issue('ATL-1', 'High', 'Open', '')], now);
   assert.equal(digest.staleItems[0].ageDays, null);
 });
+
+test('briefing puts blockers with unknown update dates after dated blockers', () => {
+  const digest = computeBriefingDigest([
+    issue('ATL-UNKNOWN', 'Highest', 'Open', ''),
+    issue('ATL-OLD', 'Highest', 'Open', '2026-11-01T00:00:00.000Z'),
+    issue('ATL-NEW', 'Highest', 'Open', '2026-11-08T00:00:00.000Z'),
+  ], now);
+  assert.deepEqual(digest.blockers.map((item) => item.key), ['ATL-OLD', 'ATL-NEW', 'ATL-UNKNOWN']);
+});
