@@ -1,5 +1,6 @@
 import { Send, Sparkles, Database, RotateCcw, ShieldCheck, Square } from 'lucide-react';
 import Card from '../components/Card';
+import IntelligenceBriefing from '../components/IntelligenceBriefing';
 import MarkdownText from '../components/Markdown';
 import { INTELLIGENCE_PRESETS, type IntelligenceConversation } from '../hooks/useIntelligenceConversation';
 
@@ -19,6 +20,7 @@ export default function Intelligence({ conversation }: { conversation: Intellige
           <Sparkles size={14} /> READ-ONLY ANALYSIS
         </span>
       </div>
+      <IntelligenceBriefing />
       <div className="intelligence-layout">
         <section className="intelligence-primary">
           <div className="intelligence-welcome">
