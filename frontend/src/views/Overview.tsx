@@ -50,7 +50,7 @@ export default function Overview({workspaceId,onNavigate,conversation}:{workspac
    <section className="overview-column">
     <Card className="overview-live-card" title="Jira issues" subtitle="Read-only · switch demo or live data"><JiraIssuesCard/></Card>
     <Card className="overview-live-card" title="Confluence pages"><ConfluencePagesCard conversation={conversation} onNavigate={onNavigate} /></Card>
-    <Card className="overview-live-card" title="JSM requests"><JsmRequestsCard/></Card>
+    <Card className="overview-live-card" title="JSM requests"><JsmRequestsCard conversation={conversation} onNavigate={onNavigate} /></Card>
    </section>
    <section className="overview-column">
     <Card title="Recent activity" subtitle="Sample event stream" action={<div className="chip-row">{([0,7,30] as const).map(r=><button key={r} className={`chip ${range===r?'active':''}`} onClick={()=>setRange(r)}>{r===0?'Today':`${r}D`}</button>)}</div>}>

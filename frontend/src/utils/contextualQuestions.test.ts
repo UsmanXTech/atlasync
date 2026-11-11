@@ -30,6 +30,14 @@ test('confluence contextual question names every confluence topic', () => {
   }
 });
 
+test('jsm contextual question names every jsm topic', () => {
+  const q = contextualQuestionFor('jsm');
+  assert.equal(q, CONTEXTUAL_QUESTIONS.jsm);
+  for (const topic of ['live JSM requests', 'request types', 'statuses', 'priorities', 'attention']) {
+    assert.ok(q.includes(topic), `question should name "${topic}"`);
+  }
+});
+
 test('contextual questions stay inside the resolver prompt limit and carry no invented data', () => {
   for (const q of Object.values(CONTEXTUAL_QUESTIONS)) {
     assert.ok(q.length >= 1 && q.length <= 1500, `question length ${q.length} outside 1–1500`);

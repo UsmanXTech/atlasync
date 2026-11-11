@@ -25,6 +25,13 @@
 // and cleanup, never about recency or page contents; the card's own
 // "Updated …" line comes from the card's separate 20-page fetch, not from
 // the ask snapshot.
+//
+// JSM nuance: the snapshot's JSM slice carries key + summary + status +
+// requestType + priority only — no created dates, no requester, no comments
+// or request bodies. The jsm question therefore asks about request types,
+// statuses, and priorities, never about age/recency, who asked, or what a
+// request says beyond its summary; the card's own 20-request fetch is a
+// wider list than the 10-request ask snapshot.
 export const CONTEXTUAL_QUESTIONS = {
   overview:
     'From this workspace overview — open issues, active blockers, PRs awaiting action, open incidents, and release readiness — what are the top risks right now, and what should we tackle first?',
@@ -32,6 +39,8 @@ export const CONTEXTUAL_QUESTIONS = {
     'From the live Jira projects — looking at the recent open work, which projects carry the most open issues and blockers, and which project needs attention first?',
   confluence:
     'From the live Confluence pages — looking at page status across the workspace, which pages are archived, drafted, or otherwise need attention, and what should we clean up or update first?',
+  jsm:
+    'From the live JSM requests — looking at request types, statuses, and priorities across the service desk, which requests need attention first, and are any request types piling up?',
 } as const;
 
 export type ContextualView = keyof typeof CONTEXTUAL_QUESTIONS;
