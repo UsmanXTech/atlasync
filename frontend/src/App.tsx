@@ -10,13 +10,14 @@ import Agents from './views/Agents';
 import Insights from './views/Insights';
 import Settings from './views/Settings';
 import { WORKSPACES } from './data/mock';
+import { DEFAULT_VIEW } from './utils/defaultView';
 import { useIntelligenceConversation } from './hooks/useIntelligenceConversation';
 import { useSettingsState } from './hooks/useSettingsState';
 
 // Atlasync application shell: persistent navigation and a viewport-fitted content region.
 // Live views retain their own loading, empty, and error states.
 export default function App() {
-  const [view, setView] = useState<ViewId>('overview');
+  const [view, setView] = useState<ViewId>(DEFAULT_VIEW);
   const [workspaceId, setWorkspaceId] = useState('hq');
   const [forgeMode, setForgeMode] = useState<ForgeMode>('loading');
   const [menuOpen, setMenuOpen] = useState(false);
