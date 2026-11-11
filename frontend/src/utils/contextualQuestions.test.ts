@@ -22,6 +22,14 @@ test('projects contextual question names every projects topic', () => {
   }
 });
 
+test('confluence contextual question names every confluence topic', () => {
+  const q = contextualQuestionFor('confluence');
+  assert.equal(q, CONTEXTUAL_QUESTIONS.confluence);
+  for (const topic of ['live Confluence pages', 'page status', 'archived', 'attention', 'clean up']) {
+    assert.ok(q.includes(topic), `question should name "${topic}"`);
+  }
+});
+
 test('contextual questions stay inside the resolver prompt limit and carry no invented data', () => {
   for (const q of Object.values(CONTEXTUAL_QUESTIONS)) {
     assert.ok(q.length >= 1 && q.length <= 1500, `question length ${q.length} outside 1–1500`);

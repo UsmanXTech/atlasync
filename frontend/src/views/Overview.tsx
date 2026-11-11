@@ -49,7 +49,7 @@ export default function Overview({workspaceId,onNavigate,conversation}:{workspac
    </section>
    <section className="overview-column">
     <Card className="overview-live-card" title="Jira issues" subtitle="Read-only · switch demo or live data"><JiraIssuesCard/></Card>
-    <Card className="overview-live-card" title="Confluence pages"><ConfluencePagesCard/></Card>
+    <Card className="overview-live-card" title="Confluence pages"><ConfluencePagesCard conversation={conversation} onNavigate={onNavigate} /></Card>
     <Card className="overview-live-card" title="JSM requests"><JsmRequestsCard/></Card>
    </section>
    <section className="overview-column">
