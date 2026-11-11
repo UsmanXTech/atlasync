@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, FolderKanban, RefreshCw, Search, Layers3 } from 'lucide-react';
+import { AlertTriangle, FolderKanban, RefreshCw, Search, Layers3, Sparkles } from 'lucide-react';
 import { fetchLiveJiraProjects, type LiveJiraProject } from '../services/jira';
+import { contextualQuestionFor } from '../utils/contextualQuestions';
+import type { IntelligenceConversation } from '../hooks/useIntelligenceConversation';
+import type { ViewId } from '../components/Sidebar';
 
-export default function Projects() {
+export default function Projects({onNavigate,conversation}:{onNavigate:(view:ViewId)=>void;conversation:IntelligenceConversation}) {
   const [projects, setProjects] = useState<LiveJiraProject[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,10 +28,15 @@ export default function Projects() {
   // Failed with nothing loaded: the toolbar filters loaded projects, so it is
   // dead controls in this state — the error block below carries the Retry.
   const loadFailed = error !== null && projects.length === 0;
+  // Phase 2 contextual ask: one tap asks Intelligence about this view and
+  // opens the answer there (Overview pattern, Run 83). The ask does not
+  // depend on the projects list loading — the resolver answers from its
+  // own live snapshot — so the button stays visible in the error state too.
+  const askAboutThis=()=>{conversation.ask(contextualQuestionFor('projects'));onNavigate('intelligence');};
   return <div className="view workspace-view projects-view">
     <div className="workspace-heading">
       <div><div className="eyebrow">WORKSPACE / DELIVERY</div><h2>Projects</h2><p>Your Jira project portfolio, filtered by your current Atlassian permissions.</p></div>
-      <div className="workspace-heading-actions">{!error && projects.length > 0 && <span className="pill healthy">Jira connected</span>}<button className="btn btn-primary" onClick={() => void load()} disabled={loading}><RefreshCw size={14}/>{loading ? 'Refreshing…' : 'Refresh projects'}</button></div>
+      <div className="workspace-heading-actions">{!error && projects.length > 0 && <span className="pill healthy">Jira connected</span>}<button className="btn btn-primary" onClick={()=>askAboutThis()}><Sparkles size={14}/> Ask about this</button><button className="btn btn-primary" onClick={() => void load()} disabled={loading}><RefreshCw size={14}/>{loading ? 'Refreshing…' : 'Refresh projects'}</button></div>
     </div>
     {!loadFailed && <div className="workspace-toolbar">
       <label className="workspace-search"><Search size={15}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Find a project…" aria-label="Filter projects"/></label>

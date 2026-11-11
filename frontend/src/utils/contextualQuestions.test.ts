@@ -14,6 +14,14 @@ test('overview contextual question names every overview topic', () => {
   }
 });
 
+test('projects contextual question names every projects topic', () => {
+  const q = contextualQuestionFor('projects');
+  assert.equal(q, CONTEXTUAL_QUESTIONS.projects);
+  for (const topic of ['live Jira projects', 'open issues', 'blockers', 'attention']) {
+    assert.ok(q.includes(topic), `question should name "${topic}"`);
+  }
+});
+
 test('contextual questions stay inside the resolver prompt limit and carry no invented data', () => {
   for (const q of Object.values(CONTEXTUAL_QUESTIONS)) {
     assert.ok(q.length >= 1 && q.length <= 1500, `question length ${q.length} outside 1–1500`);
