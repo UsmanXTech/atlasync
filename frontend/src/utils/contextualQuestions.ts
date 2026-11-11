@@ -11,9 +11,18 @@
 // (10 Jira issues / 10 Confluence pages / 10 JSM requests) it already
 // receives server-side; the question only tells it which slice of the
 // workspace the user is looking at.
+//
+// Projects nuance: the snapshot carries no project list — but every Jira
+// issue key carries its project prefix, so project-level grouping is
+// derivable from the recent-issues slice. The projects question therefore
+// asks about "the recent open work" per project, never about the project
+// list itself, and the system prompt's state-when-evidence-is-missing rule
+// covers the 10-issue bound.
 export const CONTEXTUAL_QUESTIONS = {
   overview:
     'From this workspace overview — open issues, active blockers, PRs awaiting action, open incidents, and release readiness — what are the top risks right now, and what should we tackle first?',
+  projects:
+    'From the live Jira projects — looking at the recent open work, which projects carry the most open issues and blockers, and which project needs attention first?',
 } as const;
 
 export type ContextualView = keyof typeof CONTEXTUAL_QUESTIONS;
