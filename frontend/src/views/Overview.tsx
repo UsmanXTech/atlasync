@@ -10,15 +10,21 @@ import { BarList } from '../components/Bars';
 import { ACTIVITY,BLOCKERS,INCIDENTS,ISSUES_BY_PRIORITY,ISSUES_BY_STATUS,PROJECTS,PULL_REQUESTS } from '../data/mock';
 import { overviewStatContext } from '../utils/overviewStats';
 import { computeReadiness, type ReadinessResult } from '../utils/readiness';
+import { contextualQuestionFor } from '../utils/contextualQuestions';
+import type { IntelligenceConversation } from '../hooks/useIntelligenceConversation';
 import { fetchLiveJiraIssues } from '../services/jira';
 import type { ActivityKind,PrStatus,WorkspaceId } from '../data/types';
 import type { ViewId } from '../components/Sidebar';
 const KIND_ICONS:Record<ActivityKind,typeof CircleDot>={jira:CircleDot,confluence:FileText,bitbucket:GitPullRequest,jsm:AlertTriangle,ai:Sparkles};
 function ageLabel(days:number){if(days===0)return'Today';if(days===1)return'Yesterday';return `${days} days ago`;}
 type ReadinessState={status:'sample'}|{status:'loading'}|{status:'live';result:ReadinessResult}|{status:'error';message:string};
-export default function Overview({workspaceId,onNavigate}:{workspaceId:WorkspaceId;onNavigate:(view:ViewId)=>void}){
+export default function Overview({workspaceId,onNavigate,conversation}:{workspaceId:WorkspaceId;onNavigate:(view:ViewId)=>void;conversation:IntelligenceConversation}){
  const [resolved,setResolved]=useState<string[]>([]),[prFilter,setPrFilter]=useState<'all'|PrStatus>('all'),[range,setRange]=useState<0|7|30>(7);
  const [readiness,setReadiness]=useState<ReadinessState>({status:'sample'});
+ // Phase 2 contextual ask: one tap asks Intelligence about this view and
+ // opens the answer there (Agents "Try it" pattern, Run 16). The question
+ // names the view's topics, never its sample numbers (see utils/contextualQuestions).
+ const askAboutThis=()=>{conversation.ask(contextualQuestionFor('overview'));onNavigate('intelligence');};
  const calcReadiness=async()=>{setReadiness({status:'loading'});const r=await fetchLiveJiraIssues(50);if(!r.ok){setReadiness({status:'error',message:r.error.message});return;}const result=computeReadiness(r.issues);if(!result){setReadiness({status:'error',message:'No Jira issues found for the default query (recently updated, newest first) — nothing to score.'});return;}setReadiness({status:'live',result});};
  const projects=useMemo(()=>PROJECTS.filter(p=>p.workspace===workspaceId),[workspaceId]);
  const blockers=useMemo(()=>BLOCKERS.filter(b=>b.workspace===workspaceId&&!resolved.includes(b.id)),[workspaceId,resolved]);
@@ -28,7 +34,7 @@ export default function Overview({workspaceId,onNavigate}:{workspaceId:Workspace
  const openIssues=projects.reduce((sum,p)=>sum+p.openIssues,0),awaitingPrs=PULL_REQUESTS.filter(p=>p.workspace===workspaceId&&(p.status==='review'||p.status==='changes')),prsInReview=awaitingPrs.length,openIncidents=incidents.filter(i=>i.status!=='resolved').length;
  const statCtx=useMemo(()=>overviewStatContext(projects,blockers,awaitingPrs,incidents),[projects,blockers,awaitingPrs,incidents]);
  return <div className="view overview-view">
-  <div className="view-head"><div><h2>Workspace overview</h2><p>Delivery snapshot across connected tools.</p></div><span className="mock-badge">SAMPLE METRICS · LIVE SOURCES BELOW</span></div>
+  <div className="view-head"><div><h2>Workspace overview</h2><p>Delivery snapshot across connected tools.</p></div><div className="view-head-actions"><span className="mock-badge">SAMPLE METRICS · LIVE SOURCES BELOW</span><button className="btn btn-primary" onClick={()=>askAboutThis()}><Sparkles size={14}/> Ask about this</button></div></div>
   <div className="stat-grid">
    <Stat label="Open issues" value={String(openIssues)} delta={statCtx.issues.text} tone={statCtx.issues.tone} icon={ListTodo}/>
    <Stat label="Active blockers" value={String(blockers.length)} delta={statCtx.blockers.text} tone={statCtx.blockers.tone} icon={ShieldAlert}/>

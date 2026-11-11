@@ -67,7 +67,7 @@ export default function App() {
         />
         <main id="main-content" tabIndex={-1}>
           <ErrorBoundary key={view}>
-            {view === 'overview' && <Overview workspaceId={workspace.id} onNavigate={setView} />}
+            {view === 'overview' && <Overview workspaceId={workspace.id} onNavigate={setView} conversation={intelligence} />}
             {view === 'intelligence' && <Intelligence conversation={intelligence} />}
             {view === 'projects' && <Projects />}
             {view === 'integrations' && <Integrations />}
