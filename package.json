@@ -6,7 +6,7 @@
     "build": "npm run build -w frontend",
     "dev": "npm run dev -w frontend",
     "preview": "npm run preview -w frontend",
-    "test": "node scripts/check-resolver.mjs && node --test forge-app/tests/jira.test.js forge-app/tests/devstatus.test.js forge-app/tests/confluence.test.js forge-app/tests/jsm.test.js forge-app/tests/projects.test.js forge-app/tests/resolver-init.test.js frontend/src/utils/requestGeneration.test.ts frontend/src/utils/liveSearch.test.ts frontend/src/utils/confluenceRow.test.ts frontend/src/utils/agentExamples.test.ts frontend/src/utils/settingsState.test.ts frontend/src/utils/appInfo.test.ts frontend/src/utils/briefing.test.ts frontend/src/utils/overviewBriefing.test.ts frontend/src/utils/defaultView.test.ts frontend/src/utils/contextualQuestions.test.ts"
+    "test": "node scripts/check-resolver.mjs && node --test forge-app/tests/jira.test.js forge-app/tests/devstatus.test.js forge-app/tests/confluence.test.js forge-app/tests/jsm.test.js forge-app/tests/projects.test.js forge-app/tests/resolver-init.test.js frontend/src/utils/requestGeneration.test.ts frontend/src/utils/liveSearch.test.ts frontend/src/utils/confluenceRow.test.ts frontend/src/utils/agentExamples.test.ts frontend/src/utils/settingsState.test.ts frontend/src/utils/appInfo.test.ts frontend/src/utils/briefing.test.ts frontend/src/utils/overviewBriefing.test.ts frontend/src/utils/defaultView.test.ts frontend/src/utils/contextualQuestions.test.ts frontend/src/utils/briefingSummary.test.ts"
   },
   "version": "0.2.0",
   "workspaces": [
