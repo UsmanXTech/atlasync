@@ -3,6 +3,7 @@ import { AlertTriangle,ArrowRight,CircleDot,FileText,GitPullRequest,ListTodo,Shi
 import Card from '../components/Card';
 import Gauge from '../components/Gauge';
 import JiraIssuesCard from '../components/JiraIssuesCard';
+import OverviewBriefingCard from '../components/OverviewBriefingCard';
 import ConfluencePagesCard from '../components/ConfluencePagesCard';
 import JsmRequestsCard from '../components/JsmRequestsCard';
 import Stat from '../components/Stat';
@@ -48,6 +49,7 @@ export default function Overview({workspaceId,onNavigate,conversation}:{workspac
     <Card title="Active blockers" subtitle="Sample data · local demo resolve actions"><div className="row-list">{blockers.map(b=><div className="data-row" key={b.id}><div className="row-main"><strong>{b.key} · {b.title}</strong><small>{b.owner} · {b.ageDays} days open</small></div><span className={`pill ${b.severity}`}>{b.severity}</span><button className="btn btn-small" onClick={()=>setResolved(v=>[...v,b.id])}>Resolve</button></div>)}{blockers.length===0&&<p className="source-empty">No demo blockers remaining.</p>}</div></Card>
    </section>
    <section className="overview-column">
+    <Card className="overview-live-card" title="Today’s briefing" subtitle="Live blocker + stale watch"><OverviewBriefingCard onNavigate={onNavigate}/></Card>
     <Card className="overview-live-card" title="Jira issues" subtitle="Read-only · switch demo or live data"><JiraIssuesCard/></Card>
     <Card className="overview-live-card" title="Confluence pages"><ConfluencePagesCard conversation={conversation} onNavigate={onNavigate} /></Card>
     <Card className="overview-live-card" title="JSM requests"><JsmRequestsCard conversation={conversation} onNavigate={onNavigate} /></Card>
