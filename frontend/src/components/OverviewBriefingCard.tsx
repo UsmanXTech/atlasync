@@ -1,25 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowRight, RefreshCw, Sparkles, Square } from 'lucide-react';
 import Card from './Card';
 import MarkdownText from './Markdown';
 import { fetchLiveJiraIssues, type JiraError } from '../services/jira';
-import { askAtlasync } from '../services/intelligence';
 import { computeBriefingDigest } from '../utils/briefing';
 import { pickBriefingTeaser, STALE_THRESHOLD_DAYS, type BriefingTeaser } from '../utils/overviewBriefing';
-import { BRIEFING_SUMMARY_QUESTION, BRIEFING_SUMMARY_SNAPSHOT_LABEL } from '../utils/briefingSummary';
-import { RequestGeneration } from '../utils/requestGeneration';
+import { BRIEFING_SUMMARY_SNAPSHOT_LABEL } from '../utils/briefingSummary';
+import type { BriefingSummary } from '../hooks/useBriefingSummary';
 import type { ViewId } from './Sidebar';
 
 type BriefingState =
   | { status: 'loading' }
   | { status: 'ready'; teaser: BriefingTeaser }
   | { status: 'error'; error: JiraError };
-
-type SummaryState =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'ready'; answer: string }
-  | { status: 'error'; message: string };
 
 // Phase 3 slice 1 — the proactive teaser on Overview. Two rows only:
 // the single highest-priority live blocker and the single oldest live
@@ -36,15 +29,19 @@ type SummaryState =
 // Intelligence for exactly one sentence about what needs attention
 // most. Forge LLM is metered, so one tap is exactly one call, a tap
 // while a summary is loading is ignored, and nothing is called on
-// load. The summary is card-local (its own RequestGeneration guard,
-// same pattern as the Intelligence hook — @forge/bridge invoke() has
-// no abort, so a late response is discarded instead): it never
-// touches the shared Intelligence conversation, so it cannot wipe an
-// analysis running there. The cost is that leaving Overview discards
-// the summary — one more tap re-fetches it. Refreshing the teaser
-// also clears the summary: it was computed from the previous
-// snapshot. The answer renders with the shared MarkdownText (Run 1),
+// load. The answer renders with the shared MarkdownText (Run 1),
 // and the snapshot it was answered from is labelled next to it.
+//
+// Phase 3 slice 3 — the summary state lives in App now (hook
+// useBriefingSummary, same lift as the Intelligence conversation in
+// Run 3), so it survives navigating away and back instead of being
+// discarded with the card. A metered answer is never thrown away by
+// a view switch. Refreshing the teaser still retires the summary —
+// but only when a fresh snapshot actually arrives: a failed refresh
+// leaves it alone, because no new snapshot exists to supersede it.
+// The mount load never clears it (the card reloads its rows on every
+// visit; the summary keeps its snapshot label, the same staleness
+// the preserved Intelligence answer already has).
 function TeaserRow({ tag, tagTone, item }: { tag: string; tagTone: string; item: { key: string; summary: string; ageDays: number | null } }) {
   return (
     <div className="briefing-row">
@@ -57,48 +54,26 @@ function TeaserRow({ tag, tagTone, item }: { tag: string; tagTone: string; item:
   );
 }
 
-export default function OverviewBriefingCard({ onNavigate }: { onNavigate: (view: ViewId) => void }) {
+export default function OverviewBriefingCard({ onNavigate, briefingSummary }: { onNavigate: (view: ViewId) => void; briefingSummary: BriefingSummary }) {
   const [state, setState] = useState<BriefingState>({ status: 'loading' });
-  const [summary, setSummary] = useState<SummaryState>({ status: 'idle' });
-  const generationsRef = useRef<RequestGeneration | null>(null);
-  if (generationsRef.current === null) generationsRef.current = new RequestGeneration();
-  const generations = generationsRef.current;
+  const { summary, summarize, stop, reset } = briefingSummary;
 
-  const load = async () => {
-    // A fresh teaser snapshot retires any summary computed from the old
-    // one: the late response is discarded by the generation guard.
-    generations.invalidate();
-    setSummary({ status: 'idle' });
+  // Returns whether a fresh snapshot arrived. The caller decides
+  // whether the summary survives: mount loads never retire it, an
+  // explicit refresh retires it only on success (see slice 3 note).
+  const load = async (): Promise<boolean> => {
     setState({ status: 'loading' });
     const result = await fetchLiveJiraIssues(25);
     if (!result.ok) {
       setState({ status: 'error', error: result.error });
-      return;
+      return false;
     }
     setState({ status: 'ready', teaser: pickBriefingTeaser(computeBriefingDigest(result.issues)) });
+    return true;
   };
 
-  const summarize = async () => {
-    if (summary.status === 'loading') return; // metered: never double-fire
-    const generation = generations.next();
-    setSummary({ status: 'loading' });
-    try {
-      const r = await askAtlasync(BRIEFING_SUMMARY_QUESTION);
-      if (!generations.isCurrent(generation)) return; // superseded — ignore
-      if (r.ok) setSummary({ status: 'ready', answer: r.answer });
-      else setSummary({ status: 'error', message: r.error.message });
-    } catch (e) {
-      if (!generations.isCurrent(generation)) return; // superseded — ignore
-      setSummary({ status: 'error', message: e instanceof Error ? e.message : 'The summary request failed.' });
-    }
-  };
-
-  // Stop the summary from the user's point of view: the late response
-  // is ignored (see generation note above). The Forge backend call
-  // itself cannot be aborted mid-flight.
-  const stopSummary = () => {
-    generations.invalidate();
-    setSummary({ status: 'idle' });
+  const refresh = async () => {
+    if (await load()) reset();
   };
 
   useEffect(() => { void load(); }, []);
@@ -110,7 +85,7 @@ export default function OverviewBriefingCard({ onNavigate }: { onNavigate: (view
       action={
         <div className="chip-row">
           {summary.status === 'loading' ? (
-            <button className="btn btn-small" onClick={stopSummary} aria-label="Stop summary">
+            <button className="btn btn-small" onClick={stop} aria-label="Stop summary">
               <Square size={13} /> Stop
             </button>
           ) : (
@@ -118,7 +93,7 @@ export default function OverviewBriefingCard({ onNavigate }: { onNavigate: (view
               <Sparkles size={13} /> Summarize
             </button>
           )}
-          <button className="btn btn-small" onClick={() => void load()} disabled={state.status === 'loading'}>
+          <button className="btn btn-small" onClick={() => void refresh()} disabled={state.status === 'loading'}>
             <RefreshCw size={13} /> Refresh
           </button>
         </div>
@@ -131,7 +106,7 @@ export default function OverviewBriefingCard({ onNavigate }: { onNavigate: (view
         <div>
           <p className="source-error" role="alert">{state.error.message}</p>
           <div className="row-actions">
-            <button className="btn btn-primary" onClick={() => void load()}>
+            <button className="btn btn-primary" onClick={() => void refresh()}>
               <RefreshCw size={14} /> Retry
             </button>
           </div>

@@ -12,6 +12,7 @@ import Settings from './views/Settings';
 import { WORKSPACES } from './data/mock';
 import { DEFAULT_VIEW } from './utils/defaultView';
 import { useIntelligenceConversation } from './hooks/useIntelligenceConversation';
+import { useBriefingSummary } from './hooks/useBriefingSummary';
 import { useSettingsState } from './hooks/useSettingsState';
 
 // Atlasync application shell: persistent navigation and a viewport-fitted content region.
@@ -24,6 +25,11 @@ export default function App() {
   // Lives above the view switch: the Intelligence answer must survive
   // navigating away and back (the view unmounts on switch).
   const intelligence = useIntelligenceConversation();
+
+  // Same pattern as Intelligence: the briefing card's LLM summary is a
+  // metered call, so it must survive navigating away and back instead
+  // of being discarded (and re-paid for) on every view switch.
+  const briefingSummary = useBriefingSummary();
 
   const workspace = WORKSPACES.find((w) => w.id === workspaceId) ?? WORKSPACES[0];
 
@@ -67,7 +73,7 @@ export default function App() {
         />
         <main id="main-content" tabIndex={-1}>
           <ErrorBoundary key={view}>
-            {view === 'overview' && <Overview workspaceId={workspace.id} onNavigate={setView} conversation={intelligence} />}
+            {view === 'overview' && <Overview workspaceId={workspace.id} onNavigate={setView} conversation={intelligence} briefingSummary={briefingSummary} />}
             {view === 'intelligence' && <Intelligence conversation={intelligence} />}
             {view === 'projects' && <Projects onNavigate={setView} conversation={intelligence} />}
             {view === 'integrations' && <Integrations />}

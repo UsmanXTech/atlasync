@@ -13,13 +13,14 @@ import { overviewStatContext } from '../utils/overviewStats';
 import { computeReadiness, type ReadinessResult } from '../utils/readiness';
 import { contextualQuestionFor } from '../utils/contextualQuestions';
 import type { IntelligenceConversation } from '../hooks/useIntelligenceConversation';
+import type { BriefingSummary } from '../hooks/useBriefingSummary';
 import { fetchLiveJiraIssues } from '../services/jira';
 import type { ActivityKind,PrStatus,WorkspaceId } from '../data/types';
 import type { ViewId } from '../components/Sidebar';
 const KIND_ICONS:Record<ActivityKind,typeof CircleDot>={jira:CircleDot,confluence:FileText,bitbucket:GitPullRequest,jsm:AlertTriangle,ai:Sparkles};
 function ageLabel(days:number){if(days===0)return'Today';if(days===1)return'Yesterday';return `${days} days ago`;}
 type ReadinessState={status:'sample'}|{status:'loading'}|{status:'live';result:ReadinessResult}|{status:'error';message:string};
-export default function Overview({workspaceId,onNavigate,conversation}:{workspaceId:WorkspaceId;onNavigate:(view:ViewId)=>void;conversation:IntelligenceConversation}){
+export default function Overview({workspaceId,onNavigate,conversation,briefingSummary}:{workspaceId:WorkspaceId;onNavigate:(view:ViewId)=>void;conversation:IntelligenceConversation;briefingSummary:BriefingSummary}){
  const [resolved,setResolved]=useState<string[]>([]),[prFilter,setPrFilter]=useState<'all'|PrStatus>('all'),[range,setRange]=useState<0|7|30>(7);
  const [readiness,setReadiness]=useState<ReadinessState>({status:'sample'});
  // Phase 2 contextual ask: one tap asks Intelligence about this view and
@@ -49,7 +50,7 @@ export default function Overview({workspaceId,onNavigate,conversation}:{workspac
     <Card title="Active blockers" subtitle="Sample data · local demo resolve actions"><div className="row-list">{blockers.map(b=><div className="data-row" key={b.id}><div className="row-main"><strong>{b.key} · {b.title}</strong><small>{b.owner} · {b.ageDays} days open</small></div><span className={`pill ${b.severity}`}>{b.severity}</span><button className="btn btn-small" onClick={()=>setResolved(v=>[...v,b.id])}>Resolve</button></div>)}{blockers.length===0&&<p className="source-empty">No demo blockers remaining.</p>}</div></Card>
    </section>
    <section className="overview-column">
-    <Card className="overview-live-card" title="Today’s briefing" subtitle="Live blocker + stale watch"><OverviewBriefingCard onNavigate={onNavigate}/></Card>
+    <Card className="overview-live-card" title="Today’s briefing" subtitle="Live blocker + stale watch"><OverviewBriefingCard onNavigate={onNavigate} briefingSummary={briefingSummary}/></Card>
     <Card className="overview-live-card" title="Jira issues" subtitle="Read-only · switch demo or live data"><JiraIssuesCard/></Card>
     <Card className="overview-live-card" title="Confluence pages"><ConfluencePagesCard conversation={conversation} onNavigate={onNavigate} /></Card>
     <Card className="overview-live-card" title="JSM requests"><JsmRequestsCard conversation={conversation} onNavigate={onNavigate} /></Card>
