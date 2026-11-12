@@ -1,15 +1,7 @@
-import { useEffect, useState } from 'react';
 import { AlertTriangle, Clock3, RefreshCw, ShieldCheck } from 'lucide-react';
 import Card from './Card';
-import { fetchLiveJiraIssues } from '../services/jira';
-import { fetchConfluencePages } from '../services/confluence';
-import { fetchJsmRequests } from '../services/jsm';
-import { computeBriefingDigest, type BriefingDigest, type BriefingItem } from '../utils/briefing';
-
-type BriefingState =
-  | { status: 'loading' }
-  | { status: 'ready'; digest: BriefingDigest; confluenceCount: number; jsmCount: number; warnings: string[] }
-  | { status: 'unavailable'; message: string };
+import type { BriefingItem } from '../utils/briefing';
+import type { Briefing } from '../hooks/useBriefingState';
 
 function BriefingList({ items }: { items: BriefingItem[] }) {
   if (items.length === 0) return <p className="source-empty">No matching open Jira issues in this snapshot.</p>;
@@ -24,39 +16,19 @@ function BriefingList({ items }: { items: BriefingItem[] }) {
   ))}</div>;
 }
 
-/** Loads live records only; never falls back to the Overview demo fixtures. */
-export default function IntelligenceBriefing() {
-  const [state, setState] = useState<BriefingState>({ status: 'loading' });
-
-  const load = async () => {
-    setState({ status: 'loading' });
-    const [jira, confluence, jsm] = await Promise.all([
-      fetchLiveJiraIssues(25), fetchConfluencePages(20), fetchJsmRequests(20),
-    ]);
-    const failures = [jira, confluence, jsm].filter((result) => !result.ok);
-    if (failures.length === 3 && failures.every((result) => !result.ok && result.error.kind === 'BACKEND_UNREACHABLE')) {
-      setState({ status: 'unavailable', message: 'Live briefing appears when installed in Forge. This standalone preview does not contain live Atlassian records.' });
-      return;
-    }
-    const warnings = [
-      ...(!jira.ok ? [`Jira unavailable: ${jira.error.message}`] : []),
-      ...(!confluence.ok ? [`Confluence unavailable: ${confluence.error.message}`] : []),
-      ...(!jsm.ok ? [`JSM unavailable: ${jsm.error.message}`] : []),
-    ];
-    setState({
-      status: 'ready',
-      digest: computeBriefingDigest(jira.ok ? jira.issues : []),
-      confluenceCount: confluence.ok ? confluence.pages.length : 0,
-      jsmCount: jsm.ok ? jsm.requests.length : 0,
-      warnings,
-    });
-  };
-
-  useEffect(() => { void load(); }, []);
+// Presentational only: the briefing state lives in App (via
+// useBriefingState), so the digest survives leaving this view.
+// Intelligence is the default/home view, and the card-local version
+// (PR #35) re-fired three live fetches and flashed its loading line
+// on every return visit (Run 103 audit probe). Refresh is the explicit
+// path to a new snapshot. Loads live records only; never falls back to
+// the Overview demo fixtures.
+export default function IntelligenceBriefing({ briefing }: { briefing: Briefing }) {
+  const { state, refresh } = briefing;
 
   return (
     <Card title="Today’s briefing" subtitle="Rules-based summary of the bounded live records · read-only"
-      action={<button className="btn btn-small" onClick={() => void load()} disabled={state.status === 'loading'}><RefreshCw size={13} /> Refresh</button>}>
+      action={<button className="btn btn-small" onClick={() => refresh()} disabled={state.status === 'loading'}><RefreshCw size={13} /> Refresh</button>}>
       {state.status === 'loading' && <p role="status" className="source-loading">Reading live Jira, Confluence and JSM records…</p>}
       {state.status === 'unavailable' && <div className="note-box"><p>{state.message}</p></div>}
       {state.status === 'ready' && <>

@@ -3,10 +3,11 @@ import Card from '../components/Card';
 import IntelligenceBriefing from '../components/IntelligenceBriefing';
 import MarkdownText from '../components/Markdown';
 import { INTELLIGENCE_PRESETS, type IntelligenceConversation } from '../hooks/useIntelligenceConversation';
+import type { Briefing } from '../hooks/useBriefingState';
 
 // Presentational only: the conversation state lives in App (via
 // useIntelligenceConversation), so the answer survives leaving this view.
-export default function Intelligence({ conversation }: { conversation: IntelligenceConversation }) {
+export default function Intelligence({ conversation, briefing }: { conversation: IntelligenceConversation; briefing: Briefing }) {
   const { prompt, setPrompt, answer, sources, error, loading, ask, cancel, reset } = conversation;
   return (
     <div className="view workspace-view intelligence-view">
@@ -20,7 +21,7 @@ export default function Intelligence({ conversation }: { conversation: Intellige
           <Sparkles size={14} /> READ-ONLY ANALYSIS
         </span>
       </div>
-      <IntelligenceBriefing />
+      <IntelligenceBriefing briefing={briefing} />
       <div className="intelligence-layout">
         <section className="intelligence-primary">
           <div className="intelligence-welcome">
