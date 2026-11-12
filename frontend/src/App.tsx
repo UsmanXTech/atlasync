@@ -13,6 +13,7 @@ import { WORKSPACES } from './data/mock';
 import { DEFAULT_VIEW } from './utils/defaultView';
 import { useIntelligenceConversation } from './hooks/useIntelligenceConversation';
 import { useBriefingSummary } from './hooks/useBriefingSummary';
+import { useBriefingState } from './hooks/useBriefingState';
 import { useSettingsState } from './hooks/useSettingsState';
 
 // Atlasync application shell: persistent navigation and a viewport-fitted content region.
@@ -30,6 +31,12 @@ export default function App() {
   // metered call, so it must survive navigating away and back instead
   // of being discarded (and re-paid for) on every view switch.
   const briefingSummary = useBriefingSummary();
+
+  // Same pattern again: the Intelligence briefing digest itself must
+  // survive navigating away and back. Intelligence is the default
+  // view, so the card-local version re-fired three live fetches and
+  // flashed its loading line on every return visit (Run 103 audit).
+  const briefing = useBriefingState();
 
   const workspace = WORKSPACES.find((w) => w.id === workspaceId) ?? WORKSPACES[0];
 
@@ -74,7 +81,7 @@ export default function App() {
         <main id="main-content" tabIndex={-1}>
           <ErrorBoundary key={view}>
             {view === 'overview' && <Overview workspaceId={workspace.id} onNavigate={setView} conversation={intelligence} briefingSummary={briefingSummary} />}
-            {view === 'intelligence' && <Intelligence conversation={intelligence} />}
+            {view === 'intelligence' && <Intelligence conversation={intelligence} briefing={briefing} />}
             {view === 'projects' && <Projects onNavigate={setView} conversation={intelligence} />}
             {view === 'integrations' && <Integrations />}
             {view === 'agents' && <Agents onNavigate={setView} conversation={intelligence} />}
