@@ -145,7 +145,7 @@ This is the one authoritative split. **Live** means the data comes from the Forg
 
 ### Deployed version vs main
 
-**v3.0.0 was deployed 2026-11-09** to the development environment on the Codegeist dev site and live-verified the same day (9 Jira issues incl. AS-1, 12 Confluence pages, 2 projects; Intelligence correctly answered the highest-priority open issues). Changes merged to `main` after that deploy (PRs #8–#21: Markdown answers, live search, JSM array fix, demo-workspace definition, Intelligence cancel, and more) are verified locally — `npm test` 41/41 + production build + headless-Chromium preview — and reach the installed app only on the next deploy. Do not claim a post-v3.0.0 change is live-verified until that deploy happens.
+**v3.2.0 was deployed 2026-11-12** to the development environment on the Codegeist dev site. It includes everything merged to `main` since v3.1.0 (PRs #38–#46: Intelligence as the default home view, "Ask about this" on Overview/Projects/Confluence/JSM, proactive briefing card with optional AI summary, briefing state preserved across navigation), verified locally — `npm test` 88/88 + production build + headless-Chromium preview. Live verification of this version follows the deploy; do not claim a post-v3.2.0 change is live-verified until that deploy happens.
 
 ### Notes
 
