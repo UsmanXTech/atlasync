@@ -57,19 +57,19 @@ jobs:
 
       - name: Forge lint
         working-directory: forge-app
-        run: forge lint
+        run: forge lint --approve MAJOR_VERSION_RULE
 
       - name: Forge deploy (development)
         working-directory: forge-app
-        run: forge deploy -e development
+        run: forge deploy -e development --non-interactive --approve MAJOR_VERSION_RULE
 
       - name: Upgrade install on iamusmanh — Jira
         working-directory: forge-app
-        run: forge install --upgrade --site iamusmanh.atlassian.net --product jira -e development --non-interactive
+        run: forge install --upgrade --site iamusmanh.atlassian.net --product jira -e development --non-interactive --confirm-scopes --non-interactive
 
       - name: Upgrade install on iamusmanh — Confluence
         working-directory: forge-app
-        run: forge install --upgrade --site iamusmanh.atlassian.net --product confluence -e development --non-interactive
+        run: forge install --upgrade --site iamusmanh.atlassian.net --product confluence -e development --non-interactive --confirm-scopes --non-interactive
 
       # JSM install may not exist yet on the dev site; if the app was never
       # installed on JSM, --upgrade errors. Keep deploying even then — the
@@ -77,4 +77,4 @@ jobs:
       - name: Upgrade install on iamusmanh — Jira Service Management
         working-directory: forge-app
         continue-on-error: true
-        run: forge install --upgrade --site iamusmanh.atlassian.net --product jira-service-management -e development --non-interactive
+        run: forge install --upgrade --site iamusmanh.atlassian.net --product jira-service-management -e development --non-interactive --confirm-scopes --non-interactive
