@@ -10,6 +10,7 @@ import {
   GitPullRequest,
   LifeBuoy,
   Menu,
+  RefreshCw,
   Search,
 } from 'lucide-react';
 import {
@@ -83,19 +84,23 @@ function liveSourceFetchers(): LiveSourceFetchers {
   };
 }
 
+/**
+ * Material Design 3 Small Top App Bar (Specification #5 & #11)
+ * - Exactly 64dp tall, surface-container (#f3ebf7), no shadow
+ * - Contained 56dp search bar with ⌘K keycap
+ * - Bell icon button with 16dp badge
+ * - Exactly ONE filled primary button (SYNC PORTFOLIO, 40dp, pill)
+ * - 30dp circular user avatar
+ */
 export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate, forgeMode, onMenu }: TopbarProps) {
   const [query, setQuery] = useState('');
   const [searchFocus, setSearchFocus] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notes, setNotes] = useState(NOTIFICATIONS);
+  const [syncing, setSyncing] = useState(false);
 
-  // Live search: inside a Forge install the three live sources are fetched
-  // once (on the first real query) and cached for the session; every later
-  // query filters the cache. In the standalone preview there is no Forge
-  // backend, so live search stays off and only labelled demo results show.
-  // Each source tracks its own state: a source that fails is named in the
-  // dropdown with its own Retry, and the retry refetches only that source.
+  // Live search cache and loader
   const [liveIssues, setLiveIssues] = useState<LiveIssue[]>([]);
   const [livePages, setLivePages] = useState<LiveConfluencePage[]>([]);
   const [liveRequests, setLiveRequests] = useState<LiveJsmRequest[]>([]);
@@ -103,22 +108,11 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
   const [liveFailed, setLiveFailed] = useState<LiveSourceKey[]>([]);
   const [liveRetrying, setLiveRetrying] = useState<LiveSourceKey[]>([]);
 
-  // The fetch lifecycle lives in LiveSearchLoader (utils/liveSearch.ts):
-  // the effect only *starts* the one-time fetch and never cancels it.
-  // The previous version listed `liveState` as an effect dependency and
-  // cancelled the in-flight fetch in its cleanup, so
-  // `setLiveState('loading')` re-ran the effect, the new run exited on
-  // the guard, and the first fetch's response was discarded — the
-  // dropdown stuck in "Searching live sources…" forever.
   const liveLoaderRef = useRef<LiveSearchLoader | null>(null);
   if (liveLoaderRef.current === null) {
     liveLoaderRef.current = new LiveSearchLoader();
   }
 
-  // Apply a loader snapshot to the component: the successful sources'
-  // records become searchable, the failed sources are named, and the
-  // overall state is 'ready' only when nothing failed — 'partial' when
-  // some sources loaded and some failed, 'error' when none loaded.
   const applyLiveSnapshot = useCallback((snapshot: LiveSearchSnapshot) => {
     setLiveIssues(snapshot.sources.issues);
     setLivePages(snapshot.sources.pages);
@@ -138,9 +132,6 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
     loader.ensure(liveSourceFetchers()).then(applyLiveSnapshot);
   }, [applyLiveSnapshot]);
 
-  // Retry one failed source: the loader refetches only sources that have
-  // not loaded, so the good sources are never fetched again and the
-  // retried source merges into the cache on success.
   const retryLiveSource = useCallback(
     (key: LiveSourceKey) => {
       const loader = liveLoaderRef.current;
@@ -159,7 +150,6 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
     startLiveFetch();
   }, [query, forgeMode, startLiveFetch]);
 
-  // Escape closes any open dropdown — keyboard users are never trapped.
   useEffect(() => {
     if (!notifOpen && !profileOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -206,8 +196,6 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
     return out.slice(0, 8);
   }, [query]);
 
-  // Live results filter the cached live sources; they are always shown
-  // under their own "Live" heading, never mixed into demo rows.
   const liveResults = useMemo<SearchResult[]>(() => {
     const q = query.trim().toLowerCase();
     if (q.length < 2 || (liveState !== 'ready' && liveState !== 'partial')) return [];
@@ -244,11 +232,16 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
     return out.slice(0, 8);
   }, [query, liveState, liveIssues, livePages, liveRequests]);
 
-  // Recent activity is searchable context too — kept in the dropdown footer.
   const activityHits = useMemo(
     () => ACTIVITY.filter((a) => a.title.toLowerCase().includes(query.trim().toLowerCase())).length,
     [query],
   );
+
+  const handleSyncPortfolio = () => {
+    setSyncing(true);
+    startLiveFetch();
+    setTimeout(() => setSyncing(false), 900);
+  };
 
   return (
     <header className="topbar">
@@ -257,7 +250,7 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
       </button>
 
       <label className="workspace-select" title="Demo data grouping — does not scope live Jira, Confluence or JSM data.">
-        <span>Demo workspace</span>
+        <span>Workspace</span>
         <span className="select-wrap">
           <select
             value={workspace.id}
@@ -275,7 +268,7 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
       </label>
 
       <div className="search">
-        <Search size={16} />
+        <Search size={18} />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -284,9 +277,10 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
           onKeyDown={(e) => {
             if (e.key === 'Escape') setQuery('');
           }}
-          placeholder="Search issues, PRs, docs, incidents…"
+          placeholder="Search issues, agents, pull requests…"
           aria-label="Global search"
         />
+        <span className="search-shortcut">⌘K</span>
         {searchFocus && query.trim().length >= 2 && (
           <div className="search-drop">
             {forgeMode === 'forge' && (
@@ -355,8 +349,6 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
             ) : (
               results.map((r) => {
                 const Icon = KIND_ICONS[r.kind] ?? CircleDot;
-                // Search results navigate to the view that shows the item —
-                // a result row must never be a dead click.
                 return (
                   <button
                     key={r.id}
@@ -397,7 +389,7 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
             }}
             aria-label="Notifications"
           >
-            <Bell size={19} />
+            <Bell size={18} />
             {unread > 0 && <span className="bell-count">{unread}</span>}
           </button>
           {notifOpen && (
@@ -419,6 +411,17 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
           )}
         </div>
 
+        {/* M3 Primary Top App Bar Action — Exactly ONE 40dp filled pill button */}
+        <button
+          className="btn btn-filled"
+          onClick={handleSyncPortfolio}
+          disabled={syncing}
+          aria-label="Sync portfolio"
+        >
+          <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
+          <span>SYNC PORTFOLIO</span>
+        </button>
+
         <div className="menu-wrap">
           <button
             className="profile-btn"
@@ -426,6 +429,7 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
               setProfileOpen((v) => !v);
               setNotifOpen(false);
             }}
+            aria-label="User profile"
           >
             <span className="avatar">UH</span>
             <span className="profile-name">

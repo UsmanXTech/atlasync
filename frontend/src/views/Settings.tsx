@@ -1,15 +1,17 @@
 import { Save, RotateCcw, ShieldCheck, Info } from 'lucide-react';
 import Card from '../components/Card';
+import Switch from '../components/Switch';
 import { SETTINGS_ROWS } from '../utils/settingsState';
 import { APP_INFO_ROWS, APP_DEPLOY_NOTE } from '../utils/appInfo';
 import type { SettingsState } from '../hooks/useSettingsState';
 
-// Presentational only: the form state lives in useSettingsState (called in
-// App, above the view switch), so a saved name/timezone/toggle choice
-// survives navigating away and back. Editing any control marks the form
-// dirty again (the "saved" note clears) until Save preview is pressed.
+/**
+ * Screen 7: Settings (Workspace Governance & Configuration)
+ * Aligned with Stitch M3 Redesign & M3 alignment brief
+ */
 export default function Settings({ settings }: { settings: SettingsState }) {
   const { name, timezone, toggles, saved, setName, setTimezone, flip, save, reset } = settings;
+
   return (
     <div className="view workspace-view">
       <div className="workspace-heading">
@@ -20,6 +22,7 @@ export default function Settings({ settings }: { settings: SettingsState }) {
         </div>
         <span className="preview-label">PREVIEW CONTROLS</span>
       </div>
+
       <div className="settings-layout">
         <Card
           title="Demo workspace profile"
@@ -44,11 +47,11 @@ export default function Settings({ settings }: { settings: SettingsState }) {
               </select>
             </div>
             <div className="settings-actions">
-              <button className="btn btn-primary" onClick={save}>
-                <Save size={14} /> Save preview
+              <button className="btn btn-filled" onClick={save} aria-label="Save preview">
+                <Save size={15} /> <span>Save preview</span>
               </button>
-              <button className="btn" onClick={reset}>
-                <RotateCcw size={14} /> Reset
+              <button className="btn" onClick={reset} aria-label="Reset preferences">
+                <RotateCcw size={15} /> <span>Reset</span>
               </button>
             </div>
             {saved && (
@@ -58,6 +61,7 @@ export default function Settings({ settings }: { settings: SettingsState }) {
             )}
           </div>
         </Card>
+
         <Card title="Notifications & sync" subtitle="Interactive preview preferences">
           <div className="settings-list">
             {SETTINGS_ROWS.map(({ key, title, detail }) => (
@@ -66,18 +70,16 @@ export default function Settings({ settings }: { settings: SettingsState }) {
                   <strong>{title}</strong>
                   <small>{detail}</small>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={toggles[key]}
-                  className={`toggle ${toggles[key] ? 'on' : ''}`}
-                  onClick={() => flip(key)}
-                  aria-label={`Toggle ${title}`}
+                <Switch
+                  checked={toggles[key]}
+                  onChange={() => flip(key)}
+                  ariaLabel={`Toggle ${title}`}
                 />
               </div>
             ))}
           </div>
         </Card>
+
         <Card
           title="About Atlasync"
           subtitle="App, deployment and data split — the facts behind this install"
@@ -92,13 +94,14 @@ export default function Settings({ settings }: { settings: SettingsState }) {
             ))}
           </div>
           <p className="about-note">
-            <Info size={13} /> {APP_DEPLOY_NOTE}
+            <Info size={14} /> <span>{APP_DEPLOY_NOTE}</span>
           </p>
         </Card>
       </div>
+
       <div className="settings-notice">
-        <ShieldCheck size={16} /> No automatic sync, alerts or email jobs are enabled by
-        changing them.
+        <ShieldCheck size={18} />
+        <span>No automatic sync, alerts or email jobs are enabled by changing them.</span>
       </div>
     </div>
   );

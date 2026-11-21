@@ -9,14 +9,21 @@ import { contextualQuestionFor } from '../utils/contextualQuestions';
 import type { IntelligenceConversation } from '../hooks/useIntelligenceConversation';
 import type { ViewId } from './Sidebar';
 
-// The Confluence card: live pages through the Forge backend, read-only.
-// Loading and error states are explicit in the card body (Nielsen H1/H9):
-// the header Refresh button alone is not enough feedback while a fetch
-// is in flight, and a bare error line leaves no recovery action in view.
-export default function ConfluencePagesCard({ conversation, onNavigate }: { conversation: IntelligenceConversation; onNavigate: (view: ViewId) => void }) {
+/**
+ * Confluence Pages Card (M3 restyled)
+ * Live pages loaded through Forge backend, read-only
+ */
+export default function ConfluencePagesCard({
+  conversation,
+  onNavigate,
+}: {
+  conversation: IntelligenceConversation;
+  onNavigate: (view: ViewId) => void;
+}) {
   const [pages, setPages] = useState<LiveConfluencePage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -25,38 +32,29 @@ export default function ConfluencePagesCard({ conversation, onNavigate }: { conv
     else setError(result.error.message);
     setLoading(false);
   }, []);
+
   useEffect(() => {
     void load();
   }, [load]);
-  // Phase 2 contextual ask: one tap asks Intelligence about these pages
-  // and opens the answer there (Agents "Try it" pattern, Run 16; same
-  // shape as the Overview/Projects buttons, Runs 83–84). The question
-  // names the pages' topics, never their numbers (see
-  // utils/contextualQuestions) — and never recency or page contents,
-  // which the ask snapshot does not carry.
+
   const askAboutThis = () => {
     conversation.ask(contextualQuestionFor('confluence'));
     onNavigate('intelligence');
   };
-  // Row metadata speaks the user's language (Nielsen H2), not the API's:
-  // the page id and the internal space id are identifiers no reader
-  // needs, while the last-updated date the service already fetches is
-  // the metadata that tells whether a page is fresh. The status pill
-  // carries a tone (current = live, trashed = removed) instead of the
-  // bare unstyled pill; its text stays Confluence's own status word.
+
   return (
     <Card
       title="Live Confluence pages"
       subtitle="Read-only · current-user permissions"
       action={
         <div className="chip-row">
-          <button className="btn btn-small btn-primary" onClick={() => askAboutThis()}>
+          <button className="btn btn-small btn-filled" onClick={askAboutThis}>
             <Sparkles size={13} />
-            Ask about this
+            <span>Ask about this</span>
           </button>
           <button className="btn btn-small" onClick={() => void load()} disabled={loading}>
             <RefreshCw size={13} />
-            {loading ? 'Loading…' : 'Refresh'}
+            <span>{loading ? 'Loading…' : 'Refresh'}</span>
           </button>
         </div>
       }
@@ -72,8 +70,8 @@ export default function ConfluencePagesCard({ conversation, onNavigate }: { conv
             {error}
           </p>
           <div className="row-actions">
-            <button className="btn btn-primary" onClick={() => void load()}>
-              <RefreshCw size={14} /> Retry
+            <button className="btn btn-filled" onClick={() => void load()}>
+              <RefreshCw size={14} /> <span>Retry</span>
             </button>
           </div>
         </div>

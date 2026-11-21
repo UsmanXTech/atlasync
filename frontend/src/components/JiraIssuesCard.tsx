@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import Card from './Card';
+import SegmentedButton from './SegmentedButton';
 import { SAMPLE_JIRA_ISSUES } from '../data/mock';
 import type { LiveIssue } from '../data/types';
 import { fetchIssueDevStatus, fetchLiveJiraIssues, type JiraError, type LinkedPullRequest } from '../services/jira';
@@ -13,10 +14,6 @@ type LiveState =
   | { status: 'ready'; issues: LiveIssue[] }
   | { status: 'error'; error: JiraError };
 
-// The Jira issues card: the first live surface in Atlasync.
-// Demo mode shows fixed sample issues (labeled as such). Live mode loads
-// real issues through the Forge backend — in the standalone preview that
-// resolves to a backend-unreachable state, never to fake live data. Every other card on the dashboard stays mock.
 function IssueRow({ issue }: { issue: LiveIssue }) {
   return (
     <div className="data-row">
@@ -43,12 +40,6 @@ type PrState =
   | { status: 'ready'; pullRequests: LinkedPullRequest[] }
   | { status: 'error'; error: JiraError };
 
-// Live issue row with linked Bitbucket pull requests (Task 6,
-// Architecture A). The PR list loads on demand through the Forge
-// backend's dev-status call — read-only, and only when the issue
-// carries a numeric Jira id. An empty list is shown honestly: no
-// Bitbucket workspace is linked to this Jira site yet, so there is
-// nothing to link — the user links one in Jira's DVCS settings.
 function LiveIssueRow({ issue }: { issue: LiveIssue }) {
   const [expanded, setExpanded] = useState(false);
   const [prs, setPrs] = useState<PrState>({ status: 'idle' });
@@ -71,26 +62,26 @@ function LiveIssueRow({ issue }: { issue: LiveIssue }) {
       {issue.id && (
         <div className="row-actions" style={{ padding: '0 0 8px' }}>
           <button
-            className="btn"
+            className="btn btn-small"
             onClick={() => (expanded ? setExpanded(false) : void loadPrs())}
             aria-expanded={expanded}
           >
-            {expanded ? 'Hide linked PRs' : 'Linked pull requests'}
+            <span>{expanded ? 'Hide linked PRs' : 'Linked pull requests'}</span>
           </button>
         </div>
       )}
       {expanded && prs.status === 'loading' && (
-        <p role="status" style={{ color: 'var(--muted)', fontSize: '0.88rem', margin: '0 0 10px' }}>
+        <p role="status" style={{ color: 'var(--md-sys-color-on-surface-variant)', fontSize: '0.88rem', margin: '0 0 10px' }}>
           Loading linked pull requests…
         </p>
       )}
       {expanded && prs.status === 'error' && (
-        <p style={{ color: 'var(--muted)', fontSize: '0.88rem', margin: '0 0 10px' }}>
+        <p style={{ color: 'var(--md-sys-color-on-surface-variant)', fontSize: '0.88rem', margin: '0 0 10px' }}>
           Could not load linked pull requests: {prs.error.message}
         </p>
       )}
       {expanded && prs.status === 'ready' && prs.pullRequests.length === 0 && (
-        <p style={{ color: 'var(--muted)', fontSize: '0.88rem', margin: '0 0 10px' }}>
+        <p style={{ color: 'var(--md-sys-color-on-surface-variant)', fontSize: '0.88rem', margin: '0 0 10px' }}>
           No linked pull requests — no Bitbucket workspace is linked to this Jira site yet. Link one in
           Jira&apos;s DVCS settings and reference the issue key in a PR to see it here.
         </p>
@@ -120,6 +111,10 @@ function LiveIssueRow({ issue }: { issue: LiveIssue }) {
   );
 }
 
+/**
+ * Jira Issues Card (M3 restyled)
+ * Toggleable between sample demo data and live Jira API records
+ */
 export default function JiraIssuesCard() {
   const [mode, setMode] = useState<Mode>('demo');
   const [live, setLive] = useState<LiveState>({ status: 'idle' });
@@ -148,14 +143,15 @@ export default function JiraIssuesCard() {
           : 'Live data from your Jira site via the Forge backend (read-only)'
       }
       action={
-        <div className="segmented" role="group" aria-label="Jira data mode">
-          <button className={mode === 'demo' ? 'active' : ''} onClick={() => switchMode('demo')}>
-            Demo data
-          </button>
-          <button className={mode === 'live' ? 'active' : ''} onClick={() => switchMode('live')}>
-            Live Jira
-          </button>
-        </div>
+        <SegmentedButton
+          options={[
+            { value: 'demo', label: 'Demo data' },
+            { value: 'live', label: 'Live Jira' },
+          ]}
+          value={mode}
+          onChange={(v) => switchMode(v as Mode)}
+          ariaLabel="Jira data mode"
+        />
       }
     >
       {mode === 'demo' && (
@@ -172,7 +168,7 @@ export default function JiraIssuesCard() {
       )}
 
       {mode === 'live' && live.status === 'loading' && (
-        <p role="status" style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>
+        <p role="status" style={{ color: 'var(--md-sys-color-on-surface-variant)', fontSize: '0.88rem' }}>
           Loading Jira issues via the Forge backend…
         </p>
       )}
@@ -180,12 +176,20 @@ export default function JiraIssuesCard() {
       {mode === 'live' && live.status === 'error' && (
         <div>
           <div className="note-box">
-            <span className={`pill ${live.error.kind === 'PERMISSION_DENIED' ? 'critical' : live.error.kind === 'RATE_LIMITED' ? 'high' : 'pending'}`}>
+            <span
+              className={`pill ${
+                live.error.kind === 'PERMISSION_DENIED'
+                  ? 'critical'
+                  : live.error.kind === 'RATE_LIMITED'
+                  ? 'high'
+                  : 'pending'
+              }`}
+            >
               {live.error.kind === 'PERMISSION_DENIED'
                 ? 'Permission denied'
                 : live.error.kind === 'RATE_LIMITED'
-                  ? 'Rate limited'
-                  : 'Could not load'}
+                ? 'Rate limited'
+                : 'Could not load'}
             </span>
             <p style={{ margin: '10px 0 0' }}>{live.error.message}</p>
             {live.error.kind === 'PERMISSION_DENIED' && (
@@ -196,11 +200,11 @@ export default function JiraIssuesCard() {
             )}
           </div>
           <div className="row-actions">
-            <button className="btn btn-primary" onClick={() => void loadLive()}>
-              <RefreshCw size={14} /> Retry
+            <button className="btn btn-filled" onClick={() => void loadLive()}>
+              <RefreshCw size={14} /> <span>Retry</span>
             </button>
             <button className="btn" onClick={() => switchMode('demo')}>
-              Back to demo data
+              <span>Back to demo data</span>
             </button>
           </div>
         </div>
@@ -208,15 +212,15 @@ export default function JiraIssuesCard() {
 
       {mode === 'live' && live.status === 'ready' && live.issues.length === 0 && (
         <div>
-          <p style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>
+          <p style={{ color: 'var(--md-sys-color-on-surface-variant)', fontSize: '0.88rem' }}>
             No Jira issues found for the default query (recently updated, newest first).
           </p>
           <div className="row-actions">
             <button className="btn" onClick={() => void loadLive()}>
-              <RefreshCw size={14} /> Refresh
+              <RefreshCw size={14} /> <span>Refresh</span>
             </button>
             <button className="btn" onClick={() => switchMode('demo')}>
-              Back to demo data
+              <span>Back to demo data</span>
             </button>
           </div>
         </div>
@@ -237,10 +241,10 @@ export default function JiraIssuesCard() {
           </div>
           <div className="row-actions">
             <button className="btn" onClick={() => void loadLive()}>
-              <RefreshCw size={14} /> Refresh
+              <RefreshCw size={14} /> <span>Refresh</span>
             </button>
             <button className="btn" onClick={() => switchMode('demo')}>
-              Back to demo data
+              <span>Back to demo data</span>
             </button>
           </div>
         </>

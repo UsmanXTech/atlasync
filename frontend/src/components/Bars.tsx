@@ -1,9 +1,20 @@
 import type { InsightPoint, IssueBucket } from '../data/types';
 
-// Horizontal distribution bars (e.g. issues by status / priority).
-// `compact` narrows the label/count columns for side-by-side groups in a
-// narrow card — the track stays readable and the count carries precision.
-export function BarList({ items, tone = 'blue', compact = false }: { items: IssueBucket[]; tone?: 'blue' | 'green' | 'amber'; compact?: boolean }) {
+/**
+ * Material Design 3 Linear Distribution Bars (Specification #7)
+ * - 4dp track thickness, rounded ends (rounded-full)
+ * - secondary-container track (#d7e3f8), primary active fill
+ * - JetBrains Mono counts with tabular numerals
+ */
+export function BarList({
+  items,
+  tone = 'blue',
+  compact = false,
+}: {
+  items: IssueBucket[];
+  tone?: 'blue' | 'green' | 'amber';
+  compact?: boolean;
+}) {
   const max = Math.max(...items.map((i) => i.count), 1);
   return (
     <div className={`bar-list${compact ? ' compact' : ''}`}>
@@ -23,7 +34,9 @@ export function BarList({ items, tone = 'blue', compact = false }: { items: Issu
   );
 }
 
-// Grouped weekly bars for the Insights view (issues / docs / PRs).
+/**
+ * Weekly activity trend visualization styled with M3 color tokens
+ */
 export function TrendChart({ points }: { points: InsightPoint[] }) {
   const max = Math.max(...points.flatMap((p) => [p.issues, p.docs, p.prs]), 1);
   const w = 560;
@@ -43,6 +56,9 @@ export function TrendChart({ points }: { points: InsightPoint[] }) {
             y1={h - pad - f * (h - pad * 2)}
             y2={h - pad - f * (h - pad * 2)}
             className="trend-grid"
+            stroke="var(--md-sys-color-outline-variant)"
+            strokeDasharray="4 4"
+            strokeWidth="1"
           />
         ))}
         {points.map((p, i) => {
@@ -50,20 +66,54 @@ export function TrendChart({ points }: { points: InsightPoint[] }) {
           const y = (v: number) => h - pad - (v / max) * (h - pad * 2);
           return (
             <g key={p.label}>
-              <rect x={x0} y={y(p.issues)} width={barW} height={h - pad - y(p.issues)} className="trend-bar blue" rx={2} />
-              <rect x={x0 + barW + 4} y={y(p.docs)} width={barW} height={h - pad - y(p.docs)} className="trend-bar green" rx={2} />
-              <rect x={x0 + barW * 2 + 8} y={y(p.prs)} width={barW} height={h - pad - y(p.prs)} className="trend-bar amber" rx={2} />
-              <text x={x0 + barW * 1.5 + 4} y={h - 8} className="trend-label" textAnchor="middle">
+              <rect
+                x={x0}
+                y={y(p.issues)}
+                width={barW}
+                height={h - pad - y(p.issues)}
+                fill="var(--md-sys-color-primary)"
+                rx={2}
+              />
+              <rect
+                x={x0 + barW + 4}
+                y={y(p.docs)}
+                width={barW}
+                height={h - pad - y(p.docs)}
+                fill="var(--md-sys-color-healthy-on-container)"
+                rx={2}
+              />
+              <rect
+                x={x0 + barW * 2 + 8}
+                y={y(p.prs)}
+                width={barW}
+                height={h - pad - y(p.prs)}
+                fill="var(--md-sys-color-at-risk-on-container)"
+                rx={2}
+              />
+              <text
+                x={x0 + barW * 1.5 + 4}
+                y={h - 8}
+                className="trend-label"
+                textAnchor="middle"
+                fill="var(--md-sys-color-on-surface-variant)"
+                fontSize="11"
+              >
                 {p.label}
               </text>
             </g>
           );
         })}
       </svg>
-      <div className="trend-legend">
-        <span><i className="dot blue" /> Issues</span>
-        <span><i className="dot green" /> Docs</span>
-        <span><i className="dot amber" /> PRs</span>
+      <div className="trend-legend" style={{ display: 'flex', gap: 16, marginTop: 8, fontSize: 12 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <i style={{ width: 8, height: 8, borderRadius: 4, background: 'var(--md-sys-color-primary)', display: 'inline-block' }} /> Issues
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <i style={{ width: 8, height: 8, borderRadius: 4, background: 'var(--md-sys-color-healthy-on-container)', display: 'inline-block' }} /> Docs
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <i style={{ width: 8, height: 8, borderRadius: 4, background: 'var(--md-sys-color-at-risk-on-container)', display: 'inline-block' }} /> PRs
+        </span>
       </div>
     </div>
   );
