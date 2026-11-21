@@ -93,7 +93,8 @@ export async function executeReadTool(name, args) {
   try {
     switch (name) {
       case 'list_jira_projects': {
-        const response = await api.asUser().requestJira(route`/rest/api/3/project/search?maxResults=20`, {
+        const limit = typeof args.limit === 'number' ? args.limit : 20;
+        const response = await api.asUser().requestJira(route`/rest/api/3/project/search?maxResults=${limit}`, {
           method: 'GET',
           headers: { Accept: 'application/json' },
         });
