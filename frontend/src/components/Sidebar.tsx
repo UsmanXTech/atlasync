@@ -81,7 +81,7 @@ export default function Sidebar({ view, onNavigate, open, onClose }: SidebarProp
         <div className="sidebar-foot">
           <div className="sidebar-foot-meta">
             <i aria-hidden="true" />
-            <span>Jira Live: Synced 14:32 · v0.2.0</span>
+            <span>Jira Live: Synced 14:32 · v2.1.0</span>
           </div>
         </div>
       </aside>

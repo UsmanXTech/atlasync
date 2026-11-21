@@ -70,24 +70,24 @@ export default function IntelligenceBriefing({ briefing }: { briefing: Briefing 
           <div className="stat-grid" style={{ marginBottom: 12 }}>
             <div className="stat">
               <span className="stat-label">Readiness estimate</span>
-              <strong className="stat-value tabular-nums">
+              <div className="stat-value tabular-nums">
                 {state.digest.readiness ? `${state.digest.readiness.score}%` : '—'}
-              </strong>
-              <small>{state.digest.readiness?.summary ?? 'No Jira issues to score'}</small>
+              </div>
+              <div className="stat-delta flat">{state.digest.readiness?.summary ?? 'No Jira issues to score'}</div>
             </div>
             <div className="stat">
               <span className="stat-label">Open Jira issues</span>
-              <strong className="stat-value tabular-nums">{state.digest.totalOpen}</strong>
-              <small>In the returned Jira snapshot</small>
+              <div className="stat-value tabular-nums">{state.digest.totalOpen}</div>
+              <div className="stat-delta flat">In the returned Jira snapshot</div>
             </div>
             <div className="stat">
               <span className="stat-label">Other records</span>
-              <strong className="stat-value tabular-nums">
+              <div className="stat-value tabular-nums">
                 {state.confluenceCount + state.jsmCount}
-              </strong>
-              <small>
+              </div>
+              <div className="stat-delta flat">
                 {state.confluenceCount} Confluence · {state.jsmCount} JSM
-              </small>
+              </div>
             </div>
           </div>
           <Card title="Top blockers" subtitle="Open Highest / High priority Jira issues">

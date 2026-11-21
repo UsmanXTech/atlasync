@@ -64,17 +64,19 @@ export default function Agents({
             <li>Summarize source records from connected Atlassian tools.</li>
             <li>Answer release-readiness and cross-tool risk questions.</li>
             <li>Report which sources were available for the current request.</li>
+            <li>Draft Jira and Confluence updates for your approval — nothing writes without it.</li>
+            <li>Keep session memory and a daily readiness snapshot.</li>
           </ul>
         </Card>
 
         <Card title="Not enabled in this build">
           <ul className="feature-list muted-list">
             <li>Autonomous Rovo/MCP orchestration.</li>
-            <li>Jira or Bitbucket write actions.</li>
-            <li>Scheduled runs, persistent agent memory or background sync.</li>
           </ul>
           <p className="source-footnote">
-            These capabilities require separate implementation, permissions and a user-data safety model.
+            Autonomous orchestration needs separate implementation, permissions and a user-data safety model.
+            Approval-gated writes, scheduled snapshots and session memory ship in this build; the Forge-hosted
+            LLM needs site-admin approval to run (see Integrations).
           </p>
         </Card>
 
