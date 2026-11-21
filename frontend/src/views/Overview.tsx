@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -29,11 +29,11 @@ import {
   PULL_REQUESTS,
 } from '../data/mock';
 import { overviewStatContext } from '../utils/overviewStats';
-import { computeReadiness, type ReadinessResult } from '../utils/readiness';
 import { contextualQuestionFor } from '../utils/contextualQuestions';
 import type { IntelligenceConversation } from '../hooks/useIntelligenceConversation';
 import type { BriefingSummary } from '../hooks/useBriefingSummary';
-import { fetchLiveJiraIssues } from '../services/jira';
+import { fetchLiveReadiness, type LiveReadiness } from '../services/readiness';
+import type { DataMode } from '../utils/dataMode';
 import type { ActivityKind, PrStatus, WorkspaceId } from '../data/types';
 import type { ViewId } from '../components/Sidebar';
 
@@ -51,54 +51,59 @@ function ageLabel(days: number) {
   return `${days} days ago`;
 }
 
-type ReadinessState =
-  | { status: 'sample' }
+type LiveReadinessState =
+  | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'live'; result: ReadinessResult }
+  | { status: 'live'; result: LiveReadiness }
   | { status: 'error'; message: string };
 
 /**
  * Screen 1: Overview (Portfolio Readiness & Blockers)
  * Aligned with Stitch M3 Redesign & M3 alignment brief
+ *
+ * v2.1.0 data modes — the two modes never mix:
+ * - Sample Dataset: ONLY demo data, labelled SAMPLE (the pre-v2.1.0 view).
+ * - Live Workspace: ONLY live Atlassian data, readiness computed by the
+ *   Forge backend (getReadiness), with exact backend errors.
  */
 export default function Overview({
   workspaceId,
   onNavigate,
   conversation,
   briefingSummary,
+  dataMode,
+  onDataMode,
 }: {
   workspaceId: WorkspaceId;
   onNavigate: (view: ViewId) => void;
   conversation: IntelligenceConversation;
   briefingSummary: BriefingSummary;
+  dataMode: DataMode;
+  onDataMode: (mode: DataMode) => void;
 }) {
   const [resolved, setResolved] = useState<string[]>([]);
   const [prFilter, setPrFilter] = useState<'all' | PrStatus>('all');
   const [range, setRange] = useState<0 | 7 | 30>(7);
-  const [readiness, setReadiness] = useState<ReadinessState>({ status: 'sample' });
+  const [liveReadiness, setLiveReadiness] = useState<LiveReadinessState>({ status: 'idle' });
+  const [liveRefresh, setLiveRefresh] = useState(0);
+
+  useEffect(() => {
+    if (dataMode !== 'live') return;
+    let cancelled = false;
+    setLiveReadiness({ status: 'loading' });
+    void fetchLiveReadiness().then((r) => {
+      if (cancelled) return;
+      if (r.ok) setLiveReadiness({ status: 'live', result: r.readiness });
+      else setLiveReadiness({ status: 'error', message: r.error.message });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [dataMode, liveRefresh]);
 
   const askAboutThis = () => {
     conversation.ask(contextualQuestionFor('overview'));
     onNavigate('intelligence');
-  };
-
-  const calcReadiness = async () => {
-    setReadiness({ status: 'loading' });
-    const r = await fetchLiveJiraIssues(50);
-    if (!r.ok) {
-      setReadiness({ status: 'error', message: r.error.message });
-      return;
-    }
-    const result = computeReadiness(r.issues);
-    if (!result) {
-      setReadiness({
-        status: 'error',
-        message:
-          'No Jira issues found for the default query (recently updated, newest first) — nothing to score.',
-      });
-      return;
-    }
-    setReadiness({ status: 'live', result });
   };
 
   const projects = useMemo(() => PROJECTS.filter((p) => p.workspace === workspaceId), [workspaceId]);
@@ -127,6 +132,213 @@ export default function Overview({
     [projects, blockers, awaitingPrs, incidents],
   );
 
+  if (dataMode === 'live') {
+    const live = liveReadiness.status === 'live' ? liveReadiness.result : null;
+    const b = live?.breakdown ?? { Bcrit: 0, Isev: 0, Pstale: 0, Dmissing: 0 };
+    return (
+      <div className="view overview-view">
+        <div className="view-head">
+          <div>
+            <h2>Delivery Confidence &amp; Portfolio Overview</h2>
+            <p>Live Atlassian snapshot — Jira, Confluence, Bitbucket &amp; JSM.</p>
+          </div>
+          <div className="view-head-actions">
+            <span className="live-badge">LIVE WORKSPACE</span>
+            <button className="btn btn-filled" onClick={askAboutThis}>
+              <Sparkles size={16} />
+              <span>Ask about this</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="stat-grid">
+          <Stat
+            label="Open issues"
+            value={live ? String(live.counts.jiraOpen) : '—'}
+            delta={live ? `${live.counts.jiraTotal} in 30-day snapshot` : 'Live snapshot'}
+            tone="flat"
+            icon={ListTodo}
+          />
+          <Stat
+            label="Active blockers"
+            value={live ? String(b.Bcrit) : '—'}
+            delta={live ? `${b.Dmissing} unassigned` : 'Highest / Critical'}
+            tone={live && b.Bcrit > 0 ? 'bad' : 'flat'}
+            icon={ShieldAlert}
+          />
+          <Stat
+            label="Stale PRs"
+            value={live ? String(b.Pstale) : '—'}
+            delta="Open PRs on critical issues"
+            tone={live && b.Pstale > 0 ? 'bad' : 'flat'}
+            icon={GitPullRequest}
+          />
+          <Stat
+            label="Open incidents"
+            value={live ? String(b.Isev) : '—'}
+            delta="SEV-1/2 proxy: Highest / Critical"
+            tone={live && b.Isev > 0 ? 'bad' : 'flat'}
+            icon={AlertTriangle}
+          />
+        </div>
+
+        <div className="overview-main-grid">
+          {/* Column 1: Live Readiness + Live Critical Blockers */}
+          <section className="overview-column">
+            <Card
+              className="overview-readiness"
+              title="Release readiness"
+              subtitle="Live · computed in the Forge backend"
+            >
+              <div className="ai-teaser">
+                {liveReadiness.status === 'loading' && <p role="status">Reading the live snapshot…</p>}
+                {liveReadiness.status === 'error' && (
+                  <>
+                    <p className="source-error" role="alert">
+                      {liveReadiness.message}
+                    </p>
+                    <div className="row-actions">
+                      <button className="btn" onClick={() => setLiveRefresh((v) => v + 1)}>
+                        <RefreshCw size={14} /> <span>Retry</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+                {live && live.score === null && (
+                  <>
+                    <p>
+                      <strong>No records in the 30-day snapshot — nothing to score.</strong>
+                    </p>
+                    {live.notes.map((note) => (
+                      <p key={note} className="source-footnote">
+                        {note}
+                      </p>
+                    ))}
+                    <div className="row-actions">
+                      <button className="btn" onClick={() => setLiveRefresh((v) => v + 1)}>
+                        <RefreshCw size={14} /> <span>Retry</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+                {live && live.score !== null && (
+                  <>
+                    <Gauge value={live.score} label="Live Readiness" />
+                    <div>
+                      <p>
+                        <strong>Live estimate from the {live.counts.jiraTotal} most recently updated Jira issues.</strong>{' '}
+                        −12 × {b.Bcrit} critical blockers · −15 × {b.Isev} SEV-1/2 incidents · −5 × {b.Pstale} stale
+                        PRs · −10 × {b.Dmissing} unassigned.
+                      </p>
+                      <p className="source-footnote">
+                        Isev is a priority proxy: JSM exposes no SEV field. Dmissing counts open Highest/Critical
+                        blockers with no assignee. PR age is not available from dev-status — open PRs on critical
+                        issues are counted as stale.
+                      </p>
+                      {live.notes.map((note) => (
+                        <p key={note} className="source-footnote">
+                          {note}
+                        </p>
+                      ))}
+                      {live.generatedAt && (
+                        <p className="source-footnote">Computed {new Date(live.generatedAt).toLocaleTimeString()}.</p>
+                      )}
+                      {live.unavailable.length > 0 && (
+                        <p className="source-error">{live.unavailable.join(' · ')}</p>
+                      )}
+                      <div className="row-actions">
+                        <button className="btn btn-filled" onClick={() => onNavigate('intelligence')}>
+                          <span>Ask Intelligence</span> <ArrowRight size={14} />
+                        </button>
+                        <button className="btn" onClick={() => setLiveRefresh((v) => v + 1)}>
+                          <RefreshCw size={14} /> <span>Refresh</span>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </Card>
+
+            <Card title="Critical blockers" subtitle="Open Highest / Critical · live snapshot">
+              <div className="row-list">
+                {live?.blockers.map((blocker) => (
+                  <div className="data-row" key={blocker.key}>
+                    <div className="row-main">
+                      <strong>
+                        <span className="issue-key">{blocker.key}</span> · {blocker.summary}
+                      </strong>
+                      <small>
+                        {blocker.assignee ?? 'Unassigned'}
+                        {blocker.updated ? ` · updated ${new Date(blocker.updated).toLocaleDateString()}` : ''}
+                      </small>
+                    </div>
+                    <span className="pill critical">{blocker.priority ?? 'Critical'}</span>
+                  </div>
+                ))}
+                {live && live.blockers.length === 0 && (
+                  <p className="source-empty">No open Highest / Critical blockers in the snapshot.</p>
+                )}
+                {!live && <p className="source-empty">Loading live blockers…</p>}
+              </div>
+            </Card>
+          </section>
+
+          {/* Column 2: Live Feeds (Briefing, Jira, Confluence, JSM) */}
+          <section className="overview-column">
+            <Card className="overview-live-card" title="Today’s briefing" subtitle="Live blocker + stale watch">
+              <OverviewBriefingCard onNavigate={onNavigate} briefingSummary={briefingSummary} />
+            </Card>
+            <Card className="overview-live-card" title="Jira issues" subtitle="Read-only · switch demo or live data">
+              <JiraIssuesCard dataMode={dataMode} />
+            </Card>
+            <Card className="overview-live-card" title="Confluence pages">
+              <ConfluencePagesCard conversation={conversation} onNavigate={onNavigate} />
+            </Card>
+            <Card className="overview-live-card" title="JSM requests">
+              <JsmRequestsCard conversation={conversation} onNavigate={onNavigate} />
+            </Card>
+          </section>
+
+          {/* Column 3: Live Incidents + Sample-data note */}
+          <section className="overview-column">
+            <Card title="SEV-1/2 incidents" subtitle="Open JSM requests · Highest / Critical priority">
+              <div className="row-list">
+                {live?.incidents.map((incident) => (
+                  <div className="data-row" key={incident.key}>
+                    <div className="row-main">
+                      <strong>
+                        <span className="issue-key">{incident.key}</span> · {incident.summary}
+                      </strong>
+                      <small>{incident.status}</small>
+                    </div>
+                    <span className="pill critical">{incident.priority ?? 'Critical'}</span>
+                  </div>
+                ))}
+                {live && live.incidents.length === 0 && (
+                  <p className="source-empty">No open SEV-1/2 incidents in the snapshot.</p>
+                )}
+                {!live && <p className="source-empty">Loading live incidents…</p>}
+              </div>
+            </Card>
+
+            <Card title="Sample data hidden" subtitle="Live Workspace shows live records only">
+              <p>
+                Activity, pull requests and incident history shown in Sample Dataset are demo data and are hidden
+                here.
+              </p>
+              <div className="row-actions">
+                <button className="btn" onClick={() => onDataMode('sample')}>
+                  <span>Switch to Sample Dataset</span>
+                </button>
+              </div>
+            </Card>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="view overview-view">
       <div className="view-head">
@@ -135,7 +347,7 @@ export default function Overview({
           <p>Multi-tool delivery snapshot across Jira, Confluence, Bitbucket &amp; JSM.</p>
         </div>
         <div className="view-head-actions">
-          <span className="mock-badge">SAMPLE METRICS · LIVE SOURCES BELOW</span>
+          <span className="mock-badge">SAMPLE DATASET · DEMO DATA ONLY</span>
           <button className="btn btn-filled" onClick={askAboutThis}>
             <Sparkles size={16} />
             <span>Ask about this</span>
@@ -180,71 +392,22 @@ export default function Overview({
           <Card
             className="overview-readiness"
             title="Release readiness"
-            subtitle={
-              readiness.status === 'live'
-                ? 'Atlas v2 · live estimate from Jira'
-                : 'Atlas v2 · sample assessment'
-            }
+            subtitle="Atlas v2 · sample assessment"
           >
             <div className="ai-teaser">
-              <Gauge
-                value={readiness.status === 'live' ? readiness.result.score : 72}
-                label={readiness.status === 'live' ? 'Live Readiness' : 'Sample Readiness'}
-              />
+              <Gauge value={72} label="Sample Readiness" />
               <div>
-                {readiness.status === 'sample' && (
-                  <>
-                    <p>
-                      <strong>Demo-only estimate.</strong> Not calculated from live records.
-                    </p>
-                    <div className="row-actions">
-                      <button className="btn btn-filled" onClick={() => onNavigate('intelligence')}>
-                        <span>Ask Intelligence</span> <ArrowRight size={14} />
-                      </button>
-                      <button className="btn" onClick={() => void calcReadiness()}>
-                        <span>Calculate from live Jira</span>
-                      </button>
-                    </div>
-                  </>
-                )}
-                {readiness.status === 'loading' && <p role="status">Reading live Jira issues…</p>}
-                {readiness.status === 'live' && (
-                  <>
-                    <p>
-                      <strong>
-                        Live estimate from the {readiness.result.total} most recently updated Jira issues.
-                      </strong>{' '}
-                      {readiness.result.summary}.
-                    </p>
-                    <p className="source-footnote">
-                      −15 per open Highest (max −45) · −8 High (max −24) · −3 Medium (max −12) · −1 Low (max −5). Done issues don&apos;t lower the score.
-                    </p>
-                    <div className="row-actions">
-                      <button className="btn btn-filled" onClick={() => onNavigate('intelligence')}>
-                        <span>Ask Intelligence</span> <ArrowRight size={14} />
-                      </button>
-                      <button className="btn" onClick={() => setReadiness({ status: 'sample' })}>
-                        <span>Back to sample</span>
-                      </button>
-                    </div>
-                  </>
-                )}
-                {readiness.status === 'error' && (
-                  <>
-                    <p className="source-error" role="alert">
-                      {readiness.message}
-                    </p>
-                    <p>Showing the sample estimate instead.</p>
-                    <div className="row-actions">
-                      <button className="btn" onClick={() => void calcReadiness()}>
-                        <RefreshCw size={14} /> <span>Retry</span>
-                      </button>
-                      <button className="btn btn-filled" onClick={() => onNavigate('intelligence')}>
-                        <span>Ask Intelligence</span> <ArrowRight size={14} />
-                      </button>
-                    </div>
-                  </>
-                )}
+                <p>
+                  <strong>Demo-only estimate.</strong> Not calculated from live records.
+                </p>
+                <div className="row-actions">
+                  <button className="btn btn-filled" onClick={() => onNavigate('intelligence')}>
+                    <span>Ask Intelligence</span> <ArrowRight size={14} />
+                  </button>
+                  <button className="btn" onClick={() => onDataMode('live')}>
+                    <span>View live readiness</span>
+                  </button>
+                </div>
               </div>
             </div>
           </Card>
@@ -292,19 +455,18 @@ export default function Overview({
           </Card>
         </section>
 
-        {/* Column 2: Live Feeds (Briefing, Jira, Confluence, JSM) */}
+        {/* Column 2: Live feeds live in Live Workspace mode — Sample shows a switch card instead */}
         <section className="overview-column">
-          <Card className="overview-live-card" title="Today’s briefing" subtitle="Live blocker + stale watch">
-            <OverviewBriefingCard onNavigate={onNavigate} briefingSummary={briefingSummary} />
-          </Card>
-          <Card className="overview-live-card" title="Jira issues" subtitle="Read-only · switch demo or live data">
-            <JiraIssuesCard />
-          </Card>
-          <Card className="overview-live-card" title="Confluence pages">
-            <ConfluencePagesCard conversation={conversation} onNavigate={onNavigate} />
-          </Card>
-          <Card className="overview-live-card" title="JSM requests">
-            <JsmRequestsCard conversation={conversation} onNavigate={onNavigate} />
+          <Card title="Live Workspace" subtitle="Live Jira, Confluence and JSM feeds">
+            <p>
+              Sample Dataset shows demo data only. Switch to Live Workspace to see live records, exact backend
+              diagnostics and the backend-computed readiness score.
+            </p>
+            <div className="row-actions">
+              <button className="btn btn-filled" onClick={() => onDataMode('live')}>
+                <span>Switch to Live Workspace</span>
+              </button>
+            </div>
           </Card>
         </section>
 

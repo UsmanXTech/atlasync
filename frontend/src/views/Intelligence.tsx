@@ -1,4 +1,4 @@
-import { Send, Sparkles, Database, RotateCcw, ShieldCheck, Square } from 'lucide-react';
+import { Send, Sparkles, Database, RotateCcw, ShieldCheck, Square, Check, X, Wrench } from 'lucide-react';
 import Card from '../components/Card';
 import IntelligenceBriefing from '../components/IntelligenceBriefing';
 import MarkdownText from '../components/Markdown';
@@ -16,7 +16,7 @@ export default function Intelligence({
   conversation: IntelligenceConversation;
   briefing: Briefing;
 }) {
-  const { prompt, setPrompt, answer, sources, error, loading, ask, cancel, reset } = conversation;
+  const { prompt, setPrompt, answer, sources, error, loading, restored, threadTurns, trace, pendingAction, approving, ask, cancel, reset, approvePending } = conversation;
 
   return (
     <div className="view workspace-view intelligence-view">
@@ -27,7 +27,7 @@ export default function Intelligence({
           <p>Ask questions across permission-filtered Jira, Confluence and JSM context.</p>
         </div>
         <span className="live-readonly">
-          <Sparkles size={14} /> READ-ONLY ANALYSIS
+          <Sparkles size={14} /> PERMISSION-AWARE AGENT (APPROVAL-GATED WRITES)
         </span>
       </div>
 
@@ -42,7 +42,7 @@ export default function Intelligence({
             <div>
               <span className="eyebrow">ATLASYNC INTELLIGENCE</span>
               <h3 className="text-title-md">Think across your Atlassian workspace.</h3>
-              <p className="text-body-md">Get source-aware answers from a bounded live snapshot. Atlasync does not execute actions.</p>
+              <p className="text-body-md">Get source-aware answers from a bounded live snapshot. Atlasync can propose actions — writes only run after your approval.</p>
             </div>
           </div>
 
@@ -70,7 +70,7 @@ export default function Intelligence({
             />
             <button
               className="btn btn-filled"
-              disabled={loading || !prompt.trim()}
+              disabled={loading || !prompt.trim() || !!pendingAction}
               onClick={() => void ask()}
               aria-label="Ask Atlasync"
             >
@@ -83,6 +83,89 @@ export default function Intelligence({
               </button>
             )}
           </div>
+
+          {trace.length > 0 && (
+            <Card title="Execution trace" subtitle="Live tool calls for this analysis (max 5 steps)">
+              <div className="row-list">
+                {trace.map((entry, i) => (
+                  <div className="data-row" key={`${entry.step}-${entry.tool}-${i}`}>
+                    <div className="row-main">
+                      <strong>
+                        <span className="tabular-nums">Step {entry.step}</span>
+                        {' · '}
+                        {entry.tool}
+                      </strong>
+                      <small>
+                        {entry.args} · {entry.durationMs} ms
+                      </small>
+                    </div>
+                    <span
+                      className={`pill ${
+                        entry.status === 'ok'
+                          ? 'healthy'
+                          : entry.status === 'awaiting-approval'
+                            ? 'high'
+                            : entry.status === 'error' || entry.status === 'rejected'
+                              ? 'critical'
+                              : 'pending'
+                      }`}
+                    >
+                      {entry.status === 'awaiting-approval' ? 'awaiting approval' : entry.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {pendingAction && (
+            <Card
+              title="Approval required"
+              subtitle="This write has NOT run yet — nothing changes until you approve it"
+            >
+              <div className="approval-card">
+                <div className="approval-row">
+                  <Wrench size={18} />
+                  <div>
+                    <strong>{pendingAction.preview.tool}</strong>
+                    <small>
+                      Target: <span className="issue-key">{pendingAction.preview.target}</span>
+                    </small>
+                  </div>
+                </div>
+                <div className="approval-params">
+                  {Object.entries(pendingAction.preview.params).map(([key, value]) => (
+                    <div className="approval-param" key={key}>
+                      <span>{key}</span>
+                      <p>{typeof value === 'string' ? value : JSON.stringify(value)}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="row-actions">
+                  <button
+                    className="btn btn-filled"
+                    disabled={approving}
+                    onClick={() => void approvePending(true)}
+                    aria-label="Approve and execute"
+                  >
+                    <Check size={15} /> <span>{approving ? 'Executing…' : 'Approve & Execute'}</span>
+                  </button>
+                  <button
+                    className="btn"
+                    disabled={approving}
+                    onClick={() => void approvePending(false)}
+                    aria-label="Reject action"
+                  >
+                    <X size={15} /> <span>Reject</span>
+                  </button>
+                </div>
+                <p className="source-footnote">
+                  The backend re-checks this action against its own stored record before executing — the card
+                  above is a preview, not the authority.
+                </p>
+              </div>
+            </Card>
+          )}
 
           <Card
             title="Analysis"
@@ -98,7 +181,14 @@ export default function Intelligence({
                 {error}
               </p>
             )}
-            {!loading && !error && !answer && (
+            {!loading && !error && !answer && pendingAction && (
+              <div className="analysis-empty">
+                <ShieldCheck size={22} />
+                <strong>Waiting for your approval</strong>
+                <span>The proposed write above has not run. Approve it to execute, or reject it to continue without it.</span>
+              </div>
+            )}
+            {!loading && !error && !answer && !pendingAction && (
               <div className="analysis-empty">
                 <Sparkles size={22} />
                 <strong>Your analysis appears here</strong>
@@ -110,8 +200,15 @@ export default function Intelligence({
                 <div className="intelligence-answer">
                   <MarkdownText text={answer} />
                 </div>
+                {restored && (
+                  <p className="source-footnote">
+                    Restored from your previous session — {threadTurns} turn{threadTurns === 1 ? '' : 's'} in this
+                    thread. Ask a follow-up to continue it, or start a new analysis to clear it.
+                  </p>
+                )}
                 <p className="source-footnote">
-                  AI output may be incomplete. Atlasync does not make release decisions or run write actions.
+                  AI output may be incomplete. Atlasync does not make release decisions; write actions only run
+                  after your approval.
                 </p>
               </div>
             )}

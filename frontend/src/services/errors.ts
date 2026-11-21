@@ -12,7 +12,7 @@
 // BACKEND_UNREACHABLE / API_ERROR / unreachable fallbacks from here,
 // so the copy cannot drift again when a service is added or edited.
 
-export type LiveServiceName = 'Jira' | 'Confluence' | 'JSM' | 'Intelligence';
+export type LiveServiceName = 'Jira' | 'Confluence' | 'JSM' | 'Intelligence' | 'Settings' | 'Insights';
 
 export interface BackendUnreachableError {
   kind: 'BACKEND_UNREACHABLE';
