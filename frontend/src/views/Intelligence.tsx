@@ -1,4 +1,5 @@
-import { Send, Sparkles, Database, RotateCcw, ShieldCheck, Square, Check, X, Wrench } from 'lucide-react';
+import { useState } from 'react';
+import { Send, Sparkles, Database, ShieldCheck, Square, Check, X, Wrench, Plus, Pencil, Trash2 } from 'lucide-react';
 import Card from '../components/Card';
 import IntelligenceBriefing from '../components/IntelligenceBriefing';
 import MarkdownText from '../components/Markdown';
@@ -16,7 +17,13 @@ export default function Intelligence({
   conversation: IntelligenceConversation;
   briefing: Briefing;
 }) {
-  const { prompt, setPrompt, answer, sources, error, loading, restored, threadTurns, trace, pendingAction, approving, ask, cancel, reset, approvePending } = conversation;
+  const { prompt, setPrompt, answer, sources, error, loading, restored, threadTurns, trace, citations, generatedAt, siteUrl, pendingAction, approving, conversations, conversationsLoading, activeConversationId, ask, cancel, approvePending, selectConversation, newConversation, renameConversation, deleteConversation } = conversation;
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const citationHref = (c: { path?: string; url?: string }) =>
+    c.url ?? (siteUrl && c.path ? `${siteUrl}${c.path}` : undefined);
 
   return (
     <div className="view workspace-view intelligence-view">
@@ -200,10 +207,45 @@ export default function Intelligence({
                 <div className="intelligence-answer">
                   <MarkdownText text={answer} />
                 </div>
+                {citations.length > 0 && (
+                  <div className="row-list">
+                    <div className="data-row">
+                      <div className="row-main">
+                        <strong>Sources</strong>
+                        <small>Records the agent actually read — links open the original record</small>
+                      </div>
+                    </div>
+                    {citations.map((c) => {
+                      const href = citationHref(c);
+                      return (
+                        <div className="data-row" key={`${c.kind}-${c.key}`}>
+                          <div className="row-main">
+                            <strong>
+                              {href ? (
+                                <a href={href} target="_blank" rel="noreferrer">
+                                  {c.key}
+                                </a>
+                              ) : (
+                                <span className="issue-key">{c.key}</span>
+                              )}
+                            </strong>
+                            <small>{c.title}</small>
+                          </div>
+                          <span className="pill pending">{c.kind}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {generatedAt && (
+                  <p className="source-footnote">
+                    Snapshot computed at {new Date(generatedAt).toLocaleTimeString()} — sources as read at that time.
+                  </p>
+                )}
                 {restored && (
                   <p className="source-footnote">
                     Restored from your previous session — {threadTurns} turn{threadTurns === 1 ? '' : 's'} in this
-                    thread. Ask a follow-up to continue it, or start a new analysis to clear it.
+                    conversation. Ask a follow-up to continue it, or start a new analysis.
                   </p>
                 )}
                 <p className="source-footnote">
@@ -216,6 +258,113 @@ export default function Intelligence({
         </section>
 
         <aside className="intelligence-rail">
+          <Card title="Conversations" subtitle="Saved Intelligence chats — select to revisit">
+            <div className="row-actions">
+              <button className="btn btn-tonal" onClick={newConversation} aria-label="New conversation">
+                <Plus size={14} /> <span>New conversation</span>
+              </button>
+            </div>
+            {conversationsLoading && <p className="source-empty">Loading conversations…</p>}
+            {!conversationsLoading && conversations.length === 0 && (
+              <p className="source-empty">No conversations yet — ask your first question.</p>
+            )}
+            {conversations.length > 0 && (
+              <div className="row-list">
+                {conversations.map((c) => (
+                  <div className="data-row" key={c.id}>
+                    <div className="row-main">
+                      {renamingId === c.id ? (
+                        <input
+                          value={renameDraft}
+                          maxLength={80}
+                          onChange={(e) => setRenameDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              renameConversation(c.id, renameDraft);
+                              setRenamingId(null);
+                            }
+                            if (e.key === 'Escape') setRenamingId(null);
+                          }}
+                          aria-label="Conversation title"
+                          autoFocus
+                        />
+                      ) : (
+                        <button
+                          className="btn"
+                          onClick={() => selectConversation(c.id)}
+                          aria-label={`Open conversation ${c.title}`}
+                        >
+                          <strong>{c.title}</strong>
+                        </button>
+                      )}
+                      <small>
+                        {c.turnCount} turn{c.turnCount === 1 ? '' : 's'}
+                        {c.id === activeConversationId ? ' · current' : ''}
+                      </small>
+                    </div>
+                    {renamingId === c.id ? (
+                      <div className="row-actions">
+                        <button
+                          className="btn btn-filled"
+                          onClick={() => {
+                            renameConversation(c.id, renameDraft);
+                            setRenamingId(null);
+                          }}
+                          aria-label="Save title"
+                        >
+                          <Check size={14} />
+                        </button>
+                        <button className="btn" onClick={() => setRenamingId(null)} aria-label="Cancel rename">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : confirmDeleteId === c.id ? (
+                      <div className="row-actions">
+                        <button
+                          className="btn btn-filled"
+                          onClick={() => {
+                            deleteConversation(c.id);
+                            setConfirmDeleteId(null);
+                          }}
+                          aria-label="Confirm delete conversation"
+                        >
+                          <Check size={14} /> <span>Delete</span>
+                        </button>
+                        <button className="btn" onClick={() => setConfirmDeleteId(null)} aria-label="Cancel delete">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="row-actions">
+                        <button
+                          className="btn"
+                          onClick={() => {
+                            setRenamingId(c.id);
+                            setRenameDraft(c.title);
+                            setConfirmDeleteId(null);
+                          }}
+                          aria-label={`Rename conversation ${c.title}`}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          className="btn"
+                          onClick={() => {
+                            setConfirmDeleteId(c.id);
+                            setRenamingId(null);
+                          }}
+                          aria-label={`Delete conversation ${c.title}`}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
           <Card title="Source coverage" subtitle="Included in latest answer">
             <div className="coverage-total">
               <Database size={18} />
@@ -248,10 +397,6 @@ export default function Intelligence({
               <span>Records are retrieved as the current Atlassian user and kept within the bounded request context.</span>
             </div>
           </div>
-
-          <button className="btn btn-tonal" onClick={reset} aria-label="New analysis">
-            <RotateCcw size={14} /> <span>New analysis</span>
-          </button>
         </aside>
       </div>
     </div>

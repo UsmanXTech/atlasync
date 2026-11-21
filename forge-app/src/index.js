@@ -23,14 +23,20 @@ import {
   diagnoseHealthStatus,
 } from './readiness.js';
 import {
+  appendConversationTurn,
   appendThreadTurn,
   claimPendingAction,
   clearThread,
   consumePendingAction,
+  createConversation,
+  deleteConversation,
+  listConversations,
   listSnapshots,
+  loadConversation,
   loadSettings,
   loadThread,
   releasePendingActionClaim,
+  renameConversation,
   resolveScope,
   saveSettings,
   storePendingAction,
@@ -439,6 +445,117 @@ resolver.define('clearThread', async ({ context }) => {
   }
 });
 
+// Phase 1 (AI workspace evolution): multiple named conversations.
+//
+// The legacy single thread (getThread/clearThread) stays for backward
+// compatibility. The Intelligence view now works with conversations:
+// list (migrates the legacy thread once), create, rename, delete, get.
+// A conversation id starts with 'conv_'; ids are validated on every
+// call, and a missing conversation answers INVALID_INPUT — a turn is
+// never silently appended to the wrong conversation.
+resolver.define('listConversations', async ({ context }) => {
+  try {
+    const { cloudId, accountId } = resolveScope(context);
+    const conversations = await listConversations(kvs, cloudId, accountId);
+    return { ok: true, conversations };
+  } catch (error) {
+    console.error('[atlasync] listConversations failed:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'Conversations could not be loaded. Try again shortly.' } };
+  }
+});
+
+resolver.define('createConversation', async ({ payload, context }) => {
+  try {
+    const { cloudId, accountId } = resolveScope(context);
+    const title = payload && typeof payload.title === 'string' ? payload.title : '';
+    const conversation = await createConversation(kvs, cloudId, accountId, title);
+    return { ok: true, conversation };
+  } catch (error) {
+    console.error('[atlasync] createConversation failed:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'The conversation could not be created. Try again shortly.' } };
+  }
+});
+
+resolver.define('renameConversation', async ({ payload, context }) => {
+  const conversationId = payload && typeof payload.conversationId === 'string' ? payload.conversationId : '';
+  const title = payload && typeof payload.title === 'string' ? payload.title.trim() : '';
+  if (!conversationId || !title || title.length > 80) {
+    return { ok: false, error: { kind: 'INVALID_INPUT', message: 'A conversation id and a title of 1–80 characters are required.' } };
+  }
+  try {
+    const { cloudId, accountId } = resolveScope(context);
+    const conversation = await renameConversation(kvs, cloudId, accountId, conversationId, title);
+    if (!conversation) {
+      return { ok: false, error: { kind: 'INVALID_INPUT', message: 'No conversation matches this id.' } };
+    }
+    return { ok: true, conversation };
+  } catch (error) {
+    console.error('[atlasync] renameConversation failed:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'The conversation could not be renamed. Try again shortly.' } };
+  }
+});
+
+resolver.define('deleteConversation', async ({ payload, context }) => {
+  const conversationId = payload && typeof payload.conversationId === 'string' ? payload.conversationId : '';
+  if (!conversationId) {
+    return { ok: false, error: { kind: 'INVALID_INPUT', message: 'A conversation id is required.' } };
+  }
+  try {
+    const { cloudId, accountId } = resolveScope(context);
+    const deleted = await deleteConversation(kvs, cloudId, accountId, conversationId);
+    if (!deleted) {
+      return { ok: false, error: { kind: 'INVALID_INPUT', message: 'No conversation matches this id.' } };
+    }
+    return { ok: true };
+  } catch (error) {
+    console.error('[atlasync] deleteConversation failed:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'The conversation could not be deleted. Try again shortly.' } };
+  }
+});
+
+resolver.define('getConversation', async ({ payload, context }) => {
+  const conversationId = payload && typeof payload.conversationId === 'string' ? payload.conversationId : '';
+  if (!conversationId) {
+    return { ok: false, error: { kind: 'INVALID_INPUT', message: 'A conversation id is required.' } };
+  }
+  try {
+    const { cloudId, accountId } = resolveScope(context);
+    const conversation = await loadConversation(kvs, cloudId, accountId, conversationId);
+    if (!conversation) {
+      return { ok: false, error: { kind: 'INVALID_INPUT', message: 'No conversation matches this id.' } };
+    }
+    return { ok: true, conversation };
+  } catch (error) {
+    console.error('[atlasync] getConversation failed:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'The conversation could not be loaded. Try again shortly.' } };
+  }
+});
+
+// Phase 1: the Jira site base URL, so citation paths (/browse/AT-1,
+// /wiki/...) can be rendered as real links. One read-only serverInfo
+// call; the frontend caches it for the session and renders plain text
+// when it is unavailable.
+resolver.define('getSiteInfo', async () => {
+  try {
+    const response = await api.asUser().requestJira(route`/rest/api/3/serverInfo`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    });
+    if (response.status >= 400) {
+      return { ok: false, error: { kind: 'API_ERROR', message: 'The site address could not be read.' } };
+    }
+    const data = await response.json();
+    const siteUrl = typeof data?.baseUrl === 'string' ? data.baseUrl.replace(/\/$/, '') : '';
+    if (!siteUrl) {
+      return { ok: false, error: { kind: 'API_ERROR', message: 'The site address could not be read.' } };
+    }
+    return { ok: true, siteUrl };
+  } catch (error) {
+    console.error('[atlasync] getSiteInfo failed:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'The site address could not be read.' } };
+  }
+});
+
 // v2.1.0 Phase B — agentic Intelligence. invokeAgent runs the tool
 // loop (max 5 steps, native @forge/llm function calling): read tools
 // auto-execute, a write tool HALTS the loop and returns AWAITING_APPROVAL
@@ -454,7 +571,27 @@ resolver.define('invokeAgent', async ({ payload, context }) => {
     return { ok: false, error: { kind: 'INVALID_INPUT', message: 'Enter a prompt between 1 and 1,500 characters.' } };
   }
   const { cloudId, accountId } = resolveScope(context);
-  const thread = await loadThread(kvs, cloudId, accountId).catch(() => ({ turns: [], lastReadiness: null }));
+  // Phase 1: conversation-scoped when a valid id is given; a provided
+  // id that does not resolve fails honestly instead of silently
+  // appending the turn to the legacy thread. No id = legacy thread
+  // (old clients keep working).
+  const conversationId =
+    payload && typeof payload.conversationId === 'string' && payload.conversationId.trim() !== ''
+      ? payload.conversationId.trim()
+      : null;
+  let conversation = null;
+  if (conversationId) {
+    conversation = await loadConversation(kvs, cloudId, accountId, conversationId).catch(() => null);
+    if (!conversation) {
+      return {
+        ok: false,
+        error: { kind: 'INVALID_INPUT', message: 'This conversation no longer exists — start a new one.' },
+      };
+    }
+  }
+  const thread = conversation
+    ? { turns: conversation.turns, lastReadiness: conversation.lastReadiness }
+    : await loadThread(kvs, cloudId, accountId).catch(() => ({ turns: [], lastReadiness: null }));
   try {
     const { chat } = await import('@forge/llm');
     const result = await runAgentLoop({
@@ -463,7 +600,13 @@ resolver.define('invokeAgent', async ({ payload, context }) => {
       priorTurns: thread.turns,
       readiness: thread.lastReadiness,
       storePending: async (action) => {
-        const record = await storePendingAction(kvs, cloudId, accountId, { ...action, prompt });
+        const record = await storePendingAction(
+          kvs,
+          cloudId,
+          accountId,
+          { ...action, prompt },
+          conversation ? conversation.id : undefined,
+        );
         return { actionId: record.actionId, threadId: record.threadId };
       },
     });
@@ -477,15 +620,31 @@ resolver.define('invokeAgent', async ({ payload, context }) => {
         pendingAction: result.pendingAction,
         trace: result.trace,
         messages: [],
+        citations: result.citations ?? [],
+        generatedAt: result.generatedAt ?? null,
       };
     }
-    // Complete: append the turn to the thread (best-effort, like askAtlasync).
+    // Complete: append the turn to the conversation (best-effort, like askAtlasync).
     try {
-      await appendThreadTurn(kvs, cloudId, accountId, { question: prompt, answer: result.answer });
+      if (conversation) {
+        await appendConversationTurn(kvs, cloudId, accountId, conversation.id, {
+          question: prompt,
+          answer: result.answer,
+        });
+      } else {
+        await appendThreadTurn(kvs, cloudId, accountId, { question: prompt, answer: result.answer });
+      }
     } catch (error) {
       console.error('[atlasync] thread append failed:', error instanceof Error ? error.name : typeof error);
     }
-    return { ok: true, status: 'COMPLETE', answer: result.answer, trace: result.trace };
+    return {
+      ok: true,
+      status: 'COMPLETE',
+      answer: result.answer,
+      trace: result.trace,
+      citations: result.citations ?? [],
+      generatedAt: result.generatedAt ?? null,
+    };
   } catch (error) {
     console.error('[atlasync] invokeAgent failed:', error instanceof Error ? error.name : typeof error);
     return { ok: false, error: { kind: 'API_ERROR', message: 'Atlasync Intelligence could not complete the analysis. Check Forge LLM access/credits and try again.' } };
@@ -545,6 +704,25 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
     console.error('[atlasync] pending action failed re-validation:', pending.tool);
     return { ok: false, error: { kind: 'INVALID_INPUT', message: 'The pending action is no longer valid. Nothing was executed.' } };
   }
+  // Phase 1: a conversation-scoped pending action (threadId starts with
+  // 'conv_') appends its outcome turn to that conversation; the legacy
+  // thread otherwise. A conversation deleted between invoke and approve
+  // just means the turn is not stored — the approval still runs, and
+  // the summary (with its citations) is returned to the caller.
+  const conversationId =
+    typeof pending.threadId === 'string' && pending.threadId.startsWith('conv_') ? pending.threadId : null;
+  const citations = Array.isArray(pending.citations) ? pending.citations : [];
+  const appendOutcomeTurn = async (question, answer) => {
+    try {
+      if (conversationId) {
+        await appendConversationTurn(kvs, cloudId, accountId, conversationId, { question, answer });
+      } else {
+        await appendThreadTurn(kvs, cloudId, accountId, { question, answer });
+      }
+    } catch {
+      // best-effort only
+    }
+  };
   const trace = [...(pending.trace ?? [])];
   try {
     const { chat } = await import('@forge/llm');
@@ -555,12 +733,8 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
         messages: pending.messages ?? [],
         outcomeText: `The user REJECTED the proposed action ${pending.tool} on ${pending.preview?.target ?? 'the target'}. It was NOT executed — nothing changed.`,
       });
-      try {
-        await appendThreadTurn(kvs, cloudId, accountId, { question: pending.prompt || 'Agent action', answer });
-      } catch {
-        // best-effort only
-      }
-      return { ok: true, status: 'COMPLETE', answer, trace, executed: null };
+      await appendOutcomeTurn(pending.prompt || 'Agent action', answer);
+      return { ok: true, status: 'COMPLETE', answer, trace, executed: null, citations, generatedAt: new Date().toISOString() };
     }
     const started = Date.now();
     const execution = await executeWriteTool(pending.tool, validation.args);
@@ -577,19 +751,15 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
         messages: pending.messages ?? [],
         outcomeText: `The approved action ${pending.tool} on ${pending.preview?.target ?? 'the target'} FAILED: ${execution.error?.message ?? 'Unknown error.'} Nothing was changed unless the failure message says otherwise.`,
       });
-      return { ok: true, status: 'COMPLETE', answer, trace, executed: null, executionError: execution.error };
+      return { ok: true, status: 'COMPLETE', answer, trace, executed: null, executionError: execution.error, citations, generatedAt: new Date().toISOString() };
     }
     const answer = await summarizeAfterApproval({
       chat,
       messages: pending.messages ?? [],
       outcomeText: `The approved action ${pending.tool} on ${pending.preview?.target ?? 'the target'} EXECUTED successfully: ${JSON.stringify(execution.result)}.`,
     });
-    try {
-      await appendThreadTurn(kvs, cloudId, accountId, { question: pending.prompt || 'Agent action', answer });
-    } catch {
-      // best-effort only
-    }
-    return { ok: true, status: 'COMPLETE', answer, trace, executed: execution.result };
+    await appendOutcomeTurn(pending.prompt || 'Agent action', answer);
+    return { ok: true, status: 'COMPLETE', answer, trace, executed: execution.result, citations, generatedAt: new Date().toISOString() };
   } catch (error) {
     console.error('[atlasync] approveAgentAction failed:', error instanceof Error ? error.name : typeof error);
     return { ok: false, error: { kind: 'API_ERROR', message: 'The approval could not be completed. Check Forge LLM access/credits and try again.' } };

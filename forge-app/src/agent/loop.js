@@ -37,6 +37,41 @@ import { executeReadTool } from './toolExecutors.js';
 const MODEL = 'claude-sonnet-5';
 const MAX_COMPLETION_TOKENS = 1200;
 
+// Phase 1 citations: read tools return the records they fetched
+// (kind/key/title + a site-relative path or absolute url). The loop
+// collects them — deduped, capped — so the answer can link back to the
+// exact records it was built from. Only fetched records are ever
+// cited; malformed entries are dropped, never invented.
+const CITATION_KINDS = new Set(['jira', 'jsm', 'confluence', 'bitbucket']);
+const MAX_CITATIONS = 10;
+
+function isCitation(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return (
+    typeof value.kind === 'string' &&
+    CITATION_KINDS.has(value.kind) &&
+    typeof value.key === 'string' &&
+    value.key !== '' &&
+    typeof value.title === 'string'
+  );
+}
+
+function collectCitations(into, records) {
+  if (!Array.isArray(records)) return;
+  for (const r of records) {
+    if (!isCitation(r)) continue;
+    if (into.some((c) => c.kind === r.kind && c.key === r.key)) continue;
+    if (into.length >= MAX_CITATIONS) break;
+    into.push({
+      kind: r.kind,
+      key: r.key,
+      title: r.title,
+      ...(typeof r.path === 'string' && r.path !== '' ? { path: r.path } : {}),
+      ...(typeof r.url === 'string' && r.url !== '' ? { url: r.url } : {}),
+    });
+  }
+}
+
 export function extractText(message) {
   if (!message) return '';
   const content = message.content;
@@ -72,6 +107,7 @@ export async function runAgentLoop({
     { role: 'user', content: prompt },
   ];
   const trace = [];
+  const citations = [];
 
   for (let step = 1; step <= MAX_AGENT_STEPS; step++) {
     const response = await chat({
@@ -83,7 +119,14 @@ export async function runAgentLoop({
     });
     const message = response?.choices?.[0]?.message;
     if (!message) {
-      return { status: 'ERROR', error: 'The model returned an empty response.', trace, messages };
+      return {
+        status: 'ERROR',
+        error: 'The model returned an empty response.',
+        trace,
+        messages,
+        citations: [...citations],
+        generatedAt: new Date().toISOString(),
+      };
     }
     const text = extractText(message);
     const parsed = extractToolCalls(message);
@@ -108,6 +151,8 @@ export async function runAgentLoop({
         answer: answer.slice(0, 12000),
         trace,
         messages: [...messages, { role: 'assistant', content: answer }],
+        citations: [...citations],
+        generatedAt: new Date().toISOString(),
       };
     }
 
@@ -133,6 +178,7 @@ export async function runAgentLoop({
           preview,
           trace: [...trace],
           messages: [...messages],
+          citations: [...citations],
         });
         trace.push(
           shapeTraceEntry({ step, tool: call.name, args: validation.args, status: 'awaiting-approval', durationMs: 0 }),
@@ -144,6 +190,7 @@ export async function runAgentLoop({
       const result = await executeRead(call.name, validation.args);
       const durationMs = Date.now() - started;
       if (result.ok) {
+        collectCitations(citations, result.records);
         trace.push(shapeTraceEntry({ step, tool: call.name, args: validation.args, status: 'ok', durationMs }));
         messages.push({
           role: 'tool',
@@ -162,7 +209,14 @@ export async function runAgentLoop({
       }
     }
     if (halted) {
-      return { status: 'AWAITING_APPROVAL', pendingAction: halted.pendingAction, trace: halted.trace, messages };
+      return {
+        status: 'AWAITING_APPROVAL',
+        pendingAction: halted.pendingAction,
+        trace: halted.trace,
+        messages,
+        citations: [...citations],
+        generatedAt: new Date().toISOString(),
+      };
     }
   }
 
@@ -172,6 +226,8 @@ export async function runAgentLoop({
       'I reached the 5-step tool budget before finishing. What I gathered so far is in the execution trace — ask a narrower follow-up and I will continue from there.',
     trace,
     messages,
+    citations: [...citations],
+    generatedAt: new Date().toISOString(),
   };
 }
 

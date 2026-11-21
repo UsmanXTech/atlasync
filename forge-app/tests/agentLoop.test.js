@@ -199,3 +199,64 @@ describe('markdownToStorage', () => {
     assert.equal(markdownToStorage(''), '<p>(empty summary)</p>');
   });
 });
+
+describe('runAgentLoop citations (Phase 1)', () => {
+  it('collects citations from read tools, deduped, malformed dropped', async () => {
+    const chat = fakeChat([
+      toolCall('c1', 'get_jira_blockers', { projectKey: 'ATLAS' }),
+      toolCall('c2', 'search_confluence_runbooks', { query: 'release' }),
+      textAnswer('Two blockers, see sources.'),
+    ]);
+    const executeRead = async (name) => {
+      if (name === 'get_jira_blockers') {
+        return {
+          ok: true,
+          output: '{}',
+          records: [
+            { kind: 'jira', key: 'ATLAS-482', title: 'Checkout timeout', path: '/browse/ATLAS-482' },
+            { kind: 'jira', key: 'ATLAS-482', title: 'Checkout timeout', path: '/browse/ATLAS-482' },
+            { kind: 'bogus', key: 'X', title: 'Dropped' },
+          ],
+        };
+      }
+      return {
+        ok: true,
+        output: '{}',
+        records: [{ kind: 'confluence', key: '123', title: 'Release runbook', path: '/wiki/spaces/X/pages/123' }],
+      };
+    };
+    const result = await runAgentLoop({ chat, prompt: 'What is blocking us?', executeRead });
+    assert.equal(result.status, 'COMPLETE');
+    assert.deepEqual(result.citations, [
+      { kind: 'jira', key: 'ATLAS-482', title: 'Checkout timeout', path: '/browse/ATLAS-482' },
+      { kind: 'confluence', key: '123', title: 'Release runbook', path: '/wiki/spaces/X/pages/123' },
+    ]);
+    assert.ok(typeof result.generatedAt === 'string' && result.generatedAt !== '');
+  });
+
+  it('carries citations into the pending action on a write halt', async () => {
+    const chat = fakeChat([
+      toolCall('c1', 'get_jira_blockers', { projectKey: 'ATLAS' }),
+      toolCall('c2', 'escalate_jira_blocker', { issueKey: 'ATLAS-482', comment: 'Escalate.', priority: 'Highest' }),
+    ]);
+    const executeRead = async () => ({
+      ok: true,
+      output: '{}',
+      records: [{ kind: 'jira', key: 'ATLAS-482', title: 'Checkout timeout', path: '/browse/ATLAS-482' }],
+    });
+    let stored = null;
+    const result = await runAgentLoop({
+      chat,
+      prompt: 'Escalate ATLAS-482.',
+      executeRead,
+      storePending: async (action) => {
+        stored = action;
+        return { actionId: 'act_test1', threadId: 'agent-thread:c1:a1' };
+      },
+    });
+    assert.equal(result.status, 'AWAITING_APPROVAL');
+    assert.equal(result.citations.length, 1);
+    assert.equal(result.citations[0].key, 'ATLAS-482');
+    assert.equal(stored.citations.length, 1);
+  });
+});

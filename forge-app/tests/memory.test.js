@@ -6,24 +6,32 @@ import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import {
   DEFAULT_SETTINGS,
+  MAX_CONVERSATIONS,
   MAX_SNAPSHOTS,
   MAX_THREAD_TURNS,
   PENDING_ACTION_CLAIM_TTL_MS,
   PENDING_ACTION_TTL_MS,
+  appendConversationTurn,
   appendThreadTurn,
   claimPendingAction,
   clearThread,
   consumePendingAction,
+  conversationTitleFromQuestion,
+  createConversation,
+  deleteConversation,
   deletePendingAction,
   emptyThread,
   isPendingActionExpired,
+  listConversations,
   listSnapshots,
+  loadConversation,
   loadPendingAction,
   loadSettings,
   loadThread,
   pendingActionClaimKey,
   pendingActionKey,
   releasePendingActionClaim,
+  renameConversation,
   resolveScope,
   saveSettings,
   settingsKey,
@@ -377,5 +385,85 @@ describe('snapshots', () => {
 
   it('listSnapshots returns an empty list when nothing is stored', async () => {
     assert.deepEqual(await listSnapshots(fakeStore(), 'c1'), []);
+  });
+});
+
+describe('conversations (Phase 1)', () => {
+  it('creates, lists, renames and deletes a conversation', async () => {
+    const store = fakeStore();
+    const created = await createConversation(store, 'c1', 'a1', 'Release check');
+    assert.ok(created.id.startsWith('conv_'));
+    assert.equal(created.title, 'Release check');
+    assert.deepEqual(created.turns, []);
+    let list = await listConversations(store, 'c1', 'a1');
+    assert.equal(list.length, 1);
+    assert.equal(list[0].turnCount, 0);
+    const renamed = await renameConversation(store, 'c1', 'a1', created.id, '  Checkout risk  ');
+    assert.equal(renamed.title, 'Checkout risk');
+    list = await listConversations(store, 'c1', 'a1');
+    assert.equal(list[0].title, 'Checkout risk');
+    assert.equal(await deleteConversation(store, 'c1', 'a1', created.id), true);
+    assert.equal(await deleteConversation(store, 'c1', 'a1', created.id), false);
+    assert.deepEqual(await listConversations(store, 'c1', 'a1'), []);
+  });
+
+  it('rejects empty and over-long titles on rename', async () => {
+    const store = fakeStore();
+    const created = await createConversation(store, 'c1', 'a1');
+    assert.equal(await renameConversation(store, 'c1', 'a1', created.id, '   '), null);
+    assert.equal(await renameConversation(store, 'c1', 'a1', created.id, 'x'.repeat(81)), null);
+    assert.equal(await renameConversation(store, 'c1', 'a1', 'conv_missing', 'New'), null);
+  });
+
+  it('auto-titles from the first question and caps turns at 10', async () => {
+    const store = fakeStore();
+    const created = await createConversation(store, 'c1', 'a1');
+    assert.equal(created.title, 'New conversation');
+    for (let i = 0; i < 12; i += 1) {
+      await appendConversationTurn(store, 'c1', 'a1', created.id, {
+        question: `What is blocking the release number ${i}?`,
+        answer: `Answer ${i}`,
+      });
+    }
+    const loaded = await loadConversation(store, 'c1', 'a1', created.id);
+    assert.equal(loaded.turns.length, 10);
+    assert.equal(loaded.turns[0].question, 'What is blocking the release number 2?');
+    assert.equal(loaded.title, 'What is blocking the release number 0?');
+    const list = await listConversations(store, 'c1', 'a1');
+    assert.equal(list[0].turnCount, 10);
+  });
+
+  it('migrates the legacy thread once, and never re-migrates after delete-all', async () => {
+    const store = fakeStore();
+    await appendThreadTurn(store, 'c1', 'a1', { question: 'Old question', answer: 'Old answer' });
+    let list = await listConversations(store, 'c1', 'a1');
+    assert.equal(list.length, 1);
+    assert.equal(list[0].title, 'Previous conversation');
+    assert.equal(list[0].turnCount, 1);
+    const full = await loadConversation(store, 'c1', 'a1', list[0].id);
+    assert.equal(full.turns[0].question, 'Old question');
+    // Delete it: the legacy thread must NOT resurrect on the next list.
+    await deleteConversation(store, 'c1', 'a1', list[0].id);
+    list = await listConversations(store, 'c1', 'a1');
+    assert.deepEqual(list, []);
+  });
+
+  it('caps the conversation list at MAX_CONVERSATIONS, dropping the oldest record', async () => {
+    const store = fakeStore();
+    const ids = [];
+    for (let i = 0; i < MAX_CONVERSATIONS + 1; i += 1) {
+      const c = await createConversation(store, 'c1', 'a1', `Conv ${i}`);
+      ids.push(c.id);
+    }
+    const list = await listConversations(store, 'c1', 'a1');
+    assert.equal(list.length, MAX_CONVERSATIONS);
+    assert.equal(await loadConversation(store, 'c1', 'a1', ids[0]), null);
+    assert.ok(await loadConversation(store, 'c1', 'a1', ids[MAX_CONVERSATIONS]));
+  });
+
+  it('conversationTitleFromQuestion trims and truncates', () => {
+    assert.equal(conversationTitleFromQuestion('  hello   world  '), 'hello world');
+    assert.equal(conversationTitleFromQuestion(''), 'New conversation');
+    assert.equal(conversationTitleFromQuestion('x'.repeat(50)).length, 41);
   });
 });
