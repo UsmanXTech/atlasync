@@ -43,7 +43,7 @@ describe('runAgentLoop', () => {
     assert.deepEqual(result.trace, []);
     assert.equal(chat.requests.length, 1);
     assert.equal(chat.requests[0].model, 'claude-sonnet-5');
-    assert.equal(chat.requests[0].tools.length, 8);
+    assert.equal(chat.requests[0].tools.length, 7);
     assert.equal(chat.requests[0].tool_choice, 'auto');
   });
 
@@ -68,37 +68,32 @@ describe('runAgentLoop', () => {
     assert.match(toolMessage.content, /ATLAS-482/);
   });
 
-  it('discovers the project key first, then queries its blockers', async () => {
+  it('injects the project keys into the system prompt and calls the blocker tool with them', async () => {
     const chat = fakeChat([
-      toolCall('c1', 'list_jira_projects', '{}'),
-      toolCall('c2', 'get_jira_blockers', '{"projectKey":"AT"}'),
+      toolCall('c1', 'get_jira_blockers', '{"projectKey":"AT"}'),
       textAnswer('AT-1 is the top blocker.'),
     ]);
     const seen = [];
     const executeRead = async (name, args) => {
       seen.push([name, args]);
-      if (name === 'list_jira_projects') {
-        return {
-          ok: true,
-          output: '{}',
-          records: [{ kind: 'project', key: 'AT', title: 'Atlasync Test', path: '/jira/software/projects/AT' }],
-        };
-      }
       return {
         ok: true,
         output: '{}',
         records: [{ kind: 'jira', key: 'AT-1', title: 'Checkout timeout', path: '/browse/AT-1' }],
       };
     };
-    const result = await runAgentLoop({ chat, prompt: 'What is blocking the release?', executeRead });
+    const result = await runAgentLoop({
+      chat,
+      prompt: 'What is blocking the release?',
+      projects: [{ key: 'AT', name: 'Atlasync Test' }],
+      executeRead,
+    });
     assert.equal(result.status, 'COMPLETE');
-    assert.deepEqual(seen, [
-      ['list_jira_projects', { limit: 20 }],
-      ['get_jira_blockers', { projectKey: 'AT' }],
-    ]);
+    assert.match(chat.requests[0].messages[0].content, /Available Jira projects: AT \(Atlasync Test\)/);
+    assert.deepEqual(seen, [['get_jira_blockers', { projectKey: 'AT' }]]);
     assert.deepEqual(
       result.citations.map((c) => c.key),
-      ['AT', 'AT-1'],
+      ['AT-1'],
     );
   });
 
