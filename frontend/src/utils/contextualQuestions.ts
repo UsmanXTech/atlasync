@@ -72,3 +72,10 @@ export type ContextualView = keyof typeof CONTEXTUAL_QUESTIONS;
 export function contextualQuestionFor(view: ContextualView): string {
   return CONTEXTUAL_QUESTIONS[view];
 }
+
+// Phase 3.2 — per-project ask. The question names the project key and
+// tells the agent to say so when the 10-issue snapshot has no
+// evidence for it, rather than guessing from the tile counts.
+export function questionForProject(projectKey: string): string {
+  return `From the live Jira snapshot — looking at project ${projectKey}, what open issues and blockers does it carry, and what needs attention first? If the snapshot has no evidence for this project, say so rather than guessing.`;
+}
