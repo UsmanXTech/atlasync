@@ -93,7 +93,7 @@ describe('runAgentLoop', () => {
     const result = await runAgentLoop({ chat, prompt: 'What is blocking the release?', executeRead });
     assert.equal(result.status, 'COMPLETE');
     assert.deepEqual(seen, [
-      ['list_jira_projects', {}],
+      ['list_jira_projects', { limit: 20 }],
       ['get_jira_blockers', { projectKey: 'AT' }],
     ]);
     assert.deepEqual(

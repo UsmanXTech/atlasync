@@ -43,7 +43,11 @@ describe('tool sets', () => {
 
 describe('validateToolArgs', () => {
   it('accepts valid args for every read tool', () => {
-    assert.deepEqual(validateToolArgs('list_jira_projects', {}), { ok: true, args: {} });
+    assert.deepEqual(validateToolArgs('list_jira_projects', {}), { ok: true, args: { limit: 20 } });
+    assert.deepEqual(validateToolArgs('list_jira_projects', { limit: 5 }), { ok: true, args: { limit: 5 } });
+    assert.equal(validateToolArgs('list_jira_projects', { limit: 0 }).ok, false);
+    assert.equal(validateToolArgs('list_jira_projects', { limit: 21 }).ok, false);
+    assert.equal(validateToolArgs('list_jira_projects', { limit: 2.5 }).ok, false);
     assert.deepEqual(validateToolArgs('get_jira_blockers', { projectKey: 'ATLAS' }), { ok: true, args: { projectKey: 'ATLAS' } });
     assert.deepEqual(validateToolArgs('get_jsm_incidents', { severity: 'Highest' }), { ok: true, args: { severity: 'Highest' } });
     assert.deepEqual(validateToolArgs('search_confluence_runbooks', { query: 'release runbook' }), { ok: true, args: { query: 'release runbook' } });

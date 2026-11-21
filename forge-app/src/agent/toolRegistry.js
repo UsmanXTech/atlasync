@@ -68,10 +68,15 @@ export const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'list_jira_projects',
-      description: 'List the Jira projects the current user can see (max 20). Read-only. Call this first when a question needs a project key you do not have — never ask the user for a key the workspace already has.',
+      description: 'List the Jira projects the current user can see. Read-only. Call this first when a question needs a project key you do not have — never ask the user for a key the workspace already has.',
       parameters: {
         type: 'object',
-        properties: {},
+        // An empty parameters object broke the live chat call (the
+        // Forge LLM rejected the tools payload outright — the agent
+        // ask failed twice with an access/credits error while the
+        // plain Summarize call worked). The tool therefore takes an
+        // optional limit, so its schema is never empty.
+        properties: { limit: { type: 'integer', description: 'Maximum projects to list (1-20, default 20)' } },
         required: [],
         additionalProperties: false,
       },
@@ -192,9 +197,13 @@ export function validateToolArgs(toolName, rawArgs) {
   let error;
   switch (toolName) {
     case 'list_jira_projects': {
-      error = checkUnknownKeys(args, [], toolName);
+      error = checkUnknownKeys(args, ['limit'], toolName);
       if (error) return error;
-      return { ok: true, args: {} };
+      if (args.limit === undefined) return { ok: true, args: { limit: 20 } };
+      if (typeof args.limit !== 'number' || !Number.isInteger(args.limit) || args.limit < 1 || args.limit > 20) {
+        return invalid('limit must be an integer between 1 and 20.');
+      }
+      return { ok: true, args: { limit: args.limit } };
     }
     case 'get_jira_blockers':
     case 'get_pr_bottlenecks': {
