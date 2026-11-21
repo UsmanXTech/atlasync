@@ -85,7 +85,12 @@ export default function Agents({
         </button>
       </div>
 
-      <Card title="Pending approvals" subtitle="Proposed writes wait here until you approve or reject them">
+      <div className="agent-capabilities">
+        <Card
+          title="Pending approvals"
+          subtitle="Proposed writes wait here until you approve or reject them"
+          className="span-full"
+        >
         {pendingAction ? (
           <div className="approval-card">
             <div className="approval-row">
@@ -133,7 +138,11 @@ export default function Agents({
         )}
       </Card>
 
-      <Card title="Execution history" subtitle="What the agent actually did — newest first, last 20 runs">
+        <Card
+          title="Execution history"
+          subtitle="What the agent actually did — newest first, last 20 runs"
+          className="span-full"
+        >
         {history.loading && <p className="source-empty">Loading run history…</p>}
         {history.error && <p className="source-error">{history.error}</p>}
         {!history.loading && !history.error && history.runs.length === 0 && (
@@ -197,7 +206,6 @@ export default function Agents({
         )}
       </Card>
 
-      <div className="agent-capabilities">
         <Card title="What it can do">
           <ul className="feature-list">
             <li>Summarize source records from connected Atlassian tools.</li>
