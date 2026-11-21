@@ -31,10 +31,12 @@ import {
   createConversation,
   deleteConversation,
   listConversations,
+  listExecutionRuns,
   listSnapshots,
   loadConversation,
   loadSettings,
   loadThread,
+  recordExecutionRun,
   releasePendingActionClaim,
   renameConversation,
   resolveScope,
@@ -625,9 +627,38 @@ resolver.define('invokeAgent', async ({ payload, context }) => {
       },
     });
     if (result.status === 'ERROR') {
+      // Phase 2: record the failed run (best-effort — a history
+      // write must never break the error answer itself).
+      try {
+        await recordExecutionRun(kvs, cloudId, {
+          question: prompt,
+          status: 'ERROR',
+          error: result.error ?? 'unknown',
+          trace: result.trace ?? [],
+          citations: result.citations ?? [],
+          generatedAt: result.generatedAt ?? new Date().toISOString(),
+          conversationId: conversation ? conversation.id : null,
+        });
+      } catch {
+        // best-effort only
+      }
       return { ok: false, error: { kind: 'API_ERROR', message: 'Atlasync Intelligence could not complete the analysis. Check Forge LLM access/credits and try again.' } };
     }
     if (result.status === 'AWAITING_APPROVAL') {
+      try {
+        await recordExecutionRun(kvs, cloudId, {
+          question: prompt,
+          status: 'AWAITING_APPROVAL',
+          tool: result.pendingAction?.preview?.tool ?? null,
+          target: result.pendingAction?.preview?.target ?? null,
+          trace: result.trace ?? [],
+          citations: result.citations ?? [],
+          generatedAt: result.generatedAt ?? new Date().toISOString(),
+          conversationId: conversation ? conversation.id : null,
+        });
+      } catch {
+        // best-effort only
+      }
       return {
         ok: true,
         status: 'AWAITING_APPROVAL',
@@ -650,6 +681,19 @@ resolver.define('invokeAgent', async ({ payload, context }) => {
       }
     } catch (error) {
       console.error('[atlasync] thread append failed:', error instanceof Error ? error.name : typeof error);
+    }
+    // Phase 2: record the completed run for the Agents view history.
+    try {
+      await recordExecutionRun(kvs, cloudId, {
+        question: prompt,
+        status: 'COMPLETE',
+        trace: result.trace ?? [],
+        citations: result.citations ?? [],
+        generatedAt: result.generatedAt ?? new Date().toISOString(),
+        conversationId: conversation ? conversation.id : null,
+      });
+    } catch {
+      // best-effort only
     }
     return {
       ok: true,
@@ -738,6 +782,25 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
     }
   };
   const trace = [...(pending.trace ?? [])];
+  // Phase 2: record the approval decision in the execution history
+  // (best-effort — a history write must never break the outcome).
+  const recordDecision = async (status, error) => {
+    try {
+      await recordExecutionRun(kvs, cloudId, {
+        question: pending.prompt || 'Agent action',
+        status,
+        tool: pending.tool,
+        target: pending.preview?.target ?? null,
+        trace,
+        citations,
+        generatedAt: new Date().toISOString(),
+        conversationId,
+        ...(error ? { error } : {}),
+      });
+    } catch {
+      // best-effort only
+    }
+  };
   try {
     const { chat } = await import('@forge/llm');
     if (!approved) {
@@ -748,6 +811,7 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
         outcomeText: `The user REJECTED the proposed action ${pending.tool} on ${pending.preview?.target ?? 'the target'}. It was NOT executed — nothing changed.`,
       });
       await appendOutcomeTurn(pending.prompt || 'Agent action', answer);
+      await recordDecision('REJECTED');
       return { ok: true, status: 'COMPLETE', answer, trace, executed: null, citations, generatedAt: new Date().toISOString() };
     }
     const started = Date.now();
@@ -765,6 +829,8 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
         messages: pending.messages ?? [],
         outcomeText: `The approved action ${pending.tool} on ${pending.preview?.target ?? 'the target'} FAILED: ${execution.error?.message ?? 'Unknown error.'} Nothing was changed unless the failure message says otherwise.`,
       });
+      await appendOutcomeTurn(pending.prompt || 'Agent action', answer);
+      await recordDecision('EXECUTION_FAILED', execution.error?.message ?? 'Unknown error.');
       return { ok: true, status: 'COMPLETE', answer, trace, executed: null, executionError: execution.error, citations, generatedAt: new Date().toISOString() };
     }
     const answer = await summarizeAfterApproval({
@@ -773,10 +839,25 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
       outcomeText: `The approved action ${pending.tool} on ${pending.preview?.target ?? 'the target'} EXECUTED successfully: ${JSON.stringify(execution.result)}.`,
     });
     await appendOutcomeTurn(pending.prompt || 'Agent action', answer);
+    await recordDecision('APPROVED');
     return { ok: true, status: 'COMPLETE', answer, trace, executed: execution.result, citations, generatedAt: new Date().toISOString() };
   } catch (error) {
     console.error('[atlasync] approveAgentAction failed:', error instanceof Error ? error.name : typeof error);
     return { ok: false, error: { kind: 'API_ERROR', message: 'The approval could not be completed. Check Forge LLM access/credits and try again.' } };
+  }
+});
+
+// Phase 2 — persistent execution history for the Agents view.
+// Newest first, capped at 20 runs. Read-only; runs are recorded by
+// invokeAgent and approveAgentAction, never written from here.
+resolver.define('listExecutionHistory', async ({ context }) => {
+  const { cloudId } = resolveScope(context);
+  try {
+    const runs = await listExecutionRuns(kvs, cloudId);
+    return { ok: true, runs };
+  } catch (error) {
+    console.error('[atlasync] listExecutionHistory failed:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'Execution history could not be loaded. Try again shortly.' } };
   }
 });
 
