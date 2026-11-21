@@ -6,7 +6,7 @@ export interface PendingAction { actionId: string; threadId: string; preview: Pe
 // `path` is site-relative (/browse/AT-1, /wiki/...) and is prefixed with
 // the Jira site URL from getSiteInfo; `url` is already absolute (e.g. a
 // Bitbucket PR link) and is used as-is.
-export interface Citation { kind: 'jira' | 'jsm' | 'confluence' | 'bitbucket'; key: string; title: string; path?: string; url?: string }
+export interface Citation { kind: 'jira' | 'jsm' | 'confluence' | 'bitbucket' | 'project'; key: string; title: string; path?: string; url?: string }
 export type AgentResult =
   | { ok: true; status: 'COMPLETE'; answer: string; trace: TraceEntry[]; citations: Citation[]; generatedAt: string | null; executed?: unknown }
   | { ok: true; status: 'AWAITING_APPROVAL'; pendingAction: PendingAction; trace: TraceEntry[]; citations: Citation[]; generatedAt: string | null }
@@ -18,7 +18,7 @@ function isTrace(value: unknown): value is TraceEntry[] {
 function isCitation(value: unknown): value is Citation {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const v = value as Record<string, unknown>;
-  return ['jira', 'jsm', 'confluence', 'bitbucket'].includes(v.kind as string)
+  return ['jira', 'jsm', 'confluence', 'bitbucket', 'project'].includes(v.kind as string)
     && typeof v.key === 'string' && v.key !== '' && typeof v.title === 'string';
 }
 function toCitations(value: unknown): Citation[] {

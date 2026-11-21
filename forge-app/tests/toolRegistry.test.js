@@ -19,11 +19,11 @@ import {
 } from '../src/agent/toolRegistry.js';
 
 describe('tool sets', () => {
-  it('declares 4 read + 3 write tools, no overlap', () => {
-    assert.equal(READ_TOOLS.length, 4);
+  it('declares 5 read + 3 write tools, no overlap', () => {
+    assert.equal(READ_TOOLS.length, 5);
     assert.equal(WRITE_TOOLS.length, 3);
-    assert.equal(TOOL_DEFINITIONS.length, 7);
-    assert.deepEqual(new Set([...READ_TOOLS, ...WRITE_TOOLS]).size, 7);
+    assert.equal(TOOL_DEFINITIONS.length, 8);
+    assert.deepEqual(new Set([...READ_TOOLS, ...WRITE_TOOLS]).size, 8);
     for (const def of TOOL_DEFINITIONS) {
       assert.equal(def.type, 'function');
       assert.equal(typeof def.function.name, 'string');
@@ -43,6 +43,7 @@ describe('tool sets', () => {
 
 describe('validateToolArgs', () => {
   it('accepts valid args for every read tool', () => {
+    assert.deepEqual(validateToolArgs('list_jira_projects', {}), { ok: true, args: {} });
     assert.deepEqual(validateToolArgs('get_jira_blockers', { projectKey: 'ATLAS' }), { ok: true, args: { projectKey: 'ATLAS' } });
     assert.deepEqual(validateToolArgs('get_jsm_incidents', { severity: 'Highest' }), { ok: true, args: { severity: 'Highest' } });
     assert.deepEqual(validateToolArgs('search_confluence_runbooks', { query: 'release runbook' }), { ok: true, args: { query: 'release runbook' } });
