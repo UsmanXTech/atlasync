@@ -36,13 +36,13 @@ export const SETTINGS_ROWS: SettingsRow[] = [
     key: 'incidentAlerts',
     title: 'Incident alerts',
     detail: 'Alert preferences are preview-only and not delivered.',
-    effect: 'Severe incidents surface in Intelligence and the daily snapshot; no email is sent yet.',
+    effect: 'Severe incidents already surface in Intelligence; this toggle gates no delivery yet and no email is sent.',
   },
   {
     key: 'weeklyDigest',
     title: 'Weekly digest',
     detail: 'Email delivery is not configured.',
-    effect: 'A weekly readiness summary is prepared for Intelligence; email delivery is not configured yet.',
+    effect: 'Weekly digest is planned; no summary is prepared yet and no email is sent.',
   },
   {
     key: 'aiSummaries',

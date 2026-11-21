@@ -32,10 +32,10 @@ test('about card: version row names the deployed version', () => {
   );
 });
 
-test('about card: deploy note is honest about the next deploy', () => {
+test('about card: deploy note is honest about how deploys happen', () => {
   assert.ok(APP_DEPLOY_NOTE.includes(APP_VERSION), 'deploy note must name the deployed version');
   assert.ok(
-    APP_DEPLOY_NOTE.includes('next deploy'),
-    'deploy note must say main changes wait for the next deploy',
+    APP_DEPLOY_NOTE.includes('deploys automatically'),
+    'deploy note must say merges to main deploy automatically',
   );
 });
