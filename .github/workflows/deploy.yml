@@ -71,10 +71,4 @@ jobs:
         working-directory: forge-app
         run: forge install --upgrade --site iamusmanh.atlassian.net --product confluence -e development --non-interactive --confirm-scopes --non-interactive
 
-      # JSM install may not exist yet on the dev site; if the app was never
-      # installed on JSM, --upgrade errors. Keep deploying even then — the
-      # Jira/Confluence upgrades above already landed.
-      - name: Upgrade install on iamusmanh — Jira Service Management
-        working-directory: forge-app
-        continue-on-error: true
-        run: forge install --upgrade --site iamusmanh.atlassian.net --product jira-service-management -e development --non-interactive --confirm-scopes --non-interactive
+      
