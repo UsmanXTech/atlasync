@@ -5,6 +5,8 @@
 // one install; they are not a security boundary):
 //   settings:${cloudId}
 //   agent-thread:${cloudId}:${accountId}   (last 10 turns + last readiness)
+//   pending-action:${cloudId}:${accountId}:${actionId}   (approval-gated write, single-use)
+//   pending-action-claim:${cloudId}:${accountId}:${actionId}   (short-lived approval claim, P0 hardening)
 //   snapshot:${cloudId}:${YYYY-MM-DD}      (daily readiness snapshot)
 //
 // Every function takes the KVS store as its first argument — the real
@@ -142,12 +144,99 @@ export async function clearThread(store, cloudId, accountId) {
 // and re-validates before executing. The frontend's copy is never
 // trusted. Entries are single-use: approve/reject deletes them, so a
 // stale approval cannot be replayed.
+//
+// P0 hardening (2026-11-21 security review):
+// Forge KVS has no compare-and-swap or transaction, so a perfect atomic
+// claim is impossible. Defense in depth instead:
+//   1. Server-enforced TTL (10 min): loadPendingAction treats an expired
+//      record as missing, so a stale approval can never execute.
+//   2. Claim: approveAgentAction writes a unique claim key, re-reads it,
+//      and proceeds only while it still holds its own claim id. A live
+//      claim already held by another approval refuses a second claim
+//      outright; two concurrent claims race on the key and the loser
+//      aborts. This narrows the race window (load->delete) to the
+//      claim-read->delete gap — it does not close it (KVS has no atomic
+//      operation). The idempotency guards in the write executors are
+//      the backstop that makes a residual double execution harmless.
+//      A claim older than PENDING_ACTION_CLAIM_TTL_MS is stale (its
+//      owner crashed before consuming) and may be stolen.
+export const PENDING_ACTION_CLAIM_TTL_MS = 60 * 1000;
+
+export function isClaimStale(claim, nowMs = Date.now()) {
+  if (!claim || typeof claim !== 'object') return true;
+  const claimed = Date.parse(claim.claimedAt);
+  if (Number.isNaN(claimed)) return true; // no trustworthy timestamp: fail closed
+  return nowMs - claimed > PENDING_ACTION_CLAIM_TTL_MS;
+}
+//   3. Fail-closed consume: if the pending record cannot be deleted,
+//      the action is NOT executed — delete errors are never swallowed.
 export function pendingActionKey(cloudId, accountId, actionId) {
   return `pending-action:${cloudId}:${accountId}:${actionId}`;
 }
 
 export function newActionId() {
   return `act_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// Server-enforced approval TTL: a pending action older than this can
+// never execute, whatever the frontend shows.
+export const PENDING_ACTION_TTL_MS = 10 * 60 * 1000;
+
+export function isPendingActionExpired(record, nowMs = Date.now()) {
+  if (!record || typeof record !== 'object') return true;
+  const created = Date.parse(record.createdAt);
+  if (Number.isNaN(created)) return true; // no trustworthy timestamp: fail closed
+  return nowMs - created > PENDING_ACTION_TTL_MS;
+}
+
+export function pendingActionClaimKey(cloudId, accountId, actionId) {
+  return `pending-action-claim:${cloudId}:${accountId}:${actionId}`;
+}
+
+export function newClaimId() {
+  return `claim_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// Claim a pending action for execution. Returns { record, claimId } on
+// success, null when the action is missing/expired or another approval
+// already holds the claim.
+export async function claimPendingAction(store, cloudId, accountId, actionId, nowMs = Date.now()) {
+  const record = await loadPendingAction(store, cloudId, accountId, actionId);
+  if (!record || isPendingActionExpired(record, nowMs)) return null;
+  // Refuse outright when a live claim is already held — a second
+  // approval (double-click, retry, second tab) must not overwrite it.
+  const existing = await store.get(pendingActionClaimKey(cloudId, accountId, actionId));
+  if (existing && !isClaimStale(existing, nowMs)) return null;
+  const claimId = newClaimId();
+  await store.set(pendingActionClaimKey(cloudId, accountId, actionId), {
+    claimId,
+    claimedAt: new Date(nowMs).toISOString(),
+  });
+  const current = await store.get(pendingActionClaimKey(cloudId, accountId, actionId));
+  if (!current || current.claimId !== claimId) return null; // lost the race
+  // Re-load: the action must still be there and unexpired.
+  const fresh = await loadPendingAction(store, cloudId, accountId, actionId);
+  if (!fresh || isPendingActionExpired(fresh, nowMs)) {
+    await releasePendingActionClaim(store, cloudId, accountId, actionId, claimId);
+    return null;
+  }
+  return { record: fresh, claimId };
+}
+
+// Release a claim, but only if it is still ours — never delete another
+// approval's claim.
+export async function releasePendingActionClaim(store, cloudId, accountId, actionId, claimId) {
+  const current = await store.get(pendingActionClaimKey(cloudId, accountId, actionId)).catch(() => null);
+  if (current && current.claimId === claimId) {
+    await store.delete(pendingActionClaimKey(cloudId, accountId, actionId)).catch(() => {});
+  }
+}
+
+// Delete the pending record AND its claim. Throws on failure — callers
+// must NOT execute when this fails (fail closed).
+export async function consumePendingAction(store, cloudId, accountId, actionId, claimId) {
+  await store.delete(pendingActionKey(cloudId, accountId, actionId));
+  await releasePendingActionClaim(store, cloudId, accountId, actionId, claimId);
 }
 
 export async function storePendingAction(store, cloudId, accountId, action) {
@@ -172,6 +261,12 @@ export async function loadPendingAction(store, cloudId, accountId, actionId) {
   const record = await store.get(pendingActionKey(cloudId, accountId, actionId.trim()));
   if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
   if (record.actionId !== actionId.trim()) return null;
+  if (isPendingActionExpired(record)) {
+    // Expired: treat as missing and clean up best-effort, so a stale
+    // approval can never execute.
+    await store.delete(pendingActionKey(cloudId, accountId, actionId.trim())).catch(() => {});
+    return null;
+  }
   return record;
 }
 

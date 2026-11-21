@@ -8,14 +8,22 @@ import {
   DEFAULT_SETTINGS,
   MAX_SNAPSHOTS,
   MAX_THREAD_TURNS,
+  PENDING_ACTION_CLAIM_TTL_MS,
+  PENDING_ACTION_TTL_MS,
   appendThreadTurn,
+  claimPendingAction,
   clearThread,
+  consumePendingAction,
   deletePendingAction,
   emptyThread,
+  isPendingActionExpired,
   listSnapshots,
   loadPendingAction,
   loadSettings,
   loadThread,
+  pendingActionClaimKey,
+  pendingActionKey,
+  releasePendingActionClaim,
   resolveScope,
   saveSettings,
   settingsKey,
@@ -223,6 +231,123 @@ describe('pending actions (Phase B)', () => {
     assert.equal(await loadPendingAction(store, 'c1', 'a1', ''), null);
     await deletePendingAction(store, 'c1', 'a1', record.actionId);
     assert.equal(await loadPendingAction(store, 'c1', 'a1', record.actionId), null);
+  });
+});
+
+describe('pending actions — P0 hardening (claim + TTL)', () => {
+  function pendingFixture() {
+    return {
+      tool: 'transition_jira_issue',
+      args: { issueKey: 'AT-1', transitionName: 'Done' },
+      preview: { tool: 'transition_jira_issue', target: 'AT-1', params: {} },
+      trace: [],
+      messages: [],
+      prompt: 'Move AT-1 to Done.',
+    };
+  }
+
+  // Every store op yields to the event loop, so two concurrent claims
+  // interleave the way two Forge invocations would.
+  function yieldingStore() {
+    const base = fakeStore();
+    const tick = () => new Promise((resolve) => setImmediate(resolve));
+    return {
+      ...base,
+      async get(key) {
+        await tick();
+        return base.get(key);
+      },
+      async set(key, value) {
+        await tick();
+        return base.set(key, value);
+      },
+      async delete(key) {
+        await tick();
+        return base.delete(key);
+      },
+    };
+  }
+
+  it('isPendingActionExpired enforces the 10-minute TTL', () => {
+    assert.equal(isPendingActionExpired({ createdAt: new Date().toISOString() }), false);
+    const stale = { createdAt: new Date(Date.now() - (PENDING_ACTION_TTL_MS + 1000)).toISOString() };
+    assert.equal(isPendingActionExpired(stale), true);
+    assert.equal(isPendingActionExpired({}), true);
+    assert.equal(isPendingActionExpired({ createdAt: 'not-a-date' }), true);
+    assert.equal(isPendingActionExpired(null), true);
+  });
+
+  it('loadPendingAction rejects expired records and cleans them up', async () => {
+    const store = fakeStore();
+    const record = await storePendingAction(store, 'c1', 'a1', pendingFixture());
+    const key = pendingActionKey('c1', 'a1', record.actionId);
+    await store.set(key, {
+      ...record,
+      createdAt: new Date(Date.now() - (PENDING_ACTION_TTL_MS + 60_000)).toISOString(),
+    });
+    assert.equal(await loadPendingAction(store, 'c1', 'a1', record.actionId), null);
+    assert.equal(await store.get(key), undefined);
+  });
+
+  it('claimPendingAction: first claim wins, second fails, release frees it', async () => {
+    const store = fakeStore();
+    const record = await storePendingAction(store, 'c1', 'a1', pendingFixture());
+    const first = await claimPendingAction(store, 'c1', 'a1', record.actionId);
+    assert.ok(first);
+    assert.equal(first.record.actionId, record.actionId);
+    assert.equal(await claimPendingAction(store, 'c1', 'a1', record.actionId), null);
+    // Releasing a foreign claim id must not free the real claim.
+    await releasePendingActionClaim(store, 'c1', 'a1', record.actionId, 'claim_not_mine');
+    assert.equal(await claimPendingAction(store, 'c1', 'a1', record.actionId), null);
+    await releasePendingActionClaim(store, 'c1', 'a1', record.actionId, first.claimId);
+    assert.ok(await claimPendingAction(store, 'c1', 'a1', record.actionId));
+  });
+
+  it('claimPendingAction refuses missing and expired actions', async () => {
+    const store = fakeStore();
+    assert.equal(await claimPendingAction(store, 'c1', 'a1', 'act_nope'), null);
+    const record = await storePendingAction(store, 'c1', 'a1', pendingFixture());
+    const key = pendingActionKey('c1', 'a1', record.actionId);
+    await store.set(key, {
+      ...record,
+      createdAt: new Date(Date.now() - (PENDING_ACTION_TTL_MS + 1000)).toISOString(),
+    });
+    assert.equal(await claimPendingAction(store, 'c1', 'a1', record.actionId), null);
+  });
+
+  it('a stale claim (owner crashed) can be stolen', async () => {
+    const store = fakeStore();
+    const record = await storePendingAction(store, 'c1', 'a1', pendingFixture());
+    const first = await claimPendingAction(store, 'c1', 'a1', record.actionId);
+    assert.ok(first);
+    // Age the claim past the claim TTL without touching the record.
+    await store.set(pendingActionClaimKey('c1', 'a1', record.actionId), {
+      claimId: first.claimId,
+      claimedAt: new Date(Date.now() - (PENDING_ACTION_CLAIM_TTL_MS + 1000)).toISOString(),
+    });
+    assert.ok(await claimPendingAction(store, 'c1', 'a1', record.actionId));
+  });
+
+  it('concurrent claims: exactly one approval wins', async () => {
+    const store = yieldingStore();
+    const record = await storePendingAction(store, 'c1', 'a1', pendingFixture());
+    const [first, second] = await Promise.all([
+      claimPendingAction(store, 'c1', 'a1', record.actionId),
+      claimPendingAction(store, 'c1', 'a1', record.actionId),
+    ]);
+    assert.equal([first, second].filter(Boolean).length, 1);
+  });
+
+  it('consumePendingAction throws when the delete fails (fail closed)', async () => {
+    const base = fakeStore();
+    const record = await storePendingAction(base, 'c1', 'a1', pendingFixture());
+    const failingStore = {
+      ...base,
+      async delete() {
+        throw new Error('kvs down');
+      },
+    };
+    await assert.rejects(consumePendingAction(failingStore, 'c1', 'a1', record.actionId, 'claim_x'));
   });
 });
 

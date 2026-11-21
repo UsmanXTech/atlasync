@@ -19,6 +19,17 @@ import { countStalePrs, isOpenPrStatus, selectCriticalBlockers } from '../readin
 const apiError = (message) => ({ ok: false, error: { kind: 'API_ERROR', message } });
 const MAX_ROWS = 10;
 
+// Flatten an Atlassian Document Format body to plain text (used by the
+// P0 idempotency guard: an identical comment already on the issue means
+// the escalation already happened).
+function adfText(body) {
+  if (!body || typeof body !== 'object' || !Array.isArray(body.content)) return '';
+  return body.content
+    .flatMap((block) => (Array.isArray(block?.content) ? block.content : []))
+    .map((node) => (typeof node?.text === 'string' ? node.text : ''))
+    .join('');
+}
+
 function escapeHtml(text) {
   return String(text)
     .replaceAll('&', '&amp;')
@@ -172,19 +183,42 @@ export async function executeWriteTool(name, args) {
   try {
     switch (name) {
       case 'escalate_jira_blocker': {
-        const commentResponse = await api.asUser().requestJira(route`/rest/api/3/issue/${args.issueKey}/comment`, {
-          method: 'POST',
-          headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            body: {
-              type: 'doc',
-              version: 1,
-              content: [{ type: 'paragraph', content: [{ type: 'text', text: args.comment }] }],
-            },
-          }),
-        });
-        if (commentResponse.status >= 400) {
-          return apiError(`Could not add the escalation comment to ${args.issueKey}. Nothing was changed.`);
+        // Idempotency (P0): a retried/double approval must not post the
+        // same comment twice. If the exact comment text is already on
+        // the issue, skip the POST and only ensure the priority. A failed
+        // comments read fails open — the approved action still runs; the
+        // guard is duplicate-prevention, not a gate.
+        let commentAlreadyPresent = false;
+        try {
+          const commentsResponse = await api.asUser().requestJira(route`/rest/api/3/issue/${args.issueKey}/comment`, {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+          });
+          if (commentsResponse.status < 400) {
+            const commentsData = await commentsResponse.json();
+            const comments = Array.isArray(commentsData?.comments) ? commentsData.comments : [];
+            commentAlreadyPresent = comments.some((c) => adfText(c?.body) === args.comment);
+          }
+        } catch {
+          // best-effort guard only
+        }
+        let commentAdded = false;
+        if (!commentAlreadyPresent) {
+          const commentResponse = await api.asUser().requestJira(route`/rest/api/3/issue/${args.issueKey}/comment`, {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              body: {
+                type: 'doc',
+                version: 1,
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: args.comment }] }],
+              },
+            }),
+          });
+          if (commentResponse.status >= 400) {
+            return apiError(`Could not add the escalation comment to ${args.issueKey}. Nothing was changed.`);
+          }
+          commentAdded = true;
         }
         const priorityResponse = await api.asUser().requestJira(route`/rest/api/3/issue/${args.issueKey}`, {
           method: 'PUT',
@@ -203,7 +237,12 @@ export async function executeWriteTool(name, args) {
         }
         return {
           ok: true,
-          result: { issueKey: args.issueKey, commentAdded: true, prioritySet: args.priority },
+          result: {
+            issueKey: args.issueKey,
+            commentAdded,
+            commentSkippedDuplicate: commentAlreadyPresent,
+            prioritySet: args.priority,
+          },
         };
       }
       case 'transition_jira_issue': {
@@ -228,6 +267,39 @@ export async function executeWriteTool(name, args) {
               message: `No transition named '${args.transitionName}' exists for ${args.issueKey}. Available: ${names}. Nothing was changed.`,
             },
           };
+        }
+        // Idempotency (P0): if the issue is already in the status this
+        // transition leads to, the action already happened — report
+        // success without re-posting. A failed status read fails open;
+        // the transitions list itself already blocks a harmful duplicate
+        // (an unavailable transition answers INVALID_INPUT above).
+        try {
+          const currentResponse = await api.asUser().requestJira(route`/rest/api/3/issue/${args.issueKey}?fields=status`, {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+          });
+          if (currentResponse.status < 400) {
+            const currentData = await currentResponse.json();
+            const currentStatus = currentData?.fields?.status?.name;
+            const targetStatus = match?.to?.name;
+            if (
+              typeof currentStatus === 'string' &&
+              typeof targetStatus === 'string' &&
+              currentStatus.trim().toLowerCase() === targetStatus.trim().toLowerCase()
+            ) {
+              return {
+                ok: true,
+                result: {
+                  issueKey: args.issueKey,
+                  toStatus: match.name,
+                  transitionId: String(match.id),
+                  alreadyInStatus: true,
+                },
+              };
+            }
+          }
+        } catch {
+          // best-effort guard only
         }
         const doResponse = await api.asUser().requestJira(route`/rest/api/3/issue/${args.issueKey}/transitions`, {
           method: 'POST',
@@ -254,6 +326,35 @@ export async function executeWriteTool(name, args) {
             ok: false,
             error: { kind: 'INVALID_INPUT', message: `No Confluence space with key '${args.spaceKey}' exists. Nothing was created.` },
           };
+        }
+        // Idempotency (P0): a page with this exact title in this space
+        // means the report already exists — return it instead of
+        // creating a duplicate. A failed lookup fails open.
+        try {
+          const existingResponse = await api.asUser().requestConfluence(
+            route`/wiki/api/v2/pages?spaceId=${space.id}&title=${encodeURIComponent(args.title)}&status=current`,
+            { method: 'GET', headers: { Accept: 'application/json' } },
+          );
+          if (existingResponse.status < 400) {
+            const existingData = await existingResponse.json();
+            const existing = (Array.isArray(existingData?.results) ? existingData.results : []).find(
+              (p) => p?.title === args.title,
+            );
+            if (existing?.id) {
+              return {
+                ok: true,
+                result: {
+                  spaceKey: args.spaceKey,
+                  pageId: String(existing.id),
+                  title: args.title,
+                  url: `/wiki/spaces/${args.spaceKey}/pages/${existing.id}`,
+                  alreadyExists: true,
+                },
+              };
+            }
+          }
+        } catch {
+          // best-effort guard only
         }
         const pageResponse = await api.asUser().requestConfluence(route`/wiki/api/v2/pages`, {
           method: 'POST',
