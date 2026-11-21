@@ -3068,8 +3068,13 @@ button.stat-clickable:focus-visible {
      scrolls internally when the content exceeds the viewport (the
      Agents view's short-screen pattern, applied here because the
      content now genuinely overflows on short screens). No visual
-     change when everything fits. */
-  grid-template-rows: auto auto auto max-content auto auto;
+     change when everything fits.
+     Fix (PR #67): the new card's row is max-content, like the trend
+     card's — an `auto` row let the grid shrink the card below its
+     content (cards carry min-height: 0), so the JSM section only
+     showed after scrolling inside the card. A max-content row can
+     never shrink; any overflow now scrolls the view, not the card. */
+  grid-template-rows: auto auto auto max-content max-content auto;
   overflow-y: auto;
   overscroll-behavior: contain;
   align-content: start;
