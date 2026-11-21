@@ -6,6 +6,11 @@ interface StatProps {
   delta: string;
   tone: 'up' | 'down' | 'flat' | 'bad';
   icon: LucideIcon;
+  // Phase 3.1 — when present the stat is a button that asks
+  // Intelligence about this metric. Sample/demo stats stay inert
+  // (no onClick) so demo numbers never leak into a live prompt.
+  onClick?: () => void;
+  ariaLabel?: string;
 }
 
 /**
@@ -14,9 +19,9 @@ interface StatProps {
  * - Title Large value with tabular numbers
  * - Semantic status container tone deltas
  */
-export default function Stat({ label, value, delta, tone, icon: Icon }: StatProps) {
-  return (
-    <div className="stat">
+export default function Stat({ label, value, delta, tone, icon: Icon, onClick, ariaLabel }: StatProps) {
+  const inner = (
+    <>
       <div className="stat-top">
         <span className="stat-label">{label}</span>
         <span className="stat-icon">
@@ -25,6 +30,14 @@ export default function Stat({ label, value, delta, tone, icon: Icon }: StatProp
       </div>
       <div className="stat-value tabular-nums">{value}</div>
       <div className={`stat-delta ${tone}`}>{delta}</div>
-    </div>
+    </>
   );
+  if (onClick) {
+    return (
+      <button type="button" className="stat stat-clickable" onClick={onClick} aria-label={ariaLabel ?? label}>
+        {inner}
+      </button>
+    );
+  }
+  return <div className="stat">{inner}</div>;
 }

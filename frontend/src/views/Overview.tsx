@@ -29,7 +29,7 @@ import {
   PULL_REQUESTS,
 } from '../data/mock';
 import { overviewStatContext } from '../utils/overviewStats';
-import { contextualQuestionFor } from '../utils/contextualQuestions';
+import { contextualQuestionFor, overviewStatQuestionFor, type OverviewStatKey } from '../utils/contextualQuestions';
 import type { IntelligenceConversation } from '../hooks/useIntelligenceConversation';
 import type { BriefingSummary } from '../hooks/useBriefingSummary';
 import { fetchLiveReadiness, type LiveReadiness } from '../services/readiness';
@@ -106,6 +106,14 @@ export default function Overview({
     onNavigate('intelligence');
   };
 
+  // Phase 3.1 — a live stat is a button: clicking it asks
+  // Intelligence about that metric's topic (never its number) and
+  // opens the answer. Sample-mode stats have no onClick and stay inert.
+  const askStat = (stat: OverviewStatKey) => {
+    conversation.ask(overviewStatQuestionFor(stat));
+    onNavigate('intelligence');
+  };
+
   const projects = useMemo(() => PROJECTS.filter((p) => p.workspace === workspaceId), [workspaceId]);
   const blockers = useMemo(
     () => BLOCKERS.filter((b) => b.workspace === workspaceId && !resolved.includes(b.id)),
@@ -158,6 +166,8 @@ export default function Overview({
             delta={live ? `${live.counts.jiraTotal} in 30-day snapshot` : 'Live snapshot'}
             tone="flat"
             icon={ListTodo}
+            onClick={() => askStat('openIssues')}
+            ariaLabel="Ask about open issues"
           />
           <Stat
             label="Active blockers"
@@ -165,6 +175,8 @@ export default function Overview({
             delta={live ? `${b.Dmissing} unassigned` : 'Highest / Critical'}
             tone={live && b.Bcrit > 0 ? 'bad' : 'flat'}
             icon={ShieldAlert}
+            onClick={() => askStat('blockers')}
+            ariaLabel="Ask about active blockers"
           />
           <Stat
             label="Stale PRs"
@@ -172,6 +184,8 @@ export default function Overview({
             delta="Open PRs on critical issues"
             tone={live && b.Pstale > 0 ? 'bad' : 'flat'}
             icon={GitPullRequest}
+            onClick={() => askStat('stalePrs')}
+            ariaLabel="Ask about stale pull requests"
           />
           <Stat
             label="Open incidents"
@@ -179,6 +193,8 @@ export default function Overview({
             delta="SEV-1/2 proxy: Highest / Critical"
             tone={live && b.Isev > 0 ? 'bad' : 'flat'}
             icon={AlertTriangle}
+            onClick={() => askStat('incidents')}
+            ariaLabel="Ask about open incidents"
           />
         </div>
 

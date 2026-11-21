@@ -43,6 +43,30 @@ export const CONTEXTUAL_QUESTIONS = {
     'From the live JSM requests — looking at request types, statuses, and priorities across the service desk, which requests need attention first, and are any request types piling up?',
 } as const;
 
+// The same no-numbers rule governs the per-stat questions below
+// (Phase 3.1): a stat click asks about that metric's TOPIC in the
+// live snapshot — never the number shown on the tile, which the
+// agent cannot see and which may come from a different fetch window
+// than the ask snapshot. Sample-mode stats stay inert (no onClick):
+// clicking demo numbers into a live agent prompt would leak demo
+// data as if it were live.
+export const OVERVIEW_STAT_QUESTIONS = {
+  openIssues:
+    'From this workspace — looking at the currently open Jira issues in the live snapshot, which ones matter most and what should we tackle first?',
+  blockers:
+    'From this workspace — looking at the active Highest and Critical Jira blockers in the live snapshot, what is blocking delivery and what should we unblock first?',
+  stalePrs:
+    'From this workspace — looking at the pull requests on critical issues in the live snapshot, which PRs are stale or blocking, and what should move first?',
+  incidents:
+    'From this workspace — looking at the open Highest and Critical JSM incidents in the live snapshot, which incidents need attention first and what is their impact?',
+} as const;
+
+export type OverviewStatKey = keyof typeof OVERVIEW_STAT_QUESTIONS;
+
+export function overviewStatQuestionFor(stat: OverviewStatKey): string {
+  return OVERVIEW_STAT_QUESTIONS[stat];
+}
+
 export type ContextualView = keyof typeof CONTEXTUAL_QUESTIONS;
 
 export function contextualQuestionFor(view: ContextualView): string {
