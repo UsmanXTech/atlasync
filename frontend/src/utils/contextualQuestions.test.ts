@@ -5,6 +5,7 @@ import {
   OVERVIEW_STAT_QUESTIONS,
   contextualQuestionFor,
   overviewStatQuestionFor,
+  questionForProject,
 } from './contextualQuestions.ts';
 
 // The contextual question is the prompt sent to the Forge LLM, so it must
@@ -62,6 +63,16 @@ test('overview stat questions name their metric topic and carry no numbers', () 
       assert.ok(q.includes(word), `question for ${key} should name "${word}"`);
     }
   }
+});
+
+// Phase 3.2 — per-project ask names the project and tells the agent
+// to admit it when the snapshot has no evidence for that project.
+test('questionForProject names the project and admits missing evidence', () => {
+  const q = questionForProject('AT');
+  assert.ok(q.length > 0 && q.length <= 1500, 'question must fit the 1–1500 limit');
+  assert.ok(q.includes('project AT'), 'question should name the project');
+  assert.ok(q.includes('no evidence'), 'question should let the agent admit missing evidence');
+  assert.ok(q.includes('rather than guessing'), 'question should forbid guessing');
 });
 
 test('contextual questions stay inside the resolver prompt limit and carry no invented data', () => {

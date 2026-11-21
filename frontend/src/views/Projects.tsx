@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Check, FolderKanban, RefreshCw, Search, Layers3, Sparkles } from 'lucide-react';
-import { fetchLiveJiraProjects, type LiveJiraProject } from '../services/jira';
-import { contextualQuestionFor } from '../utils/contextualQuestions';
+import { fetchLiveJiraIssues, fetchLiveJiraProjects, type LiveJiraProject } from '../services/jira';
+import type { LiveIssue } from '../data/types';
+import { contextualQuestionFor, questionForProject } from '../utils/contextualQuestions';
+import { countIssuesByProject } from '../utils/projectIssueCounts';
 import type { IntelligenceConversation } from '../hooks/useIntelligenceConversation';
 import type { ViewId } from '../components/Sidebar';
 
@@ -17,6 +19,8 @@ export default function Projects({
   conversation: IntelligenceConversation;
 }) {
   const [projects, setProjects] = useState<LiveJiraProject[]>([]);
+  const [issues, setIssues] = useState<LiveIssue[]>([]);
+  const [issuesFailed, setIssuesFailed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -25,16 +29,31 @@ export default function Projects({
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setIssuesFailed(false);
     try {
       const result = await fetchLiveJiraProjects(50);
       if (result.ok) setProjects(result.projects);
       else setError(result.error.message);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to load Jira projects.');
+    }
+    // Phase 3.2 — the 50-issue snapshot behind the per-project counts.
+    // A failure here is non-fatal: the tiles still render, with
+    // "Counts unavailable" instead of numbers.
+    try {
+      const issuesResult = await fetchLiveJiraIssues(50);
+      if (issuesResult.ok) setIssues(issuesResult.issues);
+      else setIssuesFailed(true);
+    } catch {
+      setIssuesFailed(true);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  // Phase 3.2 — counts grouped by issue-key prefix (AT-1 → AT) from
+  // the bounded snapshot; never full project totals.
+  const issueCounts = useMemo(() => countIssuesByProject(issues), [issues]);
 
   useEffect(() => {
     void load();
@@ -58,6 +77,14 @@ export default function Projects({
 
   const askAboutThis = () => {
     conversation.ask(contextualQuestionFor('projects'));
+    onNavigate('intelligence');
+  };
+
+  // Phase 3.2 — per-project ask: the agent answers from its
+  // 10-issue snapshot and says so when it has no evidence for the
+  // project; the tile counts never enter the prompt.
+  const askProject = (projectKey: string) => {
+    conversation.ask(questionForProject(projectKey));
     onNavigate('intelligence');
   };
 
@@ -155,21 +182,34 @@ export default function Projects({
 
       {projects.length > 0 && (
         <div className="project-board">
-          {filtered.map((p, i) => (
-            <article className="project-tile" key={p.id}>
-              <div className="tile-top">
-                <span className="project-key-pill">{p.key}</span>
-                <span className="chip chip-compact active">{p.projectType || 'Jira'}</span>
-              </div>
-              <h3>{p.name}</h3>
-              <div className="tile-bottom">
-                <span>
-                  <Layers3 size={14} /> Jira project
-                </span>
-                <span className="project-index">#{String(i + 1).padStart(2, '0')}</span>
-              </div>
-            </article>
-          ))}
+          {filtered.map((p) => {
+            const counts = issueCounts.get(p.key);
+            return (
+              <article className="project-tile" key={p.id}>
+                <div className="tile-top">
+                  <span className="project-key-pill">{p.key}</span>
+                  <span className="chip chip-compact active">{p.projectType || 'Jira'}</span>
+                </div>
+                <h3>{p.name}</h3>
+                <div className="tile-bottom">
+                  <span>
+                    <Layers3 size={14} />
+                    {issuesFailed || !counts
+                      ? 'Counts unavailable'
+                      : `${counts.open} open · ${counts.blockers} blockers`}
+                  </span>
+                  <button
+                    className="btn btn-small"
+                    onClick={() => askProject(p.key)}
+                    aria-label={`Ask about project ${p.key}`}
+                  >
+                    <Sparkles size={14} />
+                    <span>Ask</span>
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
 
@@ -178,7 +218,9 @@ export default function Projects({
       )}
 
       <div className="workspace-footnote">
-        Live Jira metadata · no invented owners, progress, or health scores. Maximum 50 projects per refresh. The demo workspace selection does not scope live projects — every project visible to you is shown.
+        Live Jira metadata · no invented owners, progress, or health scores. Maximum 50 projects per refresh. Issue
+        counts cover the 30-day snapshot (max 50 issues), not full project totals. The demo workspace selection does
+        not scope live projects — every project visible to you is shown.
       </div>
     </div>
   );
