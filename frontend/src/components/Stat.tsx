@@ -8,6 +8,12 @@ interface StatProps {
   icon: LucideIcon;
 }
 
+/**
+ * Material Design 3 Stat Tile
+ * - Title Medium label
+ * - Title Large value with tabular numbers
+ * - Semantic status container tone deltas
+ */
 export default function Stat({ label, value, delta, tone, icon: Icon }: StatProps) {
   return (
     <div className="stat">
@@ -17,7 +23,7 @@ export default function Stat({ label, value, delta, tone, icon: Icon }: StatProp
           <Icon size={16} />
         </span>
       </div>
-      <div className="stat-value">{value}</div>
+      <div className="stat-value tabular-nums">{value}</div>
       <div className={`stat-delta ${tone}`}>{delta}</div>
     </div>
   );
