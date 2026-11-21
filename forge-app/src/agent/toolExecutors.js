@@ -100,7 +100,20 @@ export async function executeReadTool(name, args) {
           priority: i.priority,
           assignee: i.assignee ?? 'Unassigned',
         }));
-        return { ok: true, output: JSON.stringify({ projectKey: args.projectKey, count: rows.length, issues: rows }) };
+        // Phase 1 citations: the same rows the model sees, as structured
+        // records — the loop collects them so answers can link back to
+        // the source issue. Never invented: only fetched rows appear.
+        const records = rows.map((r) => ({
+          kind: 'jira',
+          key: r.key,
+          title: r.summary,
+          path: `/browse/${r.key}`,
+        }));
+        return {
+          ok: true,
+          output: JSON.stringify({ projectKey: args.projectKey, count: rows.length, issues: rows }),
+          records,
+        };
       }
       case 'get_jsm_incidents': {
         const response = await api.asUser().requestJira(route`/rest/servicedeskapi/request?limit=50`, {
@@ -113,7 +126,17 @@ export async function executeReadTool(name, args) {
           .filter((r) => r.priority === args.severity)
           .slice(0, MAX_ROWS)
           .map((r) => ({ key: r.key, summary: r.summary, status: r.status, priority: r.priority }));
-        return { ok: true, output: JSON.stringify({ severity: args.severity, count: rows.length, requests: rows }) };
+        const records = rows.map((r) => ({
+          kind: 'jsm',
+          key: r.key,
+          title: r.summary,
+          path: `/browse/${r.key}`,
+        }));
+        return {
+          ok: true,
+          output: JSON.stringify({ severity: args.severity, count: rows.length, requests: rows }),
+          records,
+        };
       }
       case 'search_confluence_runbooks': {
         const cql = `text ~ "${args.query.replaceAll('"', '')}" AND type = page`;
@@ -129,7 +152,14 @@ export async function executeReadTool(name, args) {
           title: String(p?.title ?? '(untitled)'),
           url: p?._links?.webui ? `/wiki${p._links.webui}` : null,
         }));
-        return { ok: true, output: JSON.stringify({ query: args.query, count: rows.length, pages: rows }) };
+        const records = rows
+          .filter((r) => r.id !== '')
+          .map((r) => ({ kind: 'confluence', key: r.id, title: r.title, path: r.url }));
+        return {
+          ok: true,
+          output: JSON.stringify({ query: args.query, count: rows.length, pages: rows }),
+          records,
+        };
       }
       case 'get_pr_bottlenecks': {
         const issues = await fetchBlockerIssues(args.projectKey);
@@ -156,6 +186,25 @@ export async function executeReadTool(name, args) {
             continue;
           }
         }
+        const records = [];
+        for (const row of rows) {
+          records.push({
+            kind: 'jira',
+            key: row.issueKey,
+            title: row.summary,
+            path: `/browse/${row.issueKey}`,
+          });
+          for (const pr of row.pullRequests) {
+            if (pr.url) {
+              records.push({
+                kind: 'bitbucket',
+                key: pr.name,
+                title: `${row.issueKey} — ${pr.name}`,
+                url: pr.url,
+              });
+            }
+          }
+        }
         return {
           ok: true,
           output: JSON.stringify({
@@ -164,6 +213,7 @@ export async function executeReadTool(name, args) {
             bottlenecks: rows,
             note: countStalePrs([]).note,
           }),
+          records,
         };
       }
       default:

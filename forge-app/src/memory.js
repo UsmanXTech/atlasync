@@ -239,16 +239,201 @@ export async function consumePendingAction(store, cloudId, accountId, actionId, 
   await releasePendingActionClaim(store, cloudId, accountId, actionId, claimId);
 }
 
-export async function storePendingAction(store, cloudId, accountId, action) {
+// --- Phase 1 (AI workspace evolution): multiple conversations --------
+//
+// v2.1.0 kept ONE thread per user (agent-thread:...). Phase 1 keeps that
+// thread for backward compatibility (askAtlasync + old clients) and adds
+// named conversations on top of it:
+//   agent-conversations:${cloudId}:${accountId}  (index)
+//   agent-conversation:${cloudId}:${accountId}:${conversationId}  (record)
+// A conversation holds the same turn shape as the legacy thread (last 10
+// turns + lastReadiness). The first list migrates the legacy thread into
+// a "Previous conversation" once (marked, so it never re-runs — even
+// after the user deletes every conversation).
+export const MAX_CONVERSATIONS = 20;
+
+export function conversationKey(cloudId, accountId, conversationId) {
+  return `agent-conversation:${cloudId}:${accountId}:${conversationId}`;
+}
+
+export function conversationIndexKey(cloudId, accountId) {
+  return `agent-conversations:${cloudId}:${accountId}`;
+}
+
+export function conversationMigrationKey(cloudId, accountId) {
+  return `agent-conversations-migrated:${cloudId}:${accountId}`;
+}
+
+export function newConversationId() {
+  return `conv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function conversationTitleFromQuestion(question) {
+  const q = typeof question === 'string' ? question.trim().replace(/\s+/g, ' ') : '';
+  if (!q) return 'New conversation';
+  return q.length > 40 ? `${q.slice(0, 40).trimEnd()}…` : q;
+}
+
+async function loadConversationIndex(store, cloudId, accountId) {
+  const index = await store.get(conversationIndexKey(cloudId, accountId));
+  if (!Array.isArray(index)) return [];
+  return index.filter((e) => e && typeof e.id === 'string');
+}
+
+async function saveConversationIndex(store, cloudId, accountId, index) {
+  await store.set(conversationIndexKey(cloudId, accountId), index);
+  return index;
+}
+
+export async function listConversations(store, cloudId, accountId) {
+  let index = await loadConversationIndex(store, cloudId, accountId);
+  const migrated = await store.get(conversationMigrationKey(cloudId, accountId));
+  if (index.length === 0 && !migrated) {
+    const legacy = await loadThread(store, cloudId, accountId);
+    if (legacy.turns.length > 0) {
+      const now = new Date().toISOString();
+      const conversation = {
+        id: newConversationId(),
+        title: 'Previous conversation',
+        turns: legacy.turns,
+        lastReadiness: legacy.lastReadiness ?? null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await store.set(conversationKey(cloudId, accountId, conversation.id), conversation);
+      index = [
+        {
+          id: conversation.id,
+          title: conversation.title,
+          createdAt: now,
+          updatedAt: now,
+          turnCount: conversation.turns.length,
+        },
+      ];
+      await saveConversationIndex(store, cloudId, accountId, index);
+    }
+    await store.set(conversationMigrationKey(cloudId, accountId), '1');
+  }
+  return [...index].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
+}
+
+export async function createConversation(store, cloudId, accountId, title) {
+  const index = await loadConversationIndex(store, cloudId, accountId);
+  const now = new Date().toISOString();
+  const cleanTitle =
+    typeof title === 'string' && title.trim() !== '' ? title.trim().slice(0, 80) : 'New conversation';
+  const conversation = {
+    id: newConversationId(),
+    title: cleanTitle,
+    turns: [],
+    lastReadiness: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await store.set(conversationKey(cloudId, accountId, conversation.id), conversation);
+  const next = [
+    { id: conversation.id, title: conversation.title, createdAt: now, updatedAt: now, turnCount: 0 },
+    ...index,
+  ].slice(0, MAX_CONVERSATIONS);
+  const kept = new Set(next.map((e) => e.id));
+  for (const entry of index) {
+    if (!kept.has(entry.id)) {
+      await store.delete(conversationKey(cloudId, accountId, entry.id)).catch(() => {});
+    }
+  }
+  await saveConversationIndex(store, cloudId, accountId, next);
+  return conversation;
+}
+
+export async function loadConversation(store, cloudId, accountId, conversationId) {
+  if (typeof conversationId !== 'string' || conversationId.trim() === '') return null;
+  const record = await store.get(conversationKey(cloudId, accountId, conversationId.trim()));
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
+  if (record.id !== conversationId.trim()) return null;
+  return record;
+}
+
+export async function renameConversation(store, cloudId, accountId, conversationId, title) {
+  const clean = typeof title === 'string' ? title.trim() : '';
+  if (clean === '' || clean.length > 80) return null;
+  const record = await loadConversation(store, cloudId, accountId, conversationId);
+  if (!record) return null;
+  const next = { ...record, title: clean, updatedAt: new Date().toISOString() };
+  await store.set(conversationKey(cloudId, accountId, conversationId), next);
+  const index = await loadConversationIndex(store, cloudId, accountId);
+  await saveConversationIndex(
+    store,
+    cloudId,
+    accountId,
+    index.map((e) => (e.id === conversationId ? { ...e, title: clean, updatedAt: next.updatedAt } : e)),
+  );
+  return next;
+}
+
+export async function deleteConversation(store, cloudId, accountId, conversationId) {
+  const record = await loadConversation(store, cloudId, accountId, conversationId);
+  if (!record) return false;
+  await store.delete(conversationKey(cloudId, accountId, conversationId));
+  const index = await loadConversationIndex(store, cloudId, accountId);
+  await saveConversationIndex(
+    store,
+    cloudId,
+    accountId,
+    index.filter((e) => e.id !== conversationId),
+  );
+  return true;
+}
+
+export async function appendConversationTurn(store, cloudId, accountId, conversationId, turn, lastReadiness) {
+  const record = await loadConversation(store, cloudId, accountId, conversationId);
+  if (!record) return null;
+  const entry = {
+    question: typeof turn?.question === 'string' ? turn.question : '',
+    answer: typeof turn?.answer === 'string' ? turn.answer : '',
+    at: new Date().toISOString(),
+  };
+  const turns = [...(Array.isArray(record.turns) ? record.turns : []), entry].slice(-MAX_THREAD_TURNS);
+  const now = new Date().toISOString();
+  const title = record.title === 'New conversation' ? conversationTitleFromQuestion(entry.question) : record.title;
+  const next = {
+    ...record,
+    title,
+    turns,
+    lastReadiness: lastReadiness ?? record.lastReadiness ?? null,
+    updatedAt: now,
+  };
+  await store.set(conversationKey(cloudId, accountId, conversationId), next);
+  const index = await loadConversationIndex(store, cloudId, accountId);
+  await saveConversationIndex(
+    store,
+    cloudId,
+    accountId,
+    index.map((e) =>
+      e.id === conversationId ? { ...e, title, updatedAt: now, turnCount: turns.length } : e,
+    ),
+  );
+  return next;
+}
+
+export async function storePendingAction(store, cloudId, accountId, action, threadIdOverride) {
   const actionId = newActionId();
   const record = {
     actionId,
-    threadId: threadKey(cloudId, accountId),
+    // Phase 1: a conversation-scoped pending action carries the
+    // conversation id as its thread id, so approveAgentAction appends
+    // the outcome to the right conversation. Default: legacy thread.
+    threadId:
+      typeof threadIdOverride === 'string' && threadIdOverride !== ''
+        ? threadIdOverride
+        : threadKey(cloudId, accountId),
     tool: action.tool,
     args: action.args,
     preview: action.preview ?? null,
     trace: Array.isArray(action.trace) ? action.trace : [],
     messages: Array.isArray(action.messages) ? action.messages : [],
+    // Phase 1: the records the model read before proposing the write,
+    // so the approval outcome can still cite them.
+    citations: Array.isArray(action.citations) ? action.citations : [],
     prompt: typeof action.prompt === 'string' ? action.prompt.slice(0, 1500) : '',
     createdAt: new Date().toISOString(),
   };
