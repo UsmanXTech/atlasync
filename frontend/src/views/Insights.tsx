@@ -2,16 +2,27 @@ import { useCallback, useEffect, useState } from 'react';
 import { Activity, FileText, GitPullRequest, RefreshCw, ShieldCheck } from 'lucide-react';
 import Stat from '../components/Stat';
 import Card from '../components/Card';
+import { BarList } from '../components/Bars';
 import { fetchLiveJiraIssues } from '../services/jira';
 import { fetchConfluencePages } from '../services/confluence';
 import { fetchJsmRequests } from '../services/jsm';
 import { fetchSnapshots, type ReadinessSnapshot } from '../services/snapshots';
+import { jiraPriorityDistribution, jsmAgeBuckets, jiraStaleness } from '../utils/insightAnalysis';
+import type { LiveConfluencePage, LiveIssue, LiveJsmRequest } from '../data/types';
 
 type Counts = {
   jira: number;
   confluence: number;
   jsm: number;
   errors: string[];
+};
+
+// Phase 3.3 — the records behind the counts, kept so aging and
+// priority can be derived from the same refresh (no new calls).
+type Records = {
+  jira: LiveIssue[];
+  confluence: LiveConfluencePage[];
+  jsm: LiveJsmRequest[];
 };
 
 type TrendState =
@@ -25,6 +36,7 @@ type TrendState =
  */
 export default function Insights() {
   const [counts, setCounts] = useState<Counts | null>(null);
+  const [records, setRecords] = useState<Records | null>(null);
   const [loading, setLoading] = useState(false);
   const [trend, setTrend] = useState<TrendState>({ status: 'loading' });
 
@@ -56,6 +68,11 @@ export default function Insights() {
         jsm: s.ok ? s.requests.length : 0,
         errors,
       });
+      setRecords({
+        jira: j.ok ? j.issues : [],
+        confluence: c.ok ? c.pages : [],
+        jsm: s.ok ? s.requests : [],
+      });
     } catch (e) {
       setCounts({
         jira: 0,
@@ -63,6 +80,7 @@ export default function Insights() {
         jsm: 0,
         errors: [e instanceof Error ? e.message : 'Unable to read live sources.'],
       });
+      setRecords({ jira: [], confluence: [], jsm: [] });
     } finally {
       setLoading(false);
     }
@@ -73,6 +91,16 @@ export default function Insights() {
   }, [load]);
 
   const total = counts ? counts.jira + counts.confluence + counts.jsm : 0;
+
+  // Phase 3.3 — derived from the same refresh, computed once per
+  // load. `now` is captured here so all buckets share one clock.
+  const analysis = records
+    ? {
+        priority: jiraPriorityDistribution(records.jira),
+        jsmAge: jsmAgeBuckets(records.jsm, Date.now()),
+        staleness: jiraStaleness(records.jira, Date.now()),
+      }
+    : null;
 
   return (
     <div className="view workspace-view">
@@ -229,6 +257,43 @@ export default function Insights() {
             })}
           </div>
         )}
+      </Card>
+
+      <Card title="Aging & priority" subtitle="Derived from this refresh — same snapshot as the counts above">
+        {loading && !records && (
+          <p role="status" className="source-empty">
+            Reading Jira, Confluence and JSM…
+          </p>
+        )}
+        {analysis && (
+          <>
+            <div className="data-row">
+              <div className="row-main">
+                <strong>Jira issues by priority</strong>
+                <small>Open and closed issues in the 30-day snapshot</small>
+              </div>
+            </div>
+            <BarList items={analysis.priority} tone="amber" compact />
+            <div className="data-row" style={{ marginTop: 12 }}>
+              <div className="row-main">
+                <strong>JSM requests by age</strong>
+                <small>Days since the request was created — JSM is the only source with a real created date</small>
+              </div>
+            </div>
+            <BarList items={analysis.jsmAge.buckets} compact />
+            <p className="source-footnote">
+              Jira staleness: {analysis.staleness.last7} issues updated in the last 7 days,{' '}
+              {analysis.staleness.last30} in the last 30 days. The snapshot only covers issues updated in the last
+              30 days, so older work is invisible here — true Jira age needs the created field, which this slice
+              does not add.
+              {analysis.jsmAge.unknown > 0 &&
+                ` ${analysis.jsmAge.unknown} JSM requests have no usable created date and are not counted above.`}
+              {analysis.staleness.unknown > 0 &&
+                ` ${analysis.staleness.unknown} Jira issues have no usable updated date and are not counted above.`}
+            </p>
+          </>
+        )}
+        {!analysis && !loading && <p className="source-empty">No source snapshot yet.</p>}
       </Card>
 
       <Card title="Source health" subtitle="Status from this refresh only">

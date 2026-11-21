@@ -3064,7 +3064,15 @@ button.stat-clickable:focus-visible {
 
 .workspace-view:has(.insight-hero) {
   display: grid;
-  grid-template-rows: auto auto auto max-content auto;
+  /* Phase 3.3 — the view gained a card, so it gets one more row and
+     scrolls internally when the content exceeds the viewport (the
+     Agents view's short-screen pattern, applied here because the
+     content now genuinely overflows on short screens). No visual
+     change when everything fits. */
+  grid-template-rows: auto auto auto max-content auto auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  align-content: start;
 }
 
 .workspace-view:has(.insight-hero) > .card {
