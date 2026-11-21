@@ -1,20 +1,16 @@
 // Atlasync v2.1.0 — daily readiness snapshot (scheduled trigger).
 //
-// Manifest module `scheduledTrigger` key `atlasync-daily-snapshot`,
-// function `snapshot-handler`, interval `day`. (Not the `trigger`
-// module — that one is product-events only and rejects `interval`;
-// the validator proved this on 2026-11-21.) Forge invokes
-// `handler(event, context)` once a day. The handler:
-//   1. reads the workspace settings from KVS;
-//   2. no-ops (log + return) when Daily sync is off;
-//   3. otherwise computes the same readiness report as the getReadiness
-//      resolver (shared buildReadinessReport + liveSources fetchers)
-//      and stores it under snapshot:${cloudId}:${YYYY-MM-DD}.
-//
-// A failed readiness computation stores nothing — a missing day is
-// honest, an invented snapshot is not. The trigger context may not
-// carry cloudId (unlike a resolver call); resolveScope falls back to
-// the single 'default' segment in that case.
+// DISABLED 2026-11-21 (P0 security review): the `scheduledTrigger`
+// module was removed from the manifest. A scheduled trigger runs
+// without an interactive user context, so `api.asUser()` has no user
+// to act as, and the trigger context may not carry cloudId —
+// resolveScope falls back to the shared 'default' segment. Storing a
+// snapshot from that context would silently persist
+// user-permission-filtered records into shared app storage, which the
+// README forbids. Do NOT re-add the trigger (and do NOT switch the
+// fetchers to asApp() — that changes the permission model) until the
+// snapshot identity and data-ownership model is redesigned.
+// The handler below is kept, unreachable, so the redesign can reuse it.
 import { kvs } from '@forge/kvs';
 import { buildReadinessReport } from './readiness.js';
 import {

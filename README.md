@@ -150,7 +150,7 @@ This is the one authoritative split. **Live** means the data comes from the Forg
 ### Notes
 
 - **Forge LLM usage is metered**; check Atlassian's current Forge LLM pricing before enabling Intelligence. Intelligence never sends source data to an external model provider.
-- **Scheduled/background sync is not enabled**: Forge scheduled functions run without a user identity, so they must not silently persist user-permission-filtered records into shared app storage. Live reads and Intelligence always run in the requesting user's context.
+- **Scheduled/background sync is not enabled**: Forge scheduled functions run without a user identity, so they must not silently persist user-permission-filtered records into shared app storage. Live reads and Intelligence always run in the requesting user's context. Disabled 2026-11-21 (P0 security review): the daily-snapshot trigger was removed from the manifest until its identity model is redesigned; the handler code is kept, unreachable.
 
 ## Live integrations (read-only)
 

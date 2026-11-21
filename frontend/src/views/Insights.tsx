@@ -190,8 +190,9 @@ export default function Insights() {
         )}
         {trend.status === 'ready' && trend.snapshots.length < 2 && (
           <p className="source-empty">
-            Collecting snapshots — {trend.snapshots.length === 0 ? 'no daily snapshot stored yet' : '1 snapshot stored so far'}.
-            Trends appear once 2 snapshots exist. Keep Daily sync on in Settings and check back tomorrow.
+            Daily snapshots are paused while the snapshot identity model is redesigned — no new snapshots are stored.
+            {trend.snapshots.length === 1 ? ' 1 snapshot stored so far.' : ' No daily snapshot stored yet.'}
+            Trends appear once 2 snapshots exist.
           </p>
         )}
         {trend.status === 'ready' && trend.snapshots.length >= 2 && (

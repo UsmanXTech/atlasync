@@ -30,7 +30,7 @@ export const SETTINGS_ROWS: SettingsRow[] = [
     key: 'dailySync',
     title: 'Daily sync',
     detail: 'Daily synchronization is a planned feature; no scheduler is active.',
-    effect: 'A readiness snapshot is stored every day; Insights trends appear after 2 snapshots.',
+    effect: 'Daily snapshots are paused while the snapshot identity model is redesigned; the toggle is kept for that redesign.',
   },
   {
     key: 'incidentAlerts',
