@@ -68,6 +68,53 @@ describe('runAgentLoop', () => {
     assert.match(toolMessage.content, /ATLAS-482/);
   });
 
+  it('never sends an empty text block after a tool call with no text', async () => {
+    // Regression: the real Forge LLM rejects empty text content
+    // blocks, and a pure tool-call response carries content ''. The
+    // loop pushed that '' into the history verbatim, so the NEXT chat
+    // call threw ForgeLlmAPIError live — 6x in a row — while the
+    // unit-test fake never validated. Every message sent must carry
+    // non-empty text.
+    const chat = fakeChat([
+      toolCall('c1', 'get_jira_blockers', '{"projectKey":"AT"}'),
+      textAnswer('AT-1 is the top blocker.'),
+    ]);
+    const executeRead = async () => ({
+      ok: true,
+      output: '{}',
+      records: [{ kind: 'jira', key: 'AT-1', title: 'Checkout timeout', path: '/browse/AT-1' }],
+    });
+    const result = await runAgentLoop({ chat, prompt: 'What is blocking the release?', executeRead });
+    assert.equal(result.status, 'COMPLETE');
+    assert.equal(chat.requests.length, 2);
+    for (const req of chat.requests) {
+      for (const m of req.messages) {
+        assert.equal(typeof m.content, 'string');
+        assert.notEqual(m.content.trim(), '', `empty content in ${m.role} message`);
+      }
+    }
+    const pushed = chat.requests[1].messages.find((m) => m.role === 'assistant' && m.tool_calls);
+    assert.equal(pushed.content, '(no text)');
+  });
+
+  it('drops a prior turn whole when either side is blank', async () => {
+    const chat = fakeChat([textAnswer('All clear.')]);
+    await runAgentLoop({
+      chat,
+      prompt: 'Are we ready?',
+      priorTurns: [
+        { question: 'What is blocking?', answer: '' },
+        { question: 'What is blocking?', answer: 'AT-1 is the top blocker.' },
+      ],
+    });
+    const messages = chat.requests[0].messages;
+    assert.deepEqual(
+      messages.map((m) => m.role),
+      ['system', 'user', 'assistant', 'user'],
+    );
+    assert.match(messages[2].content, /AT-1 is the top blocker/);
+  });
+
   it('injects the project keys into the system prompt and calls the blocker tool with them', async () => {
     const chat = fakeChat([
       toolCall('c1', 'get_jira_blockers', '{"projectKey":"AT"}'),
