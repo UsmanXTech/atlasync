@@ -593,12 +593,26 @@ resolver.define('invokeAgent', async ({ payload, context }) => {
     ? { turns: conversation.turns, lastReadiness: conversation.lastReadiness }
     : await loadThread(kvs, cloudId, accountId).catch(() => ({ turns: [], lastReadiness: null }));
   try {
+    // Project keys are injected into the system prompt server-side so
+    // the model never has to guess or ask for one. Best-effort only:
+    // if Jira cannot be reached here, the prompt simply omits the
+    // list and the agent behaves as before.
+    let projects = [];
+    try {
+      const projectResponse = await api.asUser().requestJira(route`/rest/api/3/project/search?maxResults=20`, { headers: { Accept: 'application/json' } });
+      if (typeof projectResponse.status === 'number' && projectResponse.status < 400) {
+        projects = parseJiraProjects(await projectResponse.json());
+      }
+    } catch (error) {
+      console.error('[atlasync] invokeAgent project fetch failed:', error instanceof Error ? error.name : typeof error);
+    }
     const { chat } = await import('@forge/llm');
     const result = await runAgentLoop({
       chat,
       prompt,
       priorTurns: thread.turns,
       readiness: thread.lastReadiness,
+      projects,
       storePending: async (action) => {
         const record = await storePendingAction(
           kvs,

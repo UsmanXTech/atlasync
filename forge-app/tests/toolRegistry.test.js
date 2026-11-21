@@ -19,11 +19,11 @@ import {
 } from '../src/agent/toolRegistry.js';
 
 describe('tool sets', () => {
-  it('declares 5 read + 3 write tools, no overlap', () => {
-    assert.equal(READ_TOOLS.length, 5);
+  it('declares 4 read + 3 write tools, no overlap', () => {
+    assert.equal(READ_TOOLS.length, 4);
     assert.equal(WRITE_TOOLS.length, 3);
-    assert.equal(TOOL_DEFINITIONS.length, 8);
-    assert.deepEqual(new Set([...READ_TOOLS, ...WRITE_TOOLS]).size, 8);
+    assert.equal(TOOL_DEFINITIONS.length, 7);
+    assert.deepEqual(new Set([...READ_TOOLS, ...WRITE_TOOLS]).size, 7);
     for (const def of TOOL_DEFINITIONS) {
       assert.equal(def.type, 'function');
       assert.equal(typeof def.function.name, 'string');
@@ -43,11 +43,6 @@ describe('tool sets', () => {
 
 describe('validateToolArgs', () => {
   it('accepts valid args for every read tool', () => {
-    assert.deepEqual(validateToolArgs('list_jira_projects', {}), { ok: true, args: { limit: 20 } });
-    assert.deepEqual(validateToolArgs('list_jira_projects', { limit: 5 }), { ok: true, args: { limit: 5 } });
-    assert.equal(validateToolArgs('list_jira_projects', { limit: 0 }).ok, false);
-    assert.equal(validateToolArgs('list_jira_projects', { limit: 21 }).ok, false);
-    assert.equal(validateToolArgs('list_jira_projects', { limit: 2.5 }).ok, false);
     assert.deepEqual(validateToolArgs('get_jira_blockers', { projectKey: 'ATLAS' }), { ok: true, args: { projectKey: 'ATLAS' } });
     assert.deepEqual(validateToolArgs('get_jsm_incidents', { severity: 'Highest' }), { ok: true, args: { severity: 'Highest' } });
     assert.deepEqual(validateToolArgs('search_confluence_runbooks', { query: 'release runbook' }), { ok: true, args: { query: 'release runbook' } });
@@ -201,5 +196,20 @@ describe('buildAgentSystemPrompt', () => {
     });
     assert.match(prompt, /Latest readiness score: 41%/);
     assert.match(prompt, /Bcrit 2, Isev 1, Pstale 2, Dmissing 1/);
+  });
+
+  it('injects the available project keys so the model never has to ask for one', () => {
+    const prompt = buildAgentSystemPrompt({
+      projects: [
+        { key: 'AT', name: 'Atlasync Test' },
+        { key: 'ENG', name: 'Engineering' },
+      ],
+    });
+    assert.match(prompt, /Available Jira projects: AT \(Atlasync Test\), ENG \(Engineering\)/);
+    assert.match(prompt, /never ask the user for a project key/);
+  });
+
+  it('says so plainly when no project list is available', () => {
+    assert.match(buildAgentSystemPrompt({}), /No Jira project list is available/);
   });
 });

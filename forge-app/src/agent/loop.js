@@ -42,7 +42,7 @@ const MAX_COMPLETION_TOKENS = 1200;
 // collects them — deduped, capped — so the answer can link back to the
 // exact records it was built from. Only fetched records are ever
 // cited; malformed entries are dropped, never invented.
-const CITATION_KINDS = new Set(['jira', 'jsm', 'confluence', 'bitbucket', 'project']);
+const CITATION_KINDS = new Set(['jira', 'jsm', 'confluence', 'bitbucket']);
 const MAX_CITATIONS = 10;
 
 function isCitation(value) {
@@ -95,11 +95,12 @@ export async function runAgentLoop({
   prompt,
   priorTurns = [],
   readiness = null,
+  projects = [],
   executeRead = executeReadTool,
   storePending,
 }) {
   const messages = [
-    { role: 'system', content: buildAgentSystemPrompt({ readiness }) },
+    { role: 'system', content: buildAgentSystemPrompt({ readiness, projects }) },
     ...priorTurns.slice(-3).flatMap((t) => [
       { role: 'user', content: truncate(t.question ?? '', 1500) },
       { role: 'assistant', content: truncate(t.answer ?? '', 4000) },
