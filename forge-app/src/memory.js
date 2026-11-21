@@ -508,3 +508,84 @@ export async function listSnapshots(store, cloudId, limit = MAX_SNAPSHOTS) {
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
     .slice(0, limit);
 }
+
+// Phase 2 — persistent execution history. Every agent run (ask or
+// approval decision) is recorded as one entry so the Agents view can
+// show what the agent actually did, instead of the trace living only
+// in the current analysis in memory. Keys are
+// `exec-history:${cloudId}:${generatedAt-ISO}:${random}` so
+// lexicographic order is chronological order; listing mirrors
+// listSnapshots (bounded page walk, newest first, capped).
+export const MAX_EXECUTION_RUNS = 20;
+export const EXECUTION_RUN_STATUSES = ['COMPLETE', 'AWAITING_APPROVAL', 'ERROR', 'APPROVED', 'REJECTED', 'EXECUTION_FAILED'];
+
+export function executionHistoryKey(cloudId, runId) {
+  return `exec-history:${cloudId}:${runId}`;
+}
+
+export function executionHistoryPrefix(cloudId) {
+  return `exec-history:${cloudId}:`;
+}
+
+export function newExecutionRunId(generatedAt = new Date().toISOString()) {
+  return `${generatedAt}:${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function cleanRunText(value, max) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (trimmed === '') return null;
+  return trimmed.length > max ? trimmed.slice(0, max) : trimmed;
+}
+
+// Normalize a run into the stored shape; returns null when the input
+// cannot be a run (unknown status, no question, no timestamp).
+export function normalizeExecutionRun(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  if (!EXECUTION_RUN_STATUSES.includes(input.status)) return null;
+  const question = cleanRunText(input.question, 500);
+  if (!question) return null;
+  const generatedAt = typeof input.generatedAt === 'string' && input.generatedAt !== '' ? input.generatedAt : new Date().toISOString();
+  const trace = Array.isArray(input.trace) ? input.trace.slice(0, 20) : [];
+  const citations = Array.isArray(input.citations) ? input.citations.slice(0, 10) : [];
+  return {
+    id: typeof input.id === 'string' && input.id !== '' ? input.id : newExecutionRunId(generatedAt),
+    question,
+    status: input.status,
+    tool: cleanRunText(input.tool, 100),
+    target: cleanRunText(input.target, 200),
+    trace,
+    citations,
+    generatedAt,
+    conversationId: typeof input.conversationId === 'string' && input.conversationId !== '' ? input.conversationId : null,
+    error: cleanRunText(input.error, 500),
+  };
+}
+
+export async function recordExecutionRun(store, cloudId, run) {
+  const entry = normalizeExecutionRun(run);
+  if (!entry) return null;
+  await store.set(executionHistoryKey(cloudId, entry.id), entry);
+  return entry;
+}
+
+export async function listExecutionRuns(store, cloudId, limit = MAX_EXECUTION_RUNS) {
+  const { WhereConditions } = await import('@forge/kvs');
+  const prefix = executionHistoryPrefix(cloudId);
+  const all = [];
+  let cursor;
+  for (let page = 0; page < 10; page++) {
+    let qb = store.query().where('key', WhereConditions.beginsWith(prefix)).limit(100);
+    if (cursor) qb = qb.cursor(cursor);
+    const result = await qb.getMany();
+    const results = Array.isArray(result?.results) ? result.results : [];
+    for (const r of results) {
+      if (r && r.value && typeof r.value === 'object' && typeof r.value.id === 'string') all.push(r.value);
+    }
+    cursor = result?.nextCursor;
+    if (!cursor || results.length === 0) break;
+  }
+  return all
+    .sort((a, b) => (a.generatedAt < b.generatedAt ? 1 : a.generatedAt > b.generatedAt ? -1 : 0))
+    .slice(0, limit);
+}

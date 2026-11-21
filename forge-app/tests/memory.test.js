@@ -28,8 +28,11 @@ import {
   loadPendingAction,
   loadSettings,
   loadThread,
+  listExecutionRuns,
+  normalizeExecutionRun,
   pendingActionClaimKey,
   pendingActionKey,
+  recordExecutionRun,
   releasePendingActionClaim,
   renameConversation,
   resolveScope,
@@ -385,6 +388,68 @@ describe('snapshots', () => {
 
   it('listSnapshots returns an empty list when nothing is stored', async () => {
     assert.deepEqual(await listSnapshots(fakeStore(), 'c1'), []);
+  });
+});
+
+describe('execution history (Phase 2)', () => {
+  const run = (overrides = {}) => ({
+    question: 'What is blocking the release?',
+    status: 'COMPLETE',
+    trace: [{ step: 1, tool: 'get_jira_blockers', args: '{"projectKey":"AT"}', status: 'ok', durationMs: 253 }],
+    citations: [{ kind: 'jira', key: 'AT-1', title: 'Checkout timeout' }],
+    generatedAt: '2026-11-21T15:53:53.000Z',
+    conversationId: 'conv_1',
+    ...overrides,
+  });
+
+  it('records a run and lists it newest first, excluding other installs', async () => {
+    const store = fakeStore();
+    await recordExecutionRun(store, 'c1', run({ generatedAt: '2026-11-21T15:00:00.000Z' }));
+    await recordExecutionRun(store, 'c1', run({ generatedAt: '2026-11-21T16:00:00.000Z', status: 'AWAITING_APPROVAL', tool: 'escalate_jira_blocker', target: 'AT-1' }));
+    await recordExecutionRun(store, 'c2', run({ generatedAt: '2026-11-21T17:00:00.000Z' }));
+    const list = await listExecutionRuns(store, 'c1');
+    assert.equal(list.length, 2);
+    assert.equal(list[0].status, 'AWAITING_APPROVAL');
+    assert.equal(list[0].tool, 'escalate_jira_blocker');
+    assert.equal(list[0].target, 'AT-1');
+    assert.equal(list[1].status, 'COMPLETE');
+    assert.equal(list[0].citations[0].key, 'AT-1');
+  });
+
+  it('caps the list at MAX_EXECUTION_RUNS', async () => {
+    const store = fakeStore();
+    const base = new Date('2026-11-01T00:00:00.000Z').getTime();
+    for (let i = 0; i < 25; i++) {
+      await recordExecutionRun(store, 'c1', run({ generatedAt: new Date(base + i * 60000).toISOString() }));
+    }
+    const list = await listExecutionRuns(store, 'c1');
+    assert.equal(list.length, 20);
+    assert.equal(list[0].generatedAt, new Date(base + 24 * 60000).toISOString());
+  });
+
+  it('rejects unknown statuses and missing questions', async () => {
+    const store = fakeStore();
+    assert.equal(await recordExecutionRun(store, 'c1', run({ status: 'BOGUS' })), null);
+    assert.equal(await recordExecutionRun(store, 'c1', run({ question: '   ' })), null);
+    assert.equal(await recordExecutionRun(store, 'c1', run({ question: undefined })), null);
+    assert.deepEqual(await listExecutionRuns(store, 'c1'), []);
+  });
+
+  it('truncates long questions and caps trace/citations', async () => {
+    const entry = normalizeExecutionRun(
+      run({
+        question: 'x'.repeat(600),
+        trace: Array.from({ length: 30 }, (_, i) => ({ step: i, tool: 't', args: '{}', status: 'ok', durationMs: 1 })),
+        citations: Array.from({ length: 15 }, (_, i) => ({ kind: 'jira', key: `AT-${i}`, title: 't' })),
+      }),
+    );
+    assert.equal(entry.question.length, 500);
+    assert.equal(entry.trace.length, 20);
+    assert.equal(entry.citations.length, 10);
+  });
+
+  it('listExecutionRuns returns an empty list when nothing is stored', async () => {
+    assert.deepEqual(await listExecutionRuns(fakeStore(), 'c1'), []);
   });
 });
 
