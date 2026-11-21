@@ -68,6 +68,23 @@ describe('runAgentLoop', () => {
     assert.match(toolMessage.content, /ATLAS-482/);
   });
 
+  it('executes a read tool whose arguments arrive as a JSON string (real LLM shape)', async () => {
+    const chat = fakeChat([
+      toolCall('c1', 'get_jira_blockers', '{"projectKey":"ATLAS"}'),
+      textAnswer('Found 1 blocker.'),
+    ]);
+    const seen = [];
+    const executeRead = async (name, args) => {
+      seen.push([name, args]);
+      return { ok: true, output: '{}', records: [{ kind: 'jira', key: 'ATLAS-482', title: 'Checkout timeout', path: '/browse/ATLAS-482' }] };
+    };
+    const result = await runAgentLoop({ chat, prompt: 'What is blocking us?', executeRead });
+    assert.equal(result.status, 'COMPLETE');
+    assert.deepEqual(seen, [['get_jira_blockers', { projectKey: 'ATLAS' }]]);
+    assert.equal(result.citations.length, 1);
+    assert.equal(result.citations[0].key, 'ATLAS-482');
+  });
+
   it('truncates huge read-tool output before feeding it back', async () => {
     const chat = fakeChat([toolCall('c1', 'get_jira_blockers', { projectKey: 'ATLAS' }), textAnswer('done')]);
     const executeRead = async () => ({ ok: true, output: 'x'.repeat(9000) });
@@ -133,7 +150,7 @@ describe('runAgentLoop', () => {
 
   it('rejects malformed tool calls and continues', async () => {
     const chat = fakeChat([
-      { choices: [{ message: { role: 'assistant', content: '', tool_calls: [{ function: { name: 'x', arguments: '{"a":1}' } }] } }] },
+      { choices: [{ message: { role: 'assistant', content: '', tool_calls: [{ function: { name: 'x', arguments: 'not json' } }] } }] },
       textAnswer('Recovered from a malformed call.'),
     ]);
     const result = await runAgentLoop({ chat, prompt: 'q' });
