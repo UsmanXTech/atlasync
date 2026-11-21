@@ -16,12 +16,6 @@ modules:
   function:
     - key: resolver
       handler: index.handler
-    - key: snapshot-handler
-      handler: snapshot.handler
-  scheduledTrigger:
-    - key: atlasync-daily-snapshot
-      function: snapshot-handler
-      interval: day
 resources:
   - key: main
     path: static/atlasync

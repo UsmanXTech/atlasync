@@ -121,7 +121,7 @@ export default function Settings({ settings }: { settings: SettingsState }) {
         <ShieldCheck size={18} />
         <span>
           {connected
-            ? 'Daily sync stores a readiness snapshot every day; turn it off and the daily snapshot stops.'
+            ? 'Daily snapshots are paused while the snapshot identity model is redesigned; the Daily sync toggle is kept for that redesign and currently stores nothing.'
             : 'No automatic sync, alerts or email jobs are enabled by changing them.'}
         </span>
       </div>
