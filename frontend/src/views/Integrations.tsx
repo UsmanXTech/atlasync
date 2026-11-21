@@ -144,6 +144,36 @@ export default function Integrations() {
     void check();
   }, [check]);
 
+  // Phase 3.4 — per-tile retry: re-probes only this source and
+  // updates only its tile; the other tiles keep their state. The
+  // global check above is unchanged. A dead bridge stays a global
+  // backendError — a per-tile retry cannot fix that.
+  const checkOne = useCallback(async (source: 'jira' | 'confluence' | 'jsm') => {
+    setBackendError(null);
+    setTiles((prev) => ({ ...prev, [source]: { state: 'checking' } }));
+    try {
+      const result = await fetchHealthDiagnostics(source);
+      if (!mountedRef.current) return;
+      if (!result.ok) {
+        setBackendError(result.error.message);
+        setTiles((prev) => ({ ...prev, [source]: { state: 'idle' } }));
+        return;
+      }
+      const entry = result.diagnostics.find((d) => d.source === source);
+      setTiles((prev) => ({
+        ...prev,
+        [source]: entry
+          ? tileFromDiagnostic(entry)
+          : { state: 'error', detail: 'No diagnostic was returned for this source.', code: 'API_ERROR', scopeHint: null },
+      }));
+      setLastChecked(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    } catch {
+      if (!mountedRef.current) return;
+      setBackendError('The health check failed unexpectedly. Try again shortly.');
+      setTiles((prev) => ({ ...prev, [source]: { state: 'idle' } }));
+    }
+  }, []);
+
   const tileList = SOURCE_META.map((meta) => ({ ...meta, check: tiles[meta.source] ?? { state: 'idle' as const } }));
   const okCount = tileList.filter((t) => t.check.state === 'ok').length;
   const anyChecking = tileList.some((t) => t.check.state === 'checking');
@@ -248,6 +278,18 @@ export default function Integrations() {
               {s.check.state === 'checking' && 'Waiting for Atlassian…'}
               {s.check.state === 'idle' && 'Run a connection check to verify access.'}
             </div>
+            {(s.check.state === 'error' || s.check.state === 'not-provisioned') && (
+              <div className="row-actions">
+                <button
+                  className="btn btn-small"
+                  onClick={() => void checkOne(s.source)}
+                  aria-label={`Retry ${s.name} check`}
+                >
+                  <RefreshCw size={14} />
+                  <span>Retry</span>
+                </button>
+              </div>
+            )}
           </article>
         ))}
       </div>
