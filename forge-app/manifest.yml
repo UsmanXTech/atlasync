@@ -35,6 +35,11 @@ permissions:
     - read:confluence-space.summary
     - read:page:confluence
     - read:servicedesk-request
+    # v2.1.0 (forge lint, 2026-11-21): endpoints used by diagnostics + agent tools
+    - read:jira-user
+    - read:space:confluence
+    - search:confluence
+    - write:page:confluence
     - storage:app
     # NOTE (2026-11-21): the plan's `read:dev-status:jira` is NOT a real
     # scope — the manifest validator rejects it. Dev-status reads are
