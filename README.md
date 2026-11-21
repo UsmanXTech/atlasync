@@ -139,13 +139,13 @@ This is the one authoritative split. **Live** means the data comes from the Forg
 | Insights counts | **Live** — record counts per source, latest refresh, max 50 per source |
 | Integrations probes | **Live** — read-only health checks for Jira, Confluence, JSM, auto-run when the view opens |
 | Global search | **Live in Forge + Demo** — live Jira issues, Confluence pages, JSM requests under a Live heading; demo results under a Demo heading |
-| Overview stats, blockers, PR/incident panels, activity | **Demo** — sample data; Resolve buttons act locally only |
-| AI Agents view | **Demo** — Release Intelligence entry point; no autonomous writes or background actions |
+| Overview stats, blockers, PR/incident panels, activity | **Live in Live Workspace** — live Jira/Confluence/JSM snapshot; Sample Dataset shows demo data |
+| AI Agents view | **Live** — Release Intelligence with approval-gated writes, session memory and daily snapshots; autonomous Rovo/MCP not enabled |
 | Settings | **Preview-only** — demo workspace profile; nothing persists |
 
 ### Deployed version vs main
 
-**v3.2.0 was deployed 2026-11-12** to the development environment on the Codegeist dev site. It includes everything merged to `main` since v3.1.0 (PRs #38–#46: Intelligence as the default home view, "Ask about this" on Overview/Projects/Confluence/JSM, proactive briefing card with optional AI summary, briefing state preserved across navigation), verified locally — `npm test` 88/88 + production build + headless-Chromium preview. Live verification of this version follows the deploy; do not claim a post-v3.2.0 change is live-verified until that deploy happens.
+**v2.1.0 was deployed 2026-11-21** to the development environment on the Codegeist dev site (GitHub Actions run #4). It includes everything merged to `main` since v3.2.0 (PR #48: Material 3 restyle; PR #49: v2.1.0 agentic — diagnostics, approval-gated agent loop, KVS session memory + daily snapshots; PR #50: GitHub Actions deploy workflow), verified locally — `npm test` 170/170 + production build — and live-verified the same day on iamusmanh.atlassian.net: all 7 views with live data (Overview 8 open issues, 1 blocker, 78% readiness; Intelligence 63%; Integrations 3/3 Connected; Insights 22 records) and a working Forge LLM summary. Do not claim a post-v2.1.0 change is live-verified until that deploy happens.
 
 ### Notes
 
