@@ -625,13 +625,7 @@ resolver.define('invokeAgent', async ({ payload, context }) => {
       },
     });
     if (result.status === 'ERROR') {
-      // TEMPORARY diagnostic (PR #59): the agent ask has failed 6x
-      // live with the same generic message while Summarize works, and
-      // four code fixes changed nothing. Surface WHICH failure path
-      // fired and the loop's own error text, plus a build marker so a
-      // live run proves whether this backend is even current. Remove
-      // the bracketed suffix once the cause is known.
-      return { ok: false, error: { kind: 'API_ERROR', message: `Atlasync Intelligence could not complete the analysis. [diag-59 loop-error: ${result.error ?? 'unknown'}] Check Forge LLM access/credits and try again.` } };
+      return { ok: false, error: { kind: 'API_ERROR', message: 'Atlasync Intelligence could not complete the analysis. Check Forge LLM access/credits and try again.' } };
     }
     if (result.status === 'AWAITING_APPROVAL') {
       return {
@@ -667,11 +661,7 @@ resolver.define('invokeAgent', async ({ payload, context }) => {
     };
   } catch (error) {
     console.error('[atlasync] invokeAgent failed:', error instanceof Error ? error.name : typeof error, error instanceof Error ? error.message : '');
-    // TEMPORARY diagnostic (PR #59): same as the loop-error branch —
-    // surface the thrown error's name/message so the live UI shows
-    // the real cause instead of the generic copy. Remove once known.
-    const detail = error instanceof Error ? `${error.name}: ${String(error.message ?? '').slice(0, 200)}` : typeof error;
-    return { ok: false, error: { kind: 'API_ERROR', message: `Atlasync Intelligence could not complete the analysis. [diag-59 invoke-catch: ${detail}] Check Forge LLM access/credits and try again.` } };
+    return { ok: false, error: { kind: 'API_ERROR', message: 'Atlasync Intelligence could not complete the analysis. Check Forge LLM access/credits and try again.' } };
   }
 });
 

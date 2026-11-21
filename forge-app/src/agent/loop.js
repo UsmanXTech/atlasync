@@ -99,12 +99,23 @@ export async function runAgentLoop({
   executeRead = executeReadTool,
   storePending,
 }) {
+  // The Forge LLM rejects empty text content blocks, and a pure
+  // tool-call response carries content '' — so every message pushed
+  // into this history must carry non-empty text, and a prior turn is
+  // dropped whole when either side is blank (dropping one side would
+  // break the user/assistant alternation the API also expects).
+  const priorMessages = priorTurns.slice(-3).flatMap((t) => {
+    const q = truncate(t.question ?? '', 1500).trim();
+    const a = truncate(t.answer ?? '', 4000).trim();
+    if (q === '' || a === '') return [];
+    return [
+      { role: 'user', content: q },
+      { role: 'assistant', content: a },
+    ];
+  });
   const messages = [
     { role: 'system', content: buildAgentSystemPrompt({ readiness, projects }) },
-    ...priorTurns.slice(-3).flatMap((t) => [
-      { role: 'user', content: truncate(t.question ?? '', 1500) },
-      { role: 'assistant', content: truncate(t.answer ?? '', 4000) },
-    ]),
+    ...priorMessages,
     { role: 'user', content: prompt },
   ];
   const trace = [];
@@ -143,7 +154,7 @@ export async function runAgentLoop({
     if (parsed.calls.length === 0) {
       const answer = text.trim();
       if (!answer) {
-        messages.push({ role: 'assistant', content: text });
+        messages.push({ role: 'assistant', content: text || '(no text)' });
         messages.push({ role: 'user', content: 'Please give a final answer in text.' });
         continue;
       }
@@ -157,7 +168,7 @@ export async function runAgentLoop({
       };
     }
 
-    messages.push({ role: 'assistant', content: text, tool_calls: message.tool_calls });
+    messages.push({ role: 'assistant', content: text || '(no text)', tool_calls: message.tool_calls });
     let halted = null;
     for (const call of parsed.calls) {
       const validation = validateToolArgs(call.name, call.args);
