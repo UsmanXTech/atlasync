@@ -1,0 +1,79 @@
+# Atlasync — deploy to Forge from GitHub Actions.
+#
+# Why this exists: the sandbox cannot run `forge deploy` (the Forge CLI
+# needs Basic auth with an API token, and the stored token value is never
+# returned to Muse), so deploys were stuck on a manual step. This workflow
+# lets GitHub Actions deploy instead, using secrets only the repo owner
+# can set — Muse never sees the token value.
+#
+# Setup (owner only, ~2 minutes, once):
+#   GitHub repo -> Settings -> Secrets and variables -> Actions -> New secret
+#     FORGE_EMAIL      — the Atlassian account email that owns the app
+#     FORGE_API_TOKEN  — a fresh Atlassian API token for that account
+#   (Create the token at id.atlassian.com/manage-profile/security/api-tokens.
+#   Never paste it in chat; it lives only in GitHub Secrets.)
+#
+# Triggers:
+#   - Manual: Actions tab -> Deploy (Forge) -> Run workflow
+#   - Automatic: every push to main deploys the development environment,
+#     so a merged PR reaches iamusmanh without a manual deploy step.
+#     Remove the `push` trigger below if deploys should stay manual-only.
+#
+# What it does, in order: install deps, build frontend, run tests
+# (deploy is gated on tests passing), forge lint, forge deploy
+# (-e development), then forge install --upgrade on iamusmanh for each
+# product the app is installed on (Jira, Confluence, JSM).
+# New scopes (e.g. write:jira-work from v2.1.0) take effect on the
+# install --upgrade step, using the token owner's approval.
+
+name: Deploy (Forge)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FORGE_EMAIL: ${{ secrets.FORGE_EMAIL }}
+      FORGE_API_TOKEN: ${{ secrets.FORGE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+      - name: Install Forge CLI (pinned major v15)
+        run: npm install -g @forge/cli@15
+
+      - name: Forge lint
+        working-directory: forge-app
+        run: forge lint
+
+      - name: Forge deploy (development)
+        working-directory: forge-app
+        run: forge deploy -e development
+
+      - name: Upgrade install on iamusmanh — Jira
+        working-directory: forge-app
+        run: forge install --upgrade --site iamusmanh.atlassian.net --product jira -e development --non-interactive
+
+      - name: Upgrade install on iamusmanh — Confluence
+        working-directory: forge-app
+        run: forge install --upgrade --site iamusmanh.atlassian.net --product confluence -e development --non-interactive
+
+      # JSM install may not exist yet on the dev site; if the app was never
+      # installed on JSM, --upgrade errors. Keep deploying even then — the
+      # Jira/Confluence upgrades above already landed.
+      - name: Upgrade install on iamusmanh — Jira Service Management
+        working-directory: forge-app
+        continue-on-error: true
+        run: forge install --upgrade --site iamusmanh.atlassian.net --product jira-service-management -e development --non-interactive
