@@ -154,10 +154,26 @@ describe('extractToolCalls', () => {
     });
   });
 
+  it('parses string arguments — the real Forge LLM shape', () => {
+    const message = {
+      role: 'assistant',
+      content: '',
+      tool_calls: [{ id: 'c1', type: 'function', index: 0, function: { name: 'get_jira_blockers', arguments: '{"projectKey":"ATLAS"}' } }],
+    };
+    assert.deepEqual(extractToolCalls(message), {
+      ok: true,
+      calls: [{ id: 'c1', name: 'get_jira_blockers', args: { projectKey: 'ATLAS' } }],
+    });
+  });
+
   it('rejects malformed tool calls', () => {
     assert.equal(extractToolCalls({ tool_calls: 'nope' }).ok, false);
     assert.equal(
-      extractToolCalls({ tool_calls: [{ function: { name: 'x', arguments: '{"a":1}' } }] }).ok,
+      extractToolCalls({ tool_calls: [{ function: { name: 'x', arguments: 'not json' } }] }).ok,
+      false,
+    );
+    assert.equal(
+      extractToolCalls({ tool_calls: [{ function: { name: 'x', arguments: '[1,2]' } }] }).ok,
       false,
     );
     assert.equal(extractToolCalls({ tool_calls: [{ function: {} }] }).ok, false);

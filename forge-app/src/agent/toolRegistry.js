@@ -303,13 +303,33 @@ export function extractToolCalls(message) {
     if (!fn || typeof fn !== 'object' || typeof fn.name !== 'string') {
       return invalid('Each tool call needs a function name.');
     }
-    if (fn.arguments !== undefined && (typeof fn.arguments !== 'object' || Array.isArray(fn.arguments))) {
+    // The Forge LLM (OpenAI chat-completions shape) sends arguments as
+    // a JSON STRING; an object form is also accepted. A string that is
+    // not valid JSON — or parses to a non-object — is malformed.
+    // (Live incident 2026-11-21: the parser only accepted objects, so
+    // every real tool call was rejected and the loop burned its 5-step
+    // budget without ever reading a record.)
+    let args = {};
+    if (fn.arguments === undefined) {
+      args = {};
+    } else if (typeof fn.arguments === 'string') {
+      try {
+        args = JSON.parse(fn.arguments);
+      } catch {
+        return invalid(`Arguments for tool ${fn.name} must be valid JSON.`);
+      }
+      if (!args || typeof args !== 'object' || Array.isArray(args)) {
+        return invalid(`Arguments for tool ${fn.name} must be an object.`);
+      }
+    } else if (typeof fn.arguments === 'object' && !Array.isArray(fn.arguments)) {
+      args = fn.arguments;
+    } else {
       return invalid(`Arguments for tool ${fn.name} must be an object.`);
     }
     parsed.push({
       id: typeof call.id === 'string' ? call.id : `call-${parsed.length}`,
       name: fn.name,
-      args: fn.arguments ?? {},
+      args,
     });
   }
   return { ok: true, calls: parsed };
