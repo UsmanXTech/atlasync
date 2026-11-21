@@ -1,8 +1,9 @@
 {
   "dependencies": {
     "@forge/api": "^8.4.0",
-    "@forge/resolver": "^1.6.0",
-    "@forge/llm": "^1.0.9"
+    "@forge/kvs": "^2.1.2",
+    "@forge/llm": "^1.0.9",
+    "@forge/resolver": "^1.6.0"
   },
   "name": "atlasync-forge",
   "private": true,

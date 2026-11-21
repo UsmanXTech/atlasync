@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Sidebar, { type ViewId } from './components/Sidebar';
 import Topbar, { type ForgeMode } from './components/Topbar';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -15,6 +15,7 @@ import { useIntelligenceConversation } from './hooks/useIntelligenceConversation
 import { useBriefingSummary } from './hooks/useBriefingSummary';
 import { useBriefingState } from './hooks/useBriefingState';
 import { useSettingsState } from './hooks/useSettingsState';
+import { defaultDataMode, type DataMode } from './utils/dataMode';
 
 // Atlasync application shell: persistent navigation and a viewport-fitted content region.
 // Live views retain their own loading, empty, and error states.
@@ -23,6 +24,21 @@ export default function App() {
   const [workspaceId, setWorkspaceId] = useState('hq');
   const [forgeMode, setForgeMode] = useState<ForgeMode>('loading');
   const [menuOpen, setMenuOpen] = useState(false);
+  // v2.1.0 data mode: Sample Dataset vs Live Workspace. The default
+  // follows the install state (Live inside Forge, Sample in the
+  // standalone preview) until the user picks explicitly via the
+  // top-bar toggle; the choice then sticks for the session.
+  const [dataMode, setDataMode] = useState<DataMode>('sample');
+  const modeChosenRef = useRef(false);
+  useEffect(() => {
+    if (forgeMode === 'forge' && !modeChosenRef.current) {
+      setDataMode(defaultDataMode(forgeMode));
+    }
+  }, [forgeMode]);
+  const handleDataMode = (mode: DataMode) => {
+    modeChosenRef.current = true;
+    setDataMode(mode);
+  };
   // Lives above the view switch: the Intelligence answer must survive
   // navigating away and back (the view unmounts on switch).
   const intelligence = useIntelligenceConversation();
@@ -76,11 +92,13 @@ export default function App() {
           onWorkspace={setWorkspaceId}
           onNavigate={setView}
           forgeMode={forgeMode}
+          dataMode={dataMode}
+          onDataMode={handleDataMode}
           onMenu={() => setMenuOpen(true)}
         />
         <main id="main-content" tabIndex={-1}>
           <ErrorBoundary key={view}>
-            {view === 'overview' && <Overview workspaceId={workspace.id} onNavigate={setView} conversation={intelligence} briefingSummary={briefingSummary} />}
+            {view === 'overview' && <Overview workspaceId={workspace.id} onNavigate={setView} conversation={intelligence} briefingSummary={briefingSummary} dataMode={dataMode} onDataMode={handleDataMode} />}
             {view === 'intelligence' && <Intelligence conversation={intelligence} briefing={briefing} />}
             {view === 'projects' && <Projects onNavigate={setView} conversation={intelligence} />}
             {view === 'integrations' && <Integrations />}

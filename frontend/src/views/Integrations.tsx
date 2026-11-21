@@ -9,26 +9,57 @@ import {
   Layers3,
   LifeBuoy,
 } from 'lucide-react';
-import { fetchLiveJiraIssues } from '../services/jira';
-import { fetchConfluencePages } from '../services/confluence';
-import { fetchJsmRequests } from '../services/jsm';
+import { fetchHealthDiagnostics, type HealthDiagnostic } from '../services/diagnostics';
 
-type CheckState = {
-  state: 'idle' | 'checking' | 'ok' | 'error';
-  detail?: string;
-  count?: number;
-};
+// v2.1.0: the three source tiles are driven by the backend's
+// getHealthDiagnostics resolver (one structured entry per source:
+// exact HTTP status + scope hint) instead of three parallel data
+// fetches with a generic "Try again shortly" fallback. A source that
+// is not provisioned (JSM 404) is reported as a fact, not an alarm.
+type TileState =
+  | { state: 'idle' }
+  | { state: 'checking' }
+  | { state: 'ok'; detail: string }
+  | { state: 'error'; detail: string; code: string; scopeHint: string | null }
+  | { state: 'not-provisioned'; detail: string };
+
+const SOURCE_META = [
+  {
+    source: 'jira' as const,
+    name: 'Jira',
+    desc: 'Issues and project metadata',
+    note: 'Forge asUser · Browse Projects permissions',
+    icon: PlugZap,
+  },
+  {
+    source: 'confluence' as const,
+    name: 'Confluence',
+    desc: 'Pages and space metadata',
+    note: 'Forge asUser · content and space permissions',
+    icon: Layers3,
+  },
+  {
+    source: 'jsm' as const,
+    name: 'Jira Service Management',
+    desc: 'Customer and service requests',
+    note: 'Forge asUser · service-desk permissions',
+    icon: LifeBuoy,
+  },
+];
 
 /**
  * Screen 4: Integrations (Toolchain Sync Status)
  * Aligned with Stitch M3 Redesign & M3 alignment brief
  */
 export default function Integrations() {
-  const [jira, setJira] = useState<CheckState>({ state: 'idle' });
-  const [confluence, setConfluence] = useState<CheckState>({ state: 'idle' });
-  const [jsm, setJsm] = useState<CheckState>({ state: 'idle' });
+  const [tiles, setTiles] = useState<Record<string, TileState>>({
+    jira: { state: 'idle' },
+    confluence: { state: 'idle' },
+    jsm: { state: 'idle' },
+  });
   const [checking, setChecking] = useState(false);
   const [lastChecked, setLastChecked] = useState<string | null>(null);
+  const [backendError, setBackendError] = useState<string | null>(null);
 
   const mountedRef = useRef(true);
   const autoCheckRef = useRef(false);
@@ -40,46 +71,69 @@ export default function Integrations() {
     };
   }, []);
 
+  const tileFromDiagnostic = (entry: HealthDiagnostic): TileState => {
+    if (entry.ok) return { state: 'ok', detail: `HTTP ${entry.status} · ${entry.message}` };
+    if (entry.code === 'NOT_PROVISIONED') {
+      return { state: 'not-provisioned', detail: entry.message };
+    }
+    return {
+      state: 'error',
+      detail: entry.message,
+      code: entry.code,
+      scopeHint: entry.missingScopeHint,
+    };
+  };
+
   const check = useCallback(async () => {
     setChecking(true);
-    setJira({ state: 'checking' });
-    setConfluence({ state: 'checking' });
-    setJsm({ state: 'checking' });
-
+    setBackendError(null);
+    setTiles({
+      jira: { state: 'checking' },
+      confluence: { state: 'checking' },
+      jsm: { state: 'checking' },
+    });
     try {
-      const [j, c, s] = await Promise.all([
-        fetchLiveJiraIssues(1),
-        fetchConfluencePages(1),
-        fetchJsmRequests(1),
-      ]);
+      const result = await fetchHealthDiagnostics();
       if (!mountedRef.current) return;
-      setJira(
-        j.ok
-          ? { state: 'ok', count: j.issues.length, detail: 'Jira issue API responded.' }
-          : { state: 'error', detail: j.error.message },
-      );
-      setConfluence(
-        c.ok
-          ? { state: 'ok', count: c.pages.length, detail: 'Confluence API responded.' }
-          : { state: 'error', detail: c.error.message },
-      );
-      setJsm(
-        s.ok
-          ? { state: 'ok', count: s.requests.length, detail: 'JSM API responded.' }
-          : { state: 'error', detail: s.error.message },
-      );
-    } catch (e) {
+      if (!result.ok) {
+        // The bridge itself failed: there is no Forge backend in the
+        // standalone preview, or the resolver failed on a real install.
+        // Say so plainly instead of marking every source down.
+        setBackendError(result.error.message);
+        setTiles({
+          jira: { state: 'idle' },
+          confluence: { state: 'idle' },
+          jsm: { state: 'idle' },
+        });
+        return;
+      }
+      const next: Record<string, TileState> = {};
+      for (const entry of result.diagnostics) {
+        next[entry.source] = tileFromDiagnostic(entry);
+      }
+      for (const meta of SOURCE_META) {
+        if (!next[meta.source]) {
+          next[meta.source] = {
+            state: 'error',
+            detail: 'No diagnostic was returned for this source.',
+            code: 'API_ERROR',
+            scopeHint: null,
+          };
+        }
+      }
+      setTiles(next);
+    } catch {
       if (!mountedRef.current) return;
-      const detail = e instanceof Error ? e.message : 'Connection check failed.';
-      setJira({ state: 'error', detail });
-      setConfluence({ state: 'error', detail });
-      setJsm({ state: 'error', detail });
+      setBackendError('The health check failed unexpectedly. Try again shortly.');
+      setTiles({
+        jira: { state: 'idle' },
+        confluence: { state: 'idle' },
+        jsm: { state: 'idle' },
+      });
     } finally {
       if (mountedRef.current) {
         setChecking(false);
-        setLastChecked(
-          new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        );
+        setLastChecked(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       }
     }
   }, []);
@@ -90,34 +144,10 @@ export default function Integrations() {
     void check();
   }, [check]);
 
-  const checks = [jira, confluence, jsm];
-  const okCount = checks.filter((x) => x.state === 'ok').length;
-  const anyChecking = checks.some((x) => x.state === 'checking');
-  const allIdle = checks.every((x) => x.state === 'idle');
-
-  const sources = [
-    {
-      name: 'Jira',
-      desc: 'Issues and project metadata',
-      note: 'Forge asUser · Browse Projects permissions',
-      check: jira,
-      icon: PlugZap,
-    },
-    {
-      name: 'Confluence',
-      desc: 'Pages and space metadata',
-      note: 'Forge asUser · content and space permissions',
-      check: confluence,
-      icon: Layers3,
-    },
-    {
-      name: 'Jira Service Management',
-      desc: 'Customer and service requests',
-      note: 'Forge asUser · service-desk permissions',
-      check: jsm,
-      icon: LifeBuoy,
-    },
-  ];
+  const tileList = SOURCE_META.map((meta) => ({ ...meta, check: tiles[meta.source] ?? { state: 'idle' as const } }));
+  const okCount = tileList.filter((t) => t.check.state === 'ok').length;
+  const anyChecking = tileList.some((t) => t.check.state === 'checking');
+  const allIdle = tileList.every((t) => t.check.state === 'idle');
 
   return (
     <div className="view workspace-view">
@@ -151,19 +181,26 @@ export default function Integrations() {
             {anyChecking
               ? 'Checking connections…'
               : allIdle
-              ? 'Not checked yet'
-              : lastChecked
-              ? `Last checked ${lastChecked}`
-              : 'Checked'}
+                ? 'Not checked yet'
+                : lastChecked
+                  ? `Last checked ${lastChecked}`
+                  : 'Checked'}
           </span>
         </div>
         <p>
-          Checks make small read-only requests as the signed-in Atlassian user. A successful probe is not a full sync.
+          Checks ping each product as the signed-in Atlassian user. A successful probe is not a full sync.
         </p>
       </div>
 
+      {backendError && (
+        <p className="source-error" role="alert">
+          {backendError} This check needs the installed Forge app — in the standalone preview there is no backend
+          to reach.
+        </p>
+      )}
+
       <div className="integration-grid">
-        {sources.map((s) => (
+        {tileList.map((s) => (
           <article className="integration-tile" key={s.name}>
             <div className="integration-top">
               <span className="integration-icon">
@@ -180,6 +217,8 @@ export default function Integrations() {
                     <CircleAlert size={14} />
                     <span>Unavailable</span>
                   </>
+                ) : s.check.state === 'not-provisioned' ? (
+                  <span>Not provisioned</span>
                 ) : s.check.state === 'checking' ? (
                   <span>Checking…</span>
                 ) : (
@@ -191,14 +230,23 @@ export default function Integrations() {
             <p>{s.desc}</p>
             <small>{s.note}</small>
             <div className="connection-detail">
-              {s.check.state === 'ok'
-                ? s.check.detail
-                : s.check.state === 'error'
-                ? s.check.detail
-                : s.check.state === 'checking'
-                ? 'Waiting for Atlassian…'
-                : 'Run a connection check to verify access.'}
-              {s.check.state === 'ok' && <b>{s.check.count} record returned</b>}
+              {s.check.state === 'ok' && s.check.detail}
+              {s.check.state === 'error' && (
+                <>
+                  {s.check.detail}
+                  <br />
+                  <b>Diagnostic: {s.check.code}</b>
+                  {s.check.scopeHint && (
+                    <>
+                      <br />
+                      {s.check.scopeHint}
+                    </>
+                  )}
+                </>
+              )}
+              {s.check.state === 'not-provisioned' && s.check.detail}
+              {s.check.state === 'checking' && 'Waiting for Atlassian…'}
+              {s.check.state === 'idle' && 'Run a connection check to verify access.'}
             </div>
           </article>
         ))}

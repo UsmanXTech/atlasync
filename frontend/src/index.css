@@ -730,6 +730,25 @@ button {
   background: var(--md-sys-color-at-risk-on-container);
 }
 
+/* v2.1.0 data-mode toggle: the badge is a button now, so the global
+   40dp pill button chrome is reset back to the badge look. */
+.forge-badge.mode-toggle {
+  height: auto;
+  min-height: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-full);
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.forge-badge.mode-toggle:hover {
+  background: rgba(29, 26, 34, 0.08);
+}
+
 .icon-btn {
   position: relative;
   display: grid;
@@ -1168,6 +1187,7 @@ button {
 .pill.low,
 .pill.medium,
 .pill.sev3,
+.connection-state.not-provisioned,
 .mock-badge {
   background: var(--md-sys-color-neutral-container);
   color: var(--md-sys-color-neutral-on-container);
@@ -1195,6 +1215,21 @@ button {
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+/* v2.1.0: the Live Workspace badge — same shape as the sample badge,
+   healthy-container colors so the mode boundary is visible at a glance. */
+.live-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--md-sys-shape-corner-sm);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--md-sys-color-healthy-container);
+  color: var(--md-sys-color-healthy-on-container);
+  border: 1px solid var(--md-sys-color-healthy-outline);
 }
 
 /* ==========================================================================
@@ -1933,6 +1968,71 @@ button {
   line-height: 1.4;
 }
 
+/* v2.1.0 Phase B: the inline action approval card. The tool name and
+   target stay on one row; params render as label/value rows so the
+   exact values the user is approving are visible before any mutation. */
+.approval-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.approval-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.approval-row svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--md-sys-color-primary);
+}
+
+.approval-row strong,
+.approval-row small {
+  display: block;
+}
+
+.approval-row strong {
+  font-size: 14px;
+}
+
+.approval-row small {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.approval-params {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-sm);
+  background: var(--md-sys-color-surface-container-low);
+}
+
+.approval-param span {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.approval-param p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--md-sys-color-on-surface);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .live-readonly,
 .preview-label {
   display: inline-flex;
@@ -2664,7 +2764,8 @@ button {
   color: var(--md-sys-color-on-surface-variant);
 }
 
-.overview-view .view-head .mock-badge {
+.overview-view .view-head .mock-badge,
+.overview-view .view-head .live-badge {
   flex-shrink: 0;
 }
 

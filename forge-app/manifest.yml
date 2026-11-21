@@ -16,17 +16,30 @@ modules:
   function:
     - key: resolver
       handler: index.handler
+    - key: snapshot-handler
+      handler: snapshot.handler
+  scheduledTrigger:
+    - key: atlasync-daily-snapshot
+      function: snapshot-handler
+      interval: day
 resources:
   - key: main
     path: static/atlasync
 permissions:
   scopes:
     - read:jira-work
+    - write:jira-work
     - read:confluence-content.all
+    - read:confluence-content.summary
+    - write:confluence-content
     - read:confluence-space.summary
     - read:page:confluence
     - read:servicedesk-request
     - storage:app
+    # NOTE (2026-11-21): the plan's `read:dev-status:jira` is NOT a real
+    # scope — the manifest validator rejects it. Dev-status reads are
+    # already covered by `read:jira-work` (the existing getIssueDevStatus
+    # resolver uses it; verified by the 2026-11-05 probe).
 app:
   id: ari:cloud:ecosystem::app/63accaf9-e952-4554-af92-27b5b1b5d56d
   runtime:

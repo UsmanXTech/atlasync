@@ -19,6 +19,10 @@ export interface SettingsRow {
   key: SettingsToggleKey;
   title: string;
   detail: string;
+  // Real effect once the Forge backend is reachable (Phase C1): the
+  // toggle is persisted in KVS and actually does something. aiSummaries
+  // has no backend setting, so it keeps its preview text.
+  effect?: string;
 }
 
 export const SETTINGS_ROWS: SettingsRow[] = [
@@ -26,16 +30,19 @@ export const SETTINGS_ROWS: SettingsRow[] = [
     key: 'dailySync',
     title: 'Daily sync',
     detail: 'Daily synchronization is a planned feature; no scheduler is active.',
+    effect: 'A readiness snapshot is stored every day; Insights trends appear after 2 snapshots.',
   },
   {
     key: 'incidentAlerts',
     title: 'Incident alerts',
     detail: 'Alert preferences are preview-only and not delivered.',
+    effect: 'Severe incidents surface in Intelligence and the daily snapshot; no email is sent yet.',
   },
   {
     key: 'weeklyDigest',
     title: 'Weekly digest',
     detail: 'Email delivery is not configured.',
+    effect: 'A weekly readiness summary is prepared for Intelligence; email delivery is not configured yet.',
   },
   {
     key: 'aiSummaries',

@@ -28,6 +28,7 @@ import { fetchLiveJiraIssues } from '../services/jira';
 import { fetchConfluencePages } from '../services/confluence';
 import { fetchJsmRequests } from '../services/jsm';
 import { LiveSearchLoader, type LiveSearchSnapshot, type LiveSourceFetchers, type LiveSourceKey } from '../utils/liveSearch';
+import { DATA_MODE_LABELS, type DataMode } from '../utils/dataMode';
 
 export type ForgeMode = 'loading' | 'forge' | 'standalone';
 
@@ -46,6 +47,8 @@ interface TopbarProps {
   onWorkspace: (id: string) => void;
   onNavigate: (view: ViewId) => void;
   forgeMode: ForgeMode;
+  dataMode: DataMode;
+  onDataMode: (mode: DataMode) => void;
   onMenu: () => void;
 }
 
@@ -92,7 +95,7 @@ function liveSourceFetchers(): LiveSourceFetchers {
  * - Exactly ONE filled primary button (SYNC PORTFOLIO, 40dp, pill)
  * - 30dp circular user avatar
  */
-export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate, forgeMode, onMenu }: TopbarProps) {
+export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate, forgeMode, dataMode, onDataMode, onMenu }: TopbarProps) {
   const [query, setQuery] = useState('');
   const [searchFocus, setSearchFocus] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -375,10 +378,32 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
       </div>
 
       <div className="topbar-right">
-        <span className={`forge-badge ${forgeMode}`}>
-          <i />
-          {forgeMode === 'forge' ? 'Forge connected' : forgeMode === 'loading' ? 'Connecting…' : 'Preview mode'}
-        </span>
+        {/* v2.1.0 data-mode toggle: the old status pill ("Preview mode" /
+            "Forge connected") is now the explicit Sample Dataset vs Live
+            Workspace switch. The dot still signals Forge connectivity
+            (green = installed, amber = preview); the label is the mode.
+            While connecting, the pill is not interactive yet. */}
+        {forgeMode === 'loading' ? (
+          <span className={`forge-badge ${forgeMode}`}>
+            <i />
+            Connecting…
+          </span>
+        ) : (
+          <button
+            type="button"
+            className={`forge-badge ${forgeMode} mode-toggle`}
+            onClick={() => onDataMode(dataMode === 'sample' ? 'live' : 'sample')}
+            aria-pressed={dataMode === 'live'}
+            title={
+              dataMode === 'sample'
+                ? 'Sample Dataset — showing demo data. Click to switch to Live Workspace.'
+                : 'Live Workspace — showing live Atlassian data. Click to switch to Sample Dataset.'
+            }
+          >
+            <i />
+            {DATA_MODE_LABELS[dataMode]}
+          </button>
+        )}
 
         <div className="menu-wrap">
           <button

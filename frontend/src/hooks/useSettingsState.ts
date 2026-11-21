@@ -1,17 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   DEFAULT_TOGGLES,
   defaultSettingsFor,
   type SettingsToggleKey,
   type SettingsToggles,
 } from '../utils/settingsState';
+import { fetchSettings, saveSettings } from '../services/settings';
 import type { Workspace } from '../data/types';
+
+export type SettingsBackend = 'loading' | 'connected' | 'preview';
 
 export interface SettingsState {
   name: string;
   timezone: string;
   toggles: SettingsToggles;
   saved: boolean;
+  backend: SettingsBackend;
+  saveError: string | null;
   setName: (name: string) => void;
   setTimezone: (timezone: string) => void;
   flip: (key: SettingsToggleKey) => void;
@@ -22,23 +27,52 @@ export interface SettingsState {
 // Owns the Settings form state. The hook lives in App (above the view
 // switch), so a saved name, timezone or toggle choice survives navigating
 // to another view and back — the view itself unmounts on switch, but this
-// state does not. Before this fix (Run 17) "Save preview" showed "Saved
-// in this page session only" and the values were discarded on the first
-// view switch. A full page reload still starts fresh, and switching demo
+// state does not. A full page reload still starts fresh, and switching demo
 // workspace still resets to that workspace's defaults.
+//
+// v2.1.0 Phase C1: Daily sync / Incident alerts / Weekly digest are
+// persisted in the Forge backend (KVS) when it is reachable — the hook
+// loads them on mount and Save writes them back. AI summaries stays
+// local-only (no backend setting exists for it). In the standalone
+// preview there is no backend, so the toggles stay preview-only and the
+// view says so. Backend settings are install-wide, so switching demo
+// workspace never resets them once connected.
 export function useSettingsState(workspace: Workspace): SettingsState {
   const [name, setNameState] = useState(workspace.name);
   const [timezone, setTimezoneState] = useState(defaultSettingsFor(workspace.name).timezone);
   const [toggles, setToggles] = useState<SettingsToggles>({ ...DEFAULT_TOGGLES });
   const [saved, setSaved] = useState(false);
+  const [backend, setBackend] = useState<SettingsBackend>('loading');
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
+
+  useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    let alive = true;
+    void fetchSettings().then((r) => {
+      if (!alive) return;
+      if (r.ok) {
+        setToggles((v) => ({ ...v, ...r.settings }));
+        setBackend('connected');
+      } else {
+        setBackend('preview');
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     const d = defaultSettingsFor(workspace.name);
     setNameState(d.name);
     setTimezoneState(d.timezone);
-    setToggles(d.toggles);
+    // Install-wide backend toggles are not per-workspace; only the
+    // preview defaults reset on a workspace switch.
+    setToggles((v) => (backend === 'connected' ? v : d.toggles));
     setSaved(false);
-  }, [workspace.id, workspace.name]);
+  }, [workspace.id, workspace.name, backend]);
 
   const setName = (value: string) => {
     setNameState(value);
@@ -51,15 +85,35 @@ export function useSettingsState(workspace: Workspace): SettingsState {
   const flip = (key: SettingsToggleKey) => {
     setToggles((v) => ({ ...v, [key]: !v[key] }));
     setSaved(false);
+    setSaveError(null);
   };
-  const save = () => setSaved(true);
+  const save = useCallback(() => {
+    if (backend !== 'connected') {
+      setSaved(true);
+      return;
+    }
+    void saveSettings({
+      dailySync: toggles.dailySync,
+      incidentAlerts: toggles.incidentAlerts,
+      weeklyDigest: toggles.weeklyDigest,
+    }).then((r) => {
+      if (r.ok) {
+        setToggles((v) => ({ ...v, ...r.settings }));
+        setSaved(true);
+        setSaveError(null);
+      } else {
+        setSaveError(r.error.message);
+      }
+    });
+  }, [backend, toggles]);
   const reset = () => {
     const d = defaultSettingsFor(workspace.name);
     setNameState(d.name);
     setTimezoneState(d.timezone);
     setToggles(d.toggles);
     setSaved(false);
+    setSaveError(null);
   };
 
-  return { name, timezone, toggles, saved, setName, setTimezone, flip, save, reset };
+  return { name, timezone, toggles, saved, backend, saveError, setName, setTimezone, flip, save, reset };
 }

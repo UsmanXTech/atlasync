@@ -1,5 +1,6 @@
 import Resolver from '@forge/resolver';
 import api, { route } from '@forge/api';
+import { kvs } from '@forge/kvs';
 import {
   buildSearchBody,
   mapJiraErrorStatus,
@@ -10,6 +11,33 @@ import { parseDevStatusResponse, validateDevStatusInput } from './devstatus.js';
 import { parseConfluencePages, validateConfluenceInput } from './confluence.js';
 import { parseJsmRequests, validateJsmInput } from './jsm.js';
 import { parseJiraProjects, validateProjectInput } from './projects.js';
+import { gatherSnapshot } from './gather.js';
+import {
+  fetchConfluenceSnapshotPages,
+  fetchJiraSnapshotIssues,
+  fetchJsmSnapshotRequests,
+  countStalePrsForIssues,
+} from './liveSources.js';
+import {
+  buildReadinessReport,
+  diagnoseHealthStatus,
+} from './readiness.js';
+import {
+  appendThreadTurn,
+  clearThread,
+  deletePendingAction,
+  listSnapshots,
+  loadPendingAction,
+  loadSettings,
+  loadThread,
+  resolveScope,
+  saveSettings,
+  storePendingAction,
+  updateLastReadiness,
+} from './memory.js';
+import { runAgentLoop, summarizeAfterApproval } from './agent/loop.js';
+import { executeWriteTool } from './agent/toolExecutors.js';
+import { isWriteTool, validateToolArgs } from './agent/toolRegistry.js';
 
 // Atlasync Forge resolver.
 //
@@ -195,39 +223,24 @@ resolver.define('getJsmRequests', async ({ payload }) => {
 // slices as the current user, then ask Atlassian-hosted Forge LLM.
 // Source content is untrusted context; the model must not treat it as
 // instructions. No external AI credentials or data egress are used.
-resolver.define('askAtlasync', async ({ payload }) => {
+resolver.define('askAtlasync', async ({ payload, context }) => {
   const prompt = payload && typeof payload.prompt === 'string' ? payload.prompt.trim() : '';
   if (!prompt || prompt.length > 1500) {
     return { ok: false, error: { kind: 'INVALID_INPUT', message: 'Enter a prompt between 1 and 1,500 characters.' } };
   }
 
-  const sourceErrors = [];
-  const [jiraResult, confluenceResult, jsmResult] = await Promise.all([
-    (async () => {
-      try {
-        const response = await api.asUser().requestJira(route`/rest/api/3/search/jql`, {
-          method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-          body: JSON.stringify(buildSearchBody({ jql: 'updated >= -30d ORDER BY updated DESC', maxResults: 10 })),
-        });
-        if (response.status >= 400) { sourceErrors.push('Jira unavailable or permission denied'); return []; }
-        return parseJiraSearchResponse(await response.json()).map((i) => ({ key: i.key, summary: i.summary, status: i.status, priority: i.priority }));
-      } catch { sourceErrors.push('Jira unavailable'); return []; }
-    })(),
-    (async () => {
-      try {
-        const response = await api.asUser().requestConfluence(route`/wiki/api/v2/pages?limit=10&sort=-modified-date`, { headers: { Accept: 'application/json' } });
-        if (response.status >= 400) { sourceErrors.push('Confluence unavailable or permission denied'); return []; }
-        return parseConfluencePages(await response.json()).map((p) => ({ title: p.title, status: p.status, spaceId: p.spaceId }));
-      } catch { sourceErrors.push('Confluence unavailable'); return []; }
-    })(),
-    (async () => {
-      try {
-        const response = await api.asUser().requestJira(route`/rest/servicedeskapi/request?limit=10`, { headers: { Accept: 'application/json' } });
-        if (response.status >= 400) { sourceErrors.push('JSM unavailable or permission denied'); return []; }
-        return parseJsmRequests(await response.json()).map((r) => ({ key: r.key, summary: r.summary, status: r.status, requestType: r.requestType, priority: r.priority }));
-      } catch { sourceErrors.push('JSM unavailable'); return []; }
-    })(),
-  ]);
+  // v2.1.0: the three sources are gathered through the shared
+  // gatherSnapshot helper (Promise.allSettled — one dead source never
+  // blocks the others). Same limits and same failure strings as before.
+  const snapshot = await gatherSnapshot({
+    fetchJiraIssues: () => fetchJiraSnapshotIssues(10),
+    fetchConfluencePages: () => fetchConfluenceSnapshotPages(10),
+    fetchJsmRequests: () => fetchJsmSnapshotRequests(10),
+  });
+  const jiraResult = snapshot.jiraIssues.map((i) => ({ key: i.key, summary: i.summary, status: i.status, priority: i.priority }));
+  const confluenceResult = snapshot.confluencePages.map((p) => ({ title: p.title, status: p.status, spaceId: p.spaceId }));
+  const jsmResult = snapshot.jsmRequests.map((r) => ({ key: r.key, summary: r.summary, status: r.status, requestType: r.requestType, priority: r.priority }));
+  const sourceErrors = snapshot.unavailable;
 
   const sourceContext = {
     jiraIssues: jiraResult,
@@ -250,6 +263,15 @@ resolver.define('askAtlasync', async ({ payload }) => {
     const content = response?.choices?.[0]?.message?.content;
     const answer = typeof content === 'string' ? content : Array.isArray(content) ? content.filter((part) => part && part.type === 'text' && typeof part.text === 'string').map((part) => part.text).join('\n') : '';
     if (!answer.trim()) return { ok: false, error: { kind: 'API_ERROR', message: 'Atlasync Intelligence returned an empty response. Try again.' } };
+    // v2.1.0 Phase C1: append the turn to the KVS thread (last 10) so
+    // follow-ups survive reloads. Best-effort only — a KVS failure must
+    // never break an answer that is already computed.
+    try {
+      const { cloudId, accountId } = resolveScope(context);
+      await appendThreadTurn(kvs, cloudId, accountId, { question: prompt, answer: answer.slice(0, 12000) });
+    } catch (error) {
+      console.error('[atlasync] thread append failed:', error instanceof Error ? error.name : typeof error);
+    }
     return { ok: true, answer: answer.slice(0, 12000), sources: { jiraIssues: jiraResult.length, confluencePages: confluenceResult.length, jsmRequests: jsmResult.length, unavailable: [...new Set(sourceErrors)] } };
   } catch (error) {
     console.error('[atlasync] Forge LLM request failed:', error instanceof Error ? error.name : typeof error);
@@ -269,6 +291,281 @@ resolver.define('getJiraProjects', async ({ payload }) => {
   } catch (error) {
     console.error('[atlasync] Jira projects request threw:', error instanceof Error ? error.name : typeof error);
     return { ok: false, error: { kind: 'API_ERROR', message: 'Jira projects could not be reached. Try again shortly.' } };
+  }
+});
+
+// (Phase C1) The shared snapshot fetchers + stale-PR sampler moved to
+// liveSources.js so the daily snapshot trigger reuses them verbatim.
+
+// v2.1.0 — structured per-source health diagnostics. Each source is
+// pinged in its own try/catch and mapped by diagnoseHealthStatus; the
+// envelope is always ok:true because per-source truth lives in the
+// entries. Response bodies are never read — only the status number.
+resolver.define('getHealthDiagnostics', async () => {
+  const checks = [
+    {
+      source: 'jira',
+      run: async () => {
+        const r = await api.asUser().requestJira(route`/rest/api/3/myself`, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        });
+        return typeof r.status === 'number' ? r.status : 0;
+      },
+    },
+    {
+      source: 'confluence',
+      run: async () => {
+        const r = await api.asUser().requestConfluence(route`/wiki/api/v2/spaces?limit=1`, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        });
+        return typeof r.status === 'number' ? r.status : 0;
+      },
+    },
+    {
+      source: 'jsm',
+      run: async () => {
+        const r = await api.asUser().requestJira(route`/rest/servicedeskapi/info`, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        });
+        return typeof r.status === 'number' ? r.status : 0;
+      },
+    },
+  ];
+  const settled = await Promise.allSettled(
+    checks.map(async (check) => {
+      try {
+        return diagnoseHealthStatus(check.source, await check.run());
+      } catch {
+        return diagnoseHealthStatus(check.source, 0);
+      }
+    }),
+  );
+  return {
+    ok: true,
+    diagnostics: settled.map((result, i) =>
+      result.status === 'fulfilled' ? result.value : diagnoseHealthStatus(checks[i].source, 0),
+    ),
+  };
+});
+
+// v2.1.0 — release readiness from the live snapshot (formula in
+// readiness.js). The computation lives in buildReadinessReport so the
+// daily snapshot trigger runs the exact same code. On success the
+// thread's lastReadiness is refreshed (best-effort) so Intelligence
+// follow-ups can cite the latest score.
+resolver.define('getReadiness', async ({ context }) => {
+  const report = await buildReadinessReport({
+    fetchJiraIssues: () => fetchJiraSnapshotIssues(50),
+    fetchConfluencePages: () => fetchConfluenceSnapshotPages(10),
+    fetchJsmRequests: () => fetchJsmSnapshotRequests(50),
+    countStalePrsForIssues,
+  });
+  if (!report.ok) return report;
+  try {
+    const { cloudId, accountId } = resolveScope(context);
+    await updateLastReadiness(kvs, cloudId, accountId, {
+      score: report.score,
+      breakdown: report.breakdown,
+      generatedAt: report.generatedAt,
+    });
+  } catch (error) {
+    // The score is already computed; a KVS failure must not fail it.
+    console.error('[atlasync] lastReadiness update failed:', error instanceof Error ? error.name : typeof error);
+  }
+  return report;
+});
+
+// v2.1.0 Phase C1 — KVS-backed settings, snapshots and thread.
+// All five resolvers read/write only this app's own KVS keys (no
+// Atlassian data is mutated). A KVS failure answers ok:false with a
+// generic message; the error class goes to Forge logs only.
+resolver.define('getSettings', async ({ context }) => {
+  try {
+    const { cloudId } = resolveScope(context);
+    return { ok: true, settings: await loadSettings(kvs, cloudId) };
+  } catch (error) {
+    console.error('[atlasync] getSettings failed:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'Settings could not be loaded. Try again shortly.' } };
+  }
+});
+
+resolver.define('saveSettings', async ({ payload, context }) => {
+  try {
+    const { cloudId } = resolveScope(context);
+    const settings = await saveSettings(kvs, cloudId, payload && payload.settings !== undefined ? payload.settings : payload);
+    return { ok: true, settings };
+  } catch (error) {
+    console.error('[atlasync] saveSettings failed:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'Settings could not be saved. Try again shortly.' } };
+  }
+});
+
+resolver.define('getSnapshots', async ({ context }) => {
+  try {
+    const { cloudId } = resolveScope(context);
+    return { ok: true, snapshots: await listSnapshots(kvs, cloudId) };
+  } catch (error) {
+    console.error('[atlasync] getSnapshots failed:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'Snapshots could not be loaded. Try again shortly.' } };
+  }
+});
+
+resolver.define('getThread', async ({ context }) => {
+  try {
+    const { cloudId, accountId } = resolveScope(context);
+    const thread = await loadThread(kvs, cloudId, accountId);
+    return { ok: true, turns: thread.turns, lastReadiness: thread.lastReadiness };
+  } catch (error) {
+    console.error('[atlasync] getThread failed:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'The conversation thread could not be loaded. Try again shortly.' } };
+  }
+});
+
+// Explicit user action only ("New analysis"): clears the KVS thread so
+// the next ask starts a fresh conversation. Local state clearing lives
+// in the frontend hook; this is the backend half.
+resolver.define('clearThread', async ({ context }) => {
+  try {
+    const { cloudId, accountId } = resolveScope(context);
+    await clearThread(kvs, cloudId, accountId);
+    return { ok: true };
+  } catch (error) {
+    console.error('[atlasync] clearThread failed:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'The conversation thread could not be cleared. Try again shortly.' } };
+  }
+});
+
+// v2.1.0 Phase B — agentic Intelligence. invokeAgent runs the tool
+// loop (max 5 steps, native @forge/llm function calling): read tools
+// auto-execute, a write tool HALTS the loop and returns AWAITING_APPROVAL
+// with the exact pending action — nothing is mutated here.
+// approveAgentAction re-validates the action against the KVS pending
+// record (never the frontend's copy) and executes only on approved ===
+// true, then resumes the loop for a final summary. Rejected actions are
+// logged and summarized as not executed. A missing/expired pending
+// action answers INVALID_INPUT — an approval cannot be replayed.
+resolver.define('invokeAgent', async ({ payload, context }) => {
+  const prompt = payload && typeof payload.prompt === 'string' ? payload.prompt.trim() : '';
+  if (!prompt || prompt.length > 1500) {
+    return { ok: false, error: { kind: 'INVALID_INPUT', message: 'Enter a prompt between 1 and 1,500 characters.' } };
+  }
+  const { cloudId, accountId } = resolveScope(context);
+  const thread = await loadThread(kvs, cloudId, accountId).catch(() => ({ turns: [], lastReadiness: null }));
+  try {
+    const { chat } = await import('@forge/llm');
+    const result = await runAgentLoop({
+      chat,
+      prompt,
+      priorTurns: thread.turns,
+      readiness: thread.lastReadiness,
+      storePending: async (action) => {
+        const record = await storePendingAction(kvs, cloudId, accountId, { ...action, prompt });
+        return { actionId: record.actionId, threadId: record.threadId };
+      },
+    });
+    if (result.status === 'ERROR') {
+      return { ok: false, error: { kind: 'API_ERROR', message: 'Atlasync Intelligence could not complete the analysis. Check Forge LLM access/credits and try again.' } };
+    }
+    if (result.status === 'AWAITING_APPROVAL') {
+      return {
+        ok: true,
+        status: 'AWAITING_APPROVAL',
+        pendingAction: result.pendingAction,
+        trace: result.trace,
+        messages: [],
+      };
+    }
+    // Complete: append the turn to the thread (best-effort, like askAtlasync).
+    try {
+      await appendThreadTurn(kvs, cloudId, accountId, { question: prompt, answer: result.answer });
+    } catch (error) {
+      console.error('[atlasync] thread append failed:', error instanceof Error ? error.name : typeof error);
+    }
+    return { ok: true, status: 'COMPLETE', answer: result.answer, trace: result.trace };
+  } catch (error) {
+    console.error('[atlasync] invokeAgent failed:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'Atlasync Intelligence could not complete the analysis. Check Forge LLM access/credits and try again.' } };
+  }
+});
+
+resolver.define('approveAgentAction', async ({ payload, context }) => {
+  const actionId = payload && typeof payload.actionId === 'string' ? payload.actionId : '';
+  const threadId = payload && typeof payload.threadId === 'string' ? payload.threadId : '';
+  const approved = payload && payload.approved === true;
+  if (!actionId || !threadId) {
+    return { ok: false, error: { kind: 'INVALID_INPUT', message: 'A pending action id and thread id are required.' } };
+  }
+  const { cloudId, accountId } = resolveScope(context);
+  const pending = await loadPendingAction(kvs, cloudId, accountId, actionId).catch(() => null);
+  if (!pending || pending.threadId !== threadId) {
+    return {
+      ok: false,
+      error: {
+        kind: 'INVALID_INPUT',
+        message: 'No pending action matches this approval — it may have expired or already been handled.',
+      },
+    };
+  }
+  // Single-use: delete first, so a replayed approval finds nothing.
+  await deletePendingAction(kvs, cloudId, accountId, actionId).catch(() => {});
+  // Re-validate the KVS-stored action — never trust the frontend copy,
+  // and never execute an unvalidated tool call.
+  const validation = validateToolArgs(pending.tool, pending.args);
+  if (!validation.ok || !isWriteTool(pending.tool)) {
+    console.error('[atlasync] pending action failed re-validation:', pending.tool);
+    return { ok: false, error: { kind: 'INVALID_INPUT', message: 'The pending action is no longer valid. Nothing was executed.' } };
+  }
+  const trace = [...(pending.trace ?? [])];
+  try {
+    const { chat } = await import('@forge/llm');
+    if (!approved) {
+      console.log(`[atlasync] agent action rejected by user: ${pending.tool} ${pending.preview?.target ?? ''} (action ${actionId})`);
+      const answer = await summarizeAfterApproval({
+        chat,
+        messages: pending.messages ?? [],
+        outcomeText: `The user REJECTED the proposed action ${pending.tool} on ${pending.preview?.target ?? 'the target'}. It was NOT executed — nothing changed.`,
+      });
+      try {
+        await appendThreadTurn(kvs, cloudId, accountId, { question: pending.prompt || 'Agent action', answer });
+      } catch {
+        // best-effort only
+      }
+      return { ok: true, status: 'COMPLETE', answer, trace, executed: null };
+    }
+    const started = Date.now();
+    const execution = await executeWriteTool(pending.tool, validation.args);
+    trace.push({
+      step: trace.length + 1,
+      tool: pending.tool,
+      args: JSON.stringify(validation.args),
+      status: execution.ok ? 'ok' : 'error',
+      durationMs: Date.now() - started,
+    });
+    if (!execution.ok) {
+      const answer = await summarizeAfterApproval({
+        chat,
+        messages: pending.messages ?? [],
+        outcomeText: `The approved action ${pending.tool} on ${pending.preview?.target ?? 'the target'} FAILED: ${execution.error?.message ?? 'Unknown error.'} Nothing was changed unless the failure message says otherwise.`,
+      });
+      return { ok: true, status: 'COMPLETE', answer, trace, executed: null, executionError: execution.error };
+    }
+    const answer = await summarizeAfterApproval({
+      chat,
+      messages: pending.messages ?? [],
+      outcomeText: `The approved action ${pending.tool} on ${pending.preview?.target ?? 'the target'} EXECUTED successfully: ${JSON.stringify(execution.result)}.`,
+    });
+    try {
+      await appendThreadTurn(kvs, cloudId, accountId, { question: pending.prompt || 'Agent action', answer });
+    } catch {
+      // best-effort only
+    }
+    return { ok: true, status: 'COMPLETE', answer, trace, executed: execution.result };
+  } catch (error) {
+    console.error('[atlasync] approveAgentAction failed:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'The approval could not be completed. Check Forge LLM access/credits and try again.' } };
   }
 });
 

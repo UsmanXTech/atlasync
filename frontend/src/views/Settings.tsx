@@ -10,7 +10,8 @@ import type { SettingsState } from '../hooks/useSettingsState';
  * Aligned with Stitch M3 Redesign & M3 alignment brief
  */
 export default function Settings({ settings }: { settings: SettingsState }) {
-  const { name, timezone, toggles, saved, setName, setTimezone, flip, save, reset } = settings;
+  const { name, timezone, toggles, saved, backend, saveError, setName, setTimezone, flip, save, reset } = settings;
+  const connected = backend === 'connected';
 
   return (
     <div className="view workspace-view">
@@ -20,7 +21,9 @@ export default function Settings({ settings }: { settings: SettingsState }) {
           <h2>Settings</h2>
           <p>Workspace profile and preview preferences.</p>
         </div>
-        <span className="preview-label">PREVIEW CONTROLS</span>
+        <span className="preview-label">
+          {backend === 'loading' ? 'CHECKING BACKEND…' : connected ? 'SYNCED TO FORGE' : 'PREVIEW CONTROLS'}
+        </span>
       </div>
 
       <div className="settings-layout">
@@ -56,19 +59,29 @@ export default function Settings({ settings }: { settings: SettingsState }) {
             </div>
             {saved && (
               <span className="saved-note">
-                Saved in this page session only; no backend preferences are changed.
+                {connected
+                  ? 'Saved to the Forge backend — these toggles apply to this install.'
+                  : 'Saved in this page session only; no backend preferences are changed.'}
+              </span>
+            )}
+            {saveError && (
+              <span className="saved-note" role="alert" style={{ color: 'var(--md-sys-color-blocked-on-container)' }}>
+                {saveError}
               </span>
             )}
           </div>
         </Card>
 
-        <Card title="Notifications & sync" subtitle="Interactive preview preferences">
+        <Card
+          title="Notifications & sync"
+          subtitle={connected ? 'Stored in the Forge backend' : 'Interactive preview preferences'}
+        >
           <div className="settings-list">
-            {SETTINGS_ROWS.map(({ key, title, detail }) => (
+            {SETTINGS_ROWS.map(({ key, title, detail, effect }) => (
               <div className="setting-row" key={key}>
                 <div>
                   <strong>{title}</strong>
-                  <small>{detail}</small>
+                  <small>{connected && effect ? effect : detail}</small>
                 </div>
                 <Switch
                   checked={toggles[key]}
@@ -78,6 +91,11 @@ export default function Settings({ settings }: { settings: SettingsState }) {
               </div>
             ))}
           </div>
+          {!connected && backend !== 'loading' && (
+            <p className="source-empty" style={{ margin: '12px 0 0' }}>
+              The Forge backend is not reachable in this preview, so these toggles are preview-only.
+            </p>
+          )}
         </Card>
 
         <Card
@@ -101,7 +119,11 @@ export default function Settings({ settings }: { settings: SettingsState }) {
 
       <div className="settings-notice">
         <ShieldCheck size={18} />
-        <span>No automatic sync, alerts or email jobs are enabled by changing them.</span>
+        <span>
+          {connected
+            ? 'Daily sync stores a readiness snapshot every day; turn it off and the daily snapshot stops.'
+            : 'No automatic sync, alerts or email jobs are enabled by changing them.'}
+        </span>
       </div>
     </div>
   );
