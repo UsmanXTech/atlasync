@@ -888,7 +888,7 @@ button {
   gap: 8px;
   height: 40px;
   min-height: 40px;
-  padding: 0 20px;
+  padding: 0 16px;
   border: 1px solid var(--md-sys-color-outline-variant);
   border-radius: var(--md-sys-shape-corner-full);
   background: transparent;
@@ -899,6 +899,8 @@ button {
   white-space: nowrap;
   user-select: none;
   box-shadow: none;
+  flex-shrink: 0;
+  min-width: max-content;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
@@ -2817,6 +2819,7 @@ button {
 
 .row-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
 }
@@ -2926,7 +2929,7 @@ button {
 
 .workspace-view:has(.integration-summary) {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-rows: auto auto max-content max-content auto;
 }
 
 .workspace-view:has(.integration-summary) > .integration-grid {
@@ -2942,7 +2945,7 @@ button {
 
 .workspace-view:has(.insight-hero) {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto max-content auto;
 }
 
 .workspace-view:has(.insight-hero) > .card {

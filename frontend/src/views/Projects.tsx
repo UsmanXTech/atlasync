@@ -158,17 +158,15 @@ export default function Projects({
           {filtered.map((p, i) => (
             <article className="project-tile" key={p.id}>
               <div className="tile-top">
-                <span className="project-mark">
-                  <FolderKanban size={18} />
-                </span>
+                <span className="project-key-pill">{p.key}</span>
+                <span className="chip chip-compact active">{p.projectType || 'Jira'}</span>
               </div>
-              <div className="project-key">{p.key}</div>
               <h3>{p.name}</h3>
               <div className="tile-bottom">
                 <span>
-                  <Layers3 size={14} /> {p.projectType || 'Jira project'}
+                  <Layers3 size={14} /> Jira project
                 </span>
-                <span className="project-index">{String(i + 1).padStart(2, '0')}</span>
+                <span className="project-index">#{String(i + 1).padStart(2, '0')}</span>
               </div>
             </article>
           ))}

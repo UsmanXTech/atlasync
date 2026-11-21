@@ -347,24 +347,33 @@ export default function Overview({
             </div>
           </Card>
 
-          <Card
-            title="Pull requests"
-            subtitle="Sample PR activity"
-            action={
-              <SegmentedButton
-                options={[
-                  { value: 'all', label: 'All' },
-                  { value: 'review', label: 'Review' },
-                  { value: 'approved', label: 'Approved' },
-                  { value: 'merged', label: 'Merged' },
-                  { value: 'changes', label: 'Changes' },
-                ]}
-                value={prFilter}
-                onChange={(s) => setPrFilter(s as 'all' | PrStatus)}
-                ariaLabel="PR status filter"
-              />
-            }
-          >
+          <Card title="Pull requests" subtitle="Sample PR activity">
+            <div
+              className="chip-row"
+              role="group"
+              aria-label="PR status filter"
+              style={{ marginBottom: 8 }}
+            >
+              {(
+                [
+                  ['all', 'All'],
+                  ['review', 'Review'],
+                  ['approved', 'Approved'],
+                  ['merged', 'Merged'],
+                  ['changes', 'Changes'],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`chip ${prFilter === value ? 'active' : ''}`}
+                  aria-pressed={prFilter === value}
+                  onClick={() => setPrFilter(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <div className="row-list">
               {prs.map((pr) => (
                 <div className="data-row" key={pr.id}>
