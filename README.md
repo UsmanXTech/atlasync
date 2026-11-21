@@ -145,7 +145,7 @@ This is the one authoritative split. **Live** means the data comes from the Forg
 
 ### Deployed version vs main
 
-**v2.1.0 was deployed 2026-11-21** to the development environment on the Codegeist dev site (GitHub Actions run #4). It includes everything merged to `main` since v3.2.0 (PR #48: Material 3 restyle; PR #49: v2.1.0 agentic — diagnostics, approval-gated agent loop, KVS session memory + daily snapshots; PR #50: GitHub Actions deploy workflow), verified locally — `npm test` 170/170 + production build — and live-verified the same day on iamusmanh.atlassian.net: all 7 views with live data (Overview 8 open issues, 1 blocker, 78% readiness; Intelligence 63%; Integrations 3/3 Connected; Insights 22 records) and a working Forge LLM summary. Do not claim a post-v2.1.0 change is live-verified until that deploy happens.
+**v2.1.0 was deployed 2026-11-21** to the development environment on the Codegeist dev site (GitHub Actions run #4). It includes everything merged to `main` since v3.2.0 (PR #48: Material 3 restyle; PR #49: v2.1.0 agentic — diagnostics, approval-gated agent loop, KVS session memory + daily snapshots; PR #50: GitHub Actions deploy workflow), verified locally — `npm test` 170/170 + production build — and live-verified the same day on iamusmanh.atlassian.net: all 7 views with live data (Overview 8 open issues, 1 blocker, 78% readiness; Intelligence 63%; Integrations 3/3 Connected; Insights 22 records) and a working Forge LLM summary. Since then, every merge to `main` has deployed automatically via the workflow — the installed app now tracks `main` through run #23 (21 Nov 2026), covering PRs #51–#68: P0 security fixes, the Phase 1 agent loop, Phase 2 approvals + execution history, and Phase 3 page functionality. Post-v2.1.0 slices are live-verified per slice after their deploy.
 
 ### Notes
 
@@ -216,7 +216,7 @@ This installs the root workspace plus `frontend/` and `forge-app/`.
 npm run dev        # start the Vite dev server for the frontend
 npm run build      # type-check + build the frontend into forge-app/static/atlasync
 npm run preview    # serve the production build locally (what Forge would serve)
-npm test           # 41 unit tests (see below)
+npm test           # 207 unit tests (see below)
 ```
 
 The frontend builds with relative asset paths (`base: './'` in `vite.config.ts`), which Forge Custom UI requires. The manifest resource points at the build output directory (`forge-app/static/atlasync`), which must contain `index.html` — that is the entry point Forge serves.
@@ -252,13 +252,13 @@ Run these before committing:
 npm install        # dependencies resolve
 npm run dev        # dev server answers (smoke-check the root URL)
 npm run build      # tsc type-check + Vite production build
-npm test           # 41 unit tests (see below) + resolver structure check
+npm test           # 207 unit tests (see below) + resolver structure check
 forge lint         # manifest schema check (stops at "Not logged in" without an Atlassian login — expected)
 ```
 
 ### A note on `npm test`
 
-`npm test` runs 41 real unit tests via `node --test`: six Forge-backend suites (`forge-app/tests/` — Jira, dev-status/Bitbucket, Confluence, JSM, projects, resolver-init) using a real documented-response fixture for JSM, plus one frontend suite for the Intelligence request-generation guard (`frontend/src/utils/requestGeneration.test.ts`, run with Node type stripping). `scripts/check-resolver.mjs` additionally guards the resolver's structure. Live resolver behavior is verified only after `forge deploy` + install — never claimed from a local run.
+`npm test` runs 207 real unit tests via `node --test`: thirteen Forge-backend suites (`forge-app/tests/` — Jira, dev-status/Bitbucket, Confluence, JSM, projects, agent loop, memory, readiness, diagnostics, resolver-init, and more) using a real documented-response fixture for JSM, plus fifteen frontend utils suites (`frontend/src/utils/*.test.ts`, run with Node type stripping). `scripts/check-resolver.mjs` additionally guards the resolver's structure. Live resolver behavior is verified only after `forge deploy` + install — never claimed from a local run.
 
 ### Troubleshooting
 
@@ -275,7 +275,7 @@ forge lint         # manifest schema check (stops at "Not logged in" without an 
 | `npm run dev` | Start the frontend Vite dev server |
 | `npm run build` | Type-check and build the frontend (output: `forge-app/static/atlasync`) |
 | `npm run preview` | Serve the production build locally |
-| `npm test` | 41 unit tests (6 Forge-backend suites + 1 frontend suite) + resolver structure check |
+| `npm test` | 207 unit tests (13 Forge-backend suites + 15 frontend utils suites) + resolver structure check |
 
 ## Codegeist 2026
 

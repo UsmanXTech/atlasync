@@ -60,7 +60,7 @@ export default function Settings({ settings }: { settings: SettingsState }) {
             {saved && (
               <span className="saved-note">
                 {connected
-                  ? 'Saved to the Forge backend — these toggles apply to this install.'
+                  ? 'Saved to the Forge backend — only the toggles below are stored; the workspace name and timezone are session-only and reset on reload.'
                   : 'Saved in this page session only; no backend preferences are changed.'}
               </span>
             )}
