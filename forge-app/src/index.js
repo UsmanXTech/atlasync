@@ -24,12 +24,13 @@ import {
 } from './readiness.js';
 import {
   appendThreadTurn,
+  claimPendingAction,
   clearThread,
-  deletePendingAction,
+  consumePendingAction,
   listSnapshots,
-  loadPendingAction,
   loadSettings,
   loadThread,
+  releasePendingActionClaim,
   resolveScope,
   saveSettings,
   storePendingAction,
@@ -499,8 +500,22 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
     return { ok: false, error: { kind: 'INVALID_INPUT', message: 'A pending action id and thread id are required.' } };
   }
   const { cloudId, accountId } = resolveScope(context);
-  const pending = await loadPendingAction(kvs, cloudId, accountId, actionId).catch(() => null);
-  if (!pending || pending.threadId !== threadId) {
+  // P0 hardening: claim the action first (TTL-checked, single-claim).
+  // A missing/expired/claimed action answers INVALID_INPUT — an
+  // approval cannot be replayed or executed twice.
+  const claim = await claimPendingAction(kvs, cloudId, accountId, actionId).catch(() => null);
+  if (!claim) {
+    return {
+      ok: false,
+      error: {
+        kind: 'INVALID_INPUT',
+        message: 'No pending action matches this approval — it may have expired, already been handled, or been claimed by another approval.',
+      },
+    };
+  }
+  const { record: pending, claimId } = claim;
+  if (pending.threadId !== threadId) {
+    await releasePendingActionClaim(kvs, cloudId, accountId, actionId, claimId);
     return {
       ok: false,
       error: {
@@ -509,8 +524,20 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
       },
     };
   }
-  // Single-use: delete first, so a replayed approval finds nothing.
-  await deletePendingAction(kvs, cloudId, accountId, actionId).catch(() => {});
+  // Single-use, fail-closed: the record must be deleted before anything
+  // executes. If the delete fails, nothing executes.
+  try {
+    await consumePendingAction(kvs, cloudId, accountId, actionId, claimId);
+  } catch (error) {
+    console.error('[atlasync] approveAgentAction: could not consume pending action, refusing to execute:', error instanceof Error ? error.name : typeof error);
+    return {
+      ok: false,
+      error: {
+        kind: 'API_ERROR',
+        message: 'The approval could not be completed — the pending action could not be claimed. Nothing was executed. Try again.',
+      },
+    };
+  }
   // Re-validate the KVS-stored action — never trust the frontend copy,
   // and never execute an unvalidated tool call.
   const validation = validateToolArgs(pending.tool, pending.args);
