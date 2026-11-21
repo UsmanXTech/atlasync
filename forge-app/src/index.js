@@ -21,6 +21,7 @@ import {
 import {
   buildReadinessReport,
   diagnoseHealthStatus,
+  filterHealthChecks,
 } from './readiness.js';
 import {
   appendConversationTurn,
@@ -310,7 +311,7 @@ resolver.define('getJiraProjects', async ({ payload }) => {
 // pinged in its own try/catch and mapped by diagnoseHealthStatus; the
 // envelope is always ok:true because per-source truth lives in the
 // entries. Response bodies are never read — only the status number.
-resolver.define('getHealthDiagnostics', async () => {
+resolver.define('getHealthDiagnostics', async ({ payload }) => {
   const checks = [
     {
       source: 'jira',
@@ -343,8 +344,16 @@ resolver.define('getHealthDiagnostics', async () => {
       },
     },
   ];
+  // Phase 3.4 — optional per-source retry: a single `source` runs
+  // only that probe. Same three endpoints, same scopes, no manifest
+  // change. An unknown source is an input error, not a silent all.
+  const requested = payload && typeof payload.source === 'string' ? payload.source : null;
+  const selected = filterHealthChecks(checks, requested);
+  if (requested !== null && selected.length === 0) {
+    return { ok: false, error: { kind: 'INVALID_INPUT', message: 'source must be jira, confluence or jsm.' } };
+  }
   const settled = await Promise.allSettled(
-    checks.map(async (check) => {
+    selected.map(async (check) => {
       try {
         return diagnoseHealthStatus(check.source, await check.run());
       } catch {
@@ -355,7 +364,7 @@ resolver.define('getHealthDiagnostics', async () => {
   return {
     ok: true,
     diagnostics: settled.map((result, i) =>
-      result.status === 'fulfilled' ? result.value : diagnoseHealthStatus(checks[i].source, 0),
+      result.status === 'fulfilled' ? result.value : diagnoseHealthStatus(selected[i].source, 0),
     ),
   };
 });

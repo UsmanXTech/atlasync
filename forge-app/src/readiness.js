@@ -160,6 +160,17 @@ export function computeReadinessScore({ issues = [], jsmRequests = [], stalePrCo
   };
 }
 
+// Selects which health checks run. No source (null/undefined/empty)
+// runs all three; a known source runs only that one; an unknown
+// source selects nothing — the resolver answers INVALID_INPUT for
+// that case. Pure, so plain Node can test it (readiness.js stays
+// free of Forge imports; the checks themselves, with their live API
+// calls, live in index.js).
+export function filterHealthChecks(checks, source) {
+  if (source === undefined || source === null || source === '') return checks;
+  return checks.filter((check) => check.source === source);
+}
+
 // Maps one source's HTTP status to a structured diagnostic entry.
 // Never includes response bodies, status text, or headers — only the
 // status number and fixed copy. 401/403 name the scope that would fix

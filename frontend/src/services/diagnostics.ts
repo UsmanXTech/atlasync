@@ -41,10 +41,12 @@ function cleanDiagnostic(value: unknown): HealthDiagnostic | null {
   };
 }
 
-export async function fetchHealthDiagnostics(): Promise<HealthDiagnosticsResult> {
+export async function fetchHealthDiagnostics(source?: DiagnosticSource): Promise<HealthDiagnosticsResult> {
   try {
     const { invoke } = await import('@forge/bridge');
-    const result: unknown = await invoke('getHealthDiagnostics', {});
+    // Phase 3.4 — an optional source re-probes only that source; no
+    // source means all three (the existing global check).
+    const result: unknown = await invoke('getHealthDiagnostics', source ? { source } : {});
     if (!isRecord(result) || typeof result.ok !== 'boolean') {
       return { ok: false, error: { kind: 'API_ERROR', message: UNEXPECTED_RESPONSE_MESSAGE } };
     }
