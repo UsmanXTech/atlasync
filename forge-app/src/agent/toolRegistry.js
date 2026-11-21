@@ -22,7 +22,7 @@ export const MAX_AGENT_STEPS = 5;
 export const MAX_TOOL_OUTPUT_CHARS = 4000;
 export const MAX_TRACE_ARG_CHARS = 500;
 
-export const READ_TOOLS = ['get_jira_blockers', 'get_jsm_incidents', 'search_confluence_runbooks', 'get_pr_bottlenecks'];
+export const READ_TOOLS = ['list_jira_projects', 'get_jira_blockers', 'get_jsm_incidents', 'search_confluence_runbooks', 'get_pr_bottlenecks'];
 export const WRITE_TOOLS = ['escalate_jira_blocker', 'transition_jira_issue', 'create_confluence_release_report'];
 
 export function isReadTool(name) {
@@ -64,6 +64,19 @@ function checkString(value, field, { min = 1, max, pattern } = {}) {
 // Tool definitions for the LLM (JSON Schema parameters). Kept tight on
 // purpose: the model may only call these 7 tools with these args.
 export const TOOL_DEFINITIONS = [
+  {
+    type: 'function',
+    function: {
+      name: 'list_jira_projects',
+      description: 'List the Jira projects the current user can see (max 20). Read-only. Call this first when a question needs a project key you do not have — never ask the user for a key the workspace already has.',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
+        additionalProperties: false,
+      },
+    },
+  },
   {
     type: 'function',
     function: {
@@ -178,6 +191,11 @@ export function validateToolArgs(toolName, rawArgs) {
   if (!args) return invalid(`Arguments for tool ${toolName} must be an object.`);
   let error;
   switch (toolName) {
+    case 'list_jira_projects': {
+      error = checkUnknownKeys(args, [], toolName);
+      if (error) return error;
+      return { ok: true, args: {} };
+    }
     case 'get_jira_blockers':
     case 'get_pr_bottlenecks': {
       error = checkUnknownKeys(args, ['projectKey'], toolName);
@@ -353,5 +371,6 @@ export function buildAgentSystemPrompt({ readiness } = {}) {
     '2. CITATIONS REQUIRED: every risk or status claim must cite its source — a Jira issue key like [ATLAS-482] or a Confluence page title/link. A claim without a citation is not a claim you may make.',
     '3. WRITES ARE APPROVAL-GATED: escalate_jira_blocker, transition_jira_issue and create_confluence_release_report never execute immediately. Calling one pauses the analysis and asks the user to approve the exact target and parameters first. Never claim a write has happened before the user approves it, and never present a proposed write as already done.',
     '4. Prefer read tools over speculation. If the tools return nothing useful, say so and suggest the smallest next step instead of inventing an answer.',
+    '5. PROJECT DISCOVERY: if a question needs a Jira project key you do not have, call list_jira_projects first and use the keys it returns — never ask the user for a project key the workspace already has.',
   ].join('\n');
 }

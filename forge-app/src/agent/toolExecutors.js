@@ -14,6 +14,7 @@ import api, { route } from '@forge/api';
 import { buildSearchBody, parseJiraSearchResponse } from '../jira.js';
 import { parseDevStatusResponse } from '../devstatus.js';
 import { parseJsmRequests } from '../jsm.js';
+import { parseJiraProjects } from '../projects.js';
 import { countStalePrs, isOpenPrStatus, selectCriticalBlockers } from '../readiness.js';
 
 const apiError = (message) => ({ ok: false, error: { kind: 'API_ERROR', message } });
@@ -91,6 +92,24 @@ async function fetchBlockerIssues(projectKey) {
 export async function executeReadTool(name, args) {
   try {
     switch (name) {
+      case 'list_jira_projects': {
+        const response = await api.asUser().requestJira(route`/rest/api/3/project/search?maxResults=20`, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        });
+        if (response.status >= 400) throw new Error('Jira unavailable or permission denied');
+        const projects = parseJiraProjects(await response.json());
+        const rows = projects.map((p) => ({ key: p.key, name: p.name, projectType: p.projectType }));
+        // Kind 'project' (not 'jira'): a project is not an issue, and
+        // the frontend must not count it as one in Source coverage.
+        const records = rows.map((r) => ({
+          kind: 'project',
+          key: r.key,
+          title: r.name,
+          path: `/jira/software/projects/${r.key}`,
+        }));
+        return { ok: true, output: JSON.stringify({ count: rows.length, projects: rows }), records };
+      }
       case 'get_jira_blockers': {
         const issues = await fetchBlockerIssues(args.projectKey);
         const rows = issues.map((i) => ({

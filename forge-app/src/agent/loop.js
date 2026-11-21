@@ -42,7 +42,7 @@ const MAX_COMPLETION_TOKENS = 1200;
 // collects them — deduped, capped — so the answer can link back to the
 // exact records it was built from. Only fetched records are ever
 // cited; malformed entries are dropped, never invented.
-const CITATION_KINDS = new Set(['jira', 'jsm', 'confluence', 'bitbucket']);
+const CITATION_KINDS = new Set(['jira', 'jsm', 'confluence', 'bitbucket', 'project']);
 const MAX_CITATIONS = 10;
 
 function isCitation(value) {
