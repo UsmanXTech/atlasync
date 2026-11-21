@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CONTEXTUAL_QUESTIONS, contextualQuestionFor } from './contextualQuestions.ts';
+import {
+  CONTEXTUAL_QUESTIONS,
+  OVERVIEW_STAT_QUESTIONS,
+  contextualQuestionFor,
+  overviewStatQuestionFor,
+} from './contextualQuestions.ts';
 
 // The contextual question is the prompt sent to the Forge LLM, so it must
 // stay inside the resolver's 1–1500 character limit, name the view's topics
@@ -35,6 +40,27 @@ test('jsm contextual question names every jsm topic', () => {
   assert.equal(q, CONTEXTUAL_QUESTIONS.jsm);
   for (const topic of ['live JSM requests', 'request types', 'statuses', 'priorities', 'attention']) {
     assert.ok(q.includes(topic), `question should name "${topic}"`);
+  }
+});
+
+// Phase 3.1 — per-stat questions: each names its metric's topic and
+// carries no digits at all, so no displayed number can leak into the
+// prompt as if the agent had seen it.
+test('overview stat questions name their metric topic and carry no numbers', () => {
+  const topics: Record<keyof typeof OVERVIEW_STAT_QUESTIONS, string[]> = {
+    openIssues: ['open Jira issues', 'live snapshot', 'tackle first'],
+    blockers: ['Highest and Critical Jira blockers', 'blocking delivery', 'unblock first'],
+    stalePrs: ['pull requests on critical issues', 'stale or blocking', 'move first'],
+    incidents: ['Highest and Critical JSM incidents', 'attention first', 'impact'],
+  };
+  for (const [key, words] of Object.entries(topics) as [keyof typeof OVERVIEW_STAT_QUESTIONS, string[]][]) {
+    const q = overviewStatQuestionFor(key);
+    assert.equal(q, OVERVIEW_STAT_QUESTIONS[key]);
+    assert.ok(q.length > 0 && q.length <= 1500, `question for ${key} must fit the 1–1500 limit`);
+    assert.ok(!/\d/.test(q), `question for ${key} must not contain a number`);
+    for (const word of words) {
+      assert.ok(q.includes(word), `question for ${key} should name "${word}"`);
+    }
   }
 });
 

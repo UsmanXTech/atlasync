@@ -1049,6 +1049,24 @@ button {
   box-shadow: none;
 }
 
+/* Phase 3.1 — a clickable stat is a real <button>: reset the native
+   button chrome so it keeps the exact .stat look, and show a focus
+   ring for keyboard users. */
+button.stat-clickable {
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.stat-clickable:hover {
+  border-color: var(--md-sys-color-primary);
+}
+
+button.stat-clickable:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
 .stat-top {
   display: flex;
   justify-content: space-between;
