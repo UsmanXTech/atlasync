@@ -58,10 +58,42 @@ export function isOpenJsmRequest(request) {
   return !JSM_DONE_STATUSES.has(String(request.status ?? '').trim().toLowerCase());
 }
 
-// Top open Highest/Critical blockers for the Live-mode UI (max 10,
-// snapshot order — newest updated first). The numeric id is kept so
-// the resolver can sample linked PRs via dev-status; it is Jira's own
-// record id, not a credential.
+// Top open blockers for the Live-mode UI (max 10, snapshot order —
+// newest updated first): the ONE blocker definition used everywhere
+// user-facing — open issues at priority High or above
+// (Highest/Critical/Blocker/High/Major). This matches the agent tool
+// (buildBlockerJql: Highest, Critical, High), the briefing digest
+// (computeBriefingDigest: rank >= High) and the Projects counter.
+// The readiness formula inputs (Bcrit/Dmissing) stay Highest/Critical
+// only — the score is a severity-weighted signal, not the blocker list.
+const BLOCKER_PRIORITY_SET = new Set(['highest', 'critical', 'blocker', 'high', 'major']);
+
+export function isTopBlocker(issue) {
+  return Boolean(issue) && isOpenIssue(issue) && BLOCKER_PRIORITY_SET.has(String(issue.priority ?? '').trim().toLowerCase());
+}
+
+export function selectTopBlockers(issues, max = 10) {
+  const list = Array.isArray(issues) ? issues : [];
+  const out = [];
+  for (const issue of list) {
+    if (!isTopBlocker(issue)) continue;
+    out.push({
+      key: issue.key,
+      id: typeof issue.id === 'string' ? issue.id : null,
+      summary: typeof issue.summary === 'string' ? issue.summary : '(no summary)',
+      priority: issue.priority ?? null,
+      assignee: issue.assignee ?? null,
+      updated: typeof issue.updated === 'string' ? issue.updated : '',
+    });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+// Top open Highest/Critical issues, for sampling linked PRs (Pstale).
+// NOT the UI blocker list — that is selectTopBlockers (High or above).
+// The numeric id is kept so the resolver can sample linked PRs via
+// dev-status; it is Jira's own record id, not a credential.
 export function selectCriticalBlockers(issues, max = 10) {
   const list = Array.isArray(issues) ? issues : [];
   const out = [];
@@ -275,12 +307,19 @@ export async function buildReadinessReport({
       'Dev-status pull requests carry no updated timestamp, so the 48-hour age test does not apply here; open PRs on critical issues are counted as the stale-PR signal.',
     );
   }
+  // The blocker list is capped at 10 for display, so the stat card
+  // must NOT read its length — blockerCount counts the whole snapshot
+  // (open, High priority or above), and blockersUnassigned the open
+  // High+ issues with no assignee.
+  const topBlockers = (Array.isArray(snapshot.jiraIssues) ? snapshot.jiraIssues : []).filter((i) => isTopBlocker(i));
   return {
     ok: true,
     score: result.score,
     breakdown: result.breakdown,
     counts: result.counts,
-    blockers: selectCriticalBlockers(snapshot.jiraIssues, 10),
+    blockers: selectTopBlockers(snapshot.jiraIssues, 10),
+    blockerCount: topBlockers.length,
+    blockersUnassigned: topBlockers.filter((i) => !i.assignee).length,
     incidents: selectSevIncidents(snapshot.jsmRequests, 10),
     unavailable: snapshot.unavailable,
     notes,

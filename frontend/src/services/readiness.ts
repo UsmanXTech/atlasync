@@ -33,6 +33,11 @@ export interface LiveReadiness {
   breakdown: ReadinessBreakdown;
   counts: { jiraTotal: number; jiraOpen: number; jsmTotal: number; jsmOpen: number };
   blockers: LiveBlocker[];
+  // Snapshot-wide blocker counts (open, High priority or above).
+  // The backend sends them explicitly because the blockers list is
+  // capped at 10 — the stat card must never read the list length.
+  blockerCount: number;
+  blockersUnassigned: number;
   incidents: LiveIncident[];
   unavailable: string[];
   notes: string[];
@@ -125,6 +130,13 @@ export async function fetchLiveReadiness(): Promise<LiveReadinessResult> {
           jsmOpen: num(counts.jsmOpen),
         },
         blockers,
+        // Fall back to the (capped) list when an older backend omits
+        // the explicit counts.
+        blockerCount: typeof result.blockerCount === 'number' ? num(result.blockerCount) : blockers.length,
+        blockersUnassigned:
+          typeof result.blockersUnassigned === 'number'
+            ? num(result.blockersUnassigned)
+            : blockers.filter((b) => !b.assignee).length,
         incidents,
         unavailable: Array.isArray(result.unavailable)
           ? result.unavailable.filter((s): s is string => typeof s === 'string')

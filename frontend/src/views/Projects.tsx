@@ -223,7 +223,8 @@ export default function Projects({
 
       <div className="workspace-footnote">
         Live Jira metadata · no invented owners, progress, or health scores. Maximum 50 projects per refresh. Issue
-        counts cover the 30-day snapshot (max 50 issues), not full project totals. Every project visible to you
+        counts cover the 30-day snapshot (max 50 issues), not full project totals. Blockers are open issues at
+        High priority or above. Every project visible to you
         is shown — live data is permission-filtered, never scoped by a demo grouping.
       </div>
     </div>
