@@ -53,7 +53,7 @@ function isCriticalPriority(priority) {
   return CRITICAL_PRIORITIES.has(String(priority ?? '').trim().toLowerCase());
 }
 
-function isOpenJsmRequest(request) {
+export function isOpenJsmRequest(request) {
   if (!request || typeof request !== 'object') return false;
   return !JSM_DONE_STATUSES.has(String(request.status ?? '').trim().toLowerCase());
 }

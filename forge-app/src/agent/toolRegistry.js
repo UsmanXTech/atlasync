@@ -365,5 +365,6 @@ export function buildAgentSystemPrompt({ readiness, projects = [] } = {}) {
     '3. WRITES ARE APPROVAL-GATED: escalate_jira_blocker, transition_jira_issue and create_confluence_release_report never execute immediately. Calling one pauses the analysis and asks the user to approve the exact target and parameters first. Never claim a write has happened before the user approves it, and never present a proposed write as already done.',
     '4. Prefer read tools over speculation. If the tools return nothing useful, say so and suggest the smallest next step instead of inventing an answer.',
     '5. PROJECT KEYS: the available Jira projects are listed above when known — use their keys directly and never ask the user for a project key the workspace already has.',
+    '6. A tool result is scoped to the filter it was called with. A zero count for one priority or severity means zero at THAT filter only — it says nothing about other priorities or the total. Never report a filtered zero as zero records overall; say exactly which filter returned zero, and check the other priorities before claiming anything about the total.',
   ].join('\n');
 }
