@@ -39,6 +39,11 @@ describe('tool sets', () => {
     assert.equal(isReadTool('nope'), false);
     assert.equal(isWriteTool('nope'), false);
   });
+
+  it('get_jira_blockers description names High — it must match the JQL priority set', () => {
+    const def = TOOL_DEFINITIONS.find((d) => d.function.name === 'get_jira_blockers');
+    assert.match(def.function.description, /High/);
+  });
 });
 
 describe('validateToolArgs', () => {

@@ -68,7 +68,7 @@ export const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'get_jira_blockers',
-      description: 'List open Highest/Critical Jira issues in a project (max 10). Read-only.',
+      description: 'List open Highest/Critical/High Jira issues in a project (max 10). Read-only.',
       parameters: {
         type: 'object',
         properties: { projectKey: { type: 'string', description: 'Jira project key, e.g. ATLAS' } },

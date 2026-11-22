@@ -12,21 +12,21 @@ describe('buildBlockerJql', () => {
   it('quotes the project key so reserved words like AS are valid JQL', () => {
     assert.equal(
       buildBlockerJql('AS'),
-      'project = "AS" AND priority IN (Highest, Critical) AND status NOT IN (Done, Closed, Resolved) ORDER BY updated DESC',
+      'project = "AS" AND priority IN (Highest, Critical, High) AND status NOT IN (Done, Closed, Resolved) ORDER BY updated DESC',
     );
   });
 
   it('quotes ordinary keys the same way', () => {
     assert.equal(
       buildBlockerJql('AT'),
-      'project = "AT" AND priority IN (Highest, Critical) AND status NOT IN (Done, Closed, Resolved) ORDER BY updated DESC',
+      'project = "AT" AND priority IN (Highest, Critical, High) AND status NOT IN (Done, Closed, Resolved) ORDER BY updated DESC',
     );
   });
 
   it('strips double quotes from the key instead of breaking out of the quoted literal', () => {
     assert.equal(
       buildBlockerJql('A"S'),
-      'project = "AS" AND priority IN (Highest, Critical) AND status NOT IN (Done, Closed, Resolved) ORDER BY updated DESC',
+      'project = "AS" AND priority IN (Highest, Critical, High) AND status NOT IN (Done, Closed, Resolved) ORDER BY updated DESC',
     );
   });
 });
