@@ -10,6 +10,7 @@ import Agents from './views/Agents';
 import Insights from './views/Insights';
 import Settings from './views/Settings';
 import { DEFAULT_VIEW } from './utils/defaultView';
+import { displayWorkspaceName } from './utils/settingsState';
 import { useIntelligenceConversation } from './hooks/useIntelligenceConversation';
 import { useBriefingSummary } from './hooks/useBriefingSummary';
 import { useBriefingState } from './hooks/useBriefingState';
@@ -69,13 +70,15 @@ export default function App() {
     if (ok) setLastSyncedAt(new Date().toISOString());
   };
 
-  // Live-only: a single workspace — the demo workspace list
-  // (mock.ts) is deleted, so there is nothing to switch between.
-  const workspaceName = 'Atlasync';
-
   // Same pattern as Intelligence: the Settings form state must survive
   // navigating away and back (the view unmounts on switch).
   const settings = useSettingsState();
+
+  // Live-only: a single workspace — the demo workspace list
+  // (mock.ts) is deleted, so there is nothing to switch between.
+  // The Settings workspace name drives the sidebar heading for this
+  // session (its copy says session-only); blank falls back to 'Atlasync'.
+  const workspaceName = displayWorkspaceName(settings.name);
 
   useEffect(() => {
     let cancelled = false;
