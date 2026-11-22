@@ -15,6 +15,11 @@ export interface ExecutionRun {
   target: string | null;
   trace: TraceEntry[];
   citations: Citation[];
+  // Fix #5: count snapshot taken at record time (forge-app/src/memory.js).
+  // Optional: runs recorded before this field existed carry no counts,
+  // and the view falls back to the array lengths.
+  toolCallCount?: number;
+  sourceCount?: number;
   generatedAt: string;
   conversationId: string | null;
   error: string | null;
@@ -36,7 +41,7 @@ function isTrace(value: unknown): value is TraceEntry[] {
 
 function isCitation(value: unknown): value is Citation {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const v = value as Record<string, unknown>;
+  const v = value as unknown as Record<string, unknown>;
   return (
     ['jira', 'jsm', 'confluence', 'bitbucket'].includes(v.kind as string) &&
     typeof v.key === 'string' &&
@@ -72,6 +77,7 @@ function isRun(value: unknown): value is ExecutionRun {
 
 function toRun(value: unknown): ExecutionRun | null {
   if (!isRun(value)) return null;
+  const v = value as unknown as Record<string, unknown>;
   return {
     id: value.id,
     question: value.question,
@@ -80,6 +86,14 @@ function toRun(value: unknown): ExecutionRun | null {
     target: typeof value.target === 'string' && value.target !== '' ? value.target : null,
     trace: value.trace,
     citations: toCitations(value.citations),
+    // Fix #5: pass the stored count snapshot through when present;
+    // a non-integer or negative value is dropped, not rendered.
+    ...(Number.isInteger(v.toolCallCount) && (v.toolCallCount as number) >= 0
+      ? { toolCallCount: v.toolCallCount as number }
+      : {}),
+    ...(Number.isInteger(v.sourceCount) && (v.sourceCount as number) >= 0
+      ? { sourceCount: v.sourceCount as number }
+      : {}),
     generatedAt: value.generatedAt,
     conversationId:
       typeof value.conversationId === 'string' && value.conversationId !== '' ? value.conversationId : null,

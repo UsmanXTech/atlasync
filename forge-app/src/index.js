@@ -275,19 +275,70 @@ resolver.define('askAtlasync', async ({ payload, context }) => {
     });
     const content = response?.choices?.[0]?.message?.content;
     const answer = typeof content === 'string' ? content : Array.isArray(content) ? content.filter((part) => part && part.type === 'text' && typeof part.text === 'string').map((part) => part.text).join('\n') : '';
-    if (!answer.trim()) return { ok: false, error: { kind: 'API_ERROR', message: 'Atlasync Intelligence returned an empty response. Try again.' } };
+    if (!answer.trim()) {
+      // Fix #5: a briefing that produced no answer is still a run.
+      try {
+        const { cloudId } = resolveScope(context);
+        await recordExecutionRun(kvs, cloudId, {
+          question: prompt,
+          status: 'ERROR',
+          error: 'Atlasync Intelligence returned an empty response.',
+          trace: [],
+          citations: [],
+          toolCallCount: 0,
+          sourceCount: jiraResult.length + confluenceResult.length + jsmResult.length,
+          generatedAt: new Date().toISOString(),
+          conversationId: null,
+        });
+      } catch (recordError) {
+        console.error('[atlasync] execution history record failed:', recordError instanceof Error ? recordError.name : typeof recordError);
+      }
+      return { ok: false, error: { kind: 'API_ERROR', message: 'Atlasync Intelligence returned an empty response. Try again.' } };
+    }
     // v2.1.0 Phase C1: append the turn to the KVS thread (last 10) so
     // follow-ups survive reloads. Best-effort only — a KVS failure must
     // never break an answer that is already computed.
     try {
       const { cloudId, accountId } = resolveScope(context);
       await appendThreadTurn(kvs, cloudId, accountId, { question: prompt, answer: answer.slice(0, 12000) });
+      // Fix #5: askAtlasync never recorded an execution run, so briefing
+      // runs were invisible in the Agents history even though the model
+      // answered. The briefing makes no tool calls (toolCallCount 0);
+      // its source count is the snapshot rows it actually read.
+      await recordExecutionRun(kvs, cloudId, {
+        question: prompt,
+        status: 'COMPLETE',
+        trace: [],
+        citations: [],
+        toolCallCount: 0,
+        sourceCount: jiraResult.length + confluenceResult.length + jsmResult.length,
+        generatedAt: new Date().toISOString(),
+        conversationId: null,
+      });
     } catch (error) {
       console.error('[atlasync] thread append failed:', error instanceof Error ? error.name : typeof error);
     }
     return { ok: true, answer: answer.slice(0, 12000), sources: { jiraIssues: jiraResult.length, confluencePages: confluenceResult.length, jsmRequests: jsmResult.length, unavailable: [...new Set(sourceErrors)] } };
   } catch (error) {
     console.error('[atlasync] Forge LLM request failed:', error instanceof Error ? error.name : typeof error);
+    // Fix #5: same visibility as the success path — a failed briefing
+    // is a run too, and the snapshot rows were already read.
+    try {
+      const { cloudId } = resolveScope(context);
+      await recordExecutionRun(kvs, cloudId, {
+        question: prompt,
+        status: 'ERROR',
+        error: error instanceof Error ? error.message : 'Forge LLM request failed',
+        trace: [],
+        citations: [],
+        toolCallCount: 0,
+        sourceCount: jiraResult.length + confluenceResult.length + jsmResult.length,
+        generatedAt: new Date().toISOString(),
+        conversationId: null,
+      });
+    } catch (recordError) {
+      console.error('[atlasync] execution history record failed:', recordError instanceof Error ? recordError.name : typeof recordError);
+    }
     return { ok: false, error: { kind: 'API_ERROR', message: 'Atlasync Intelligence could not complete the analysis. Check Forge LLM access/credits and try again.' } };
   }
 });
@@ -648,11 +699,16 @@ resolver.define('invokeAgent', async ({ payload, context }) => {
           error: result.error ?? 'unknown',
           trace: result.trace ?? [],
           citations: result.citations ?? [],
+          toolCallCount: (result.trace ?? []).length,
+          sourceCount: (result.citations ?? []).length,
           generatedAt: result.generatedAt ?? new Date().toISOString(),
           conversationId: conversation ? conversation.id : null,
         });
-      } catch {
-        // best-effort only
+      } catch (error) {
+        // Fix #5: a failed history write used to be swallowed silently,
+        // so a missing run left no trace anywhere. Still best-effort —
+        // it must never break the error answer — but now it is logged.
+        console.error('[atlasync] execution history record failed:', error instanceof Error ? error.name : typeof error);
       }
       return { ok: false, error: { kind: 'API_ERROR', message: 'Atlasync Intelligence could not complete the analysis. Check Forge LLM access/credits and try again.' } };
     }
@@ -665,11 +721,13 @@ resolver.define('invokeAgent', async ({ payload, context }) => {
           target: result.pendingAction?.preview?.target ?? null,
           trace: result.trace ?? [],
           citations: result.citations ?? [],
+          toolCallCount: (result.trace ?? []).length,
+          sourceCount: (result.citations ?? []).length,
           generatedAt: result.generatedAt ?? new Date().toISOString(),
           conversationId: conversation ? conversation.id : null,
         });
-      } catch {
-        // best-effort only
+      } catch (error) {
+        console.error('[atlasync] execution history record failed:', error instanceof Error ? error.name : typeof error);
       }
       return {
         ok: true,
@@ -706,11 +764,13 @@ resolver.define('invokeAgent', async ({ payload, context }) => {
         status: 'COMPLETE',
         trace: result.trace ?? [],
         citations: result.citations ?? [],
+        toolCallCount: (result.trace ?? []).length,
+        sourceCount: (result.citations ?? []).length,
         generatedAt: result.generatedAt ?? new Date().toISOString(),
         conversationId: conversation ? conversation.id : null,
       });
-    } catch {
-      // best-effort only
+    } catch (error) {
+      console.error('[atlasync] execution history record failed:', error instanceof Error ? error.name : typeof error);
     }
     return {
       ok: true,
@@ -799,8 +859,8 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
       } else {
         await appendThreadTurn(kvs, cloudId, accountId, { question, answer, citations, sourceCounts });
       }
-    } catch {
-      // best-effort only
+    } catch (error) {
+      console.error('[atlasync] thread append failed:', error instanceof Error ? error.name : typeof error);
     }
   };
   const trace = [...(pending.trace ?? [])];
@@ -815,12 +875,14 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
         target: pending.preview?.target ?? null,
         trace,
         citations,
+        toolCallCount: trace.length,
+        sourceCount: citations.length,
         generatedAt: new Date().toISOString(),
         conversationId,
         ...(error ? { error } : {}),
       });
-    } catch {
-      // best-effort only
+    } catch (error) {
+      console.error('[atlasync] execution history record failed:', error instanceof Error ? error.name : typeof error);
     }
   };
   try {
