@@ -310,18 +310,25 @@ export default function Integrations() {
           </div>
         </article>
 
+        {/* Forge Intelligence tile: static copy, NOT a probe result.
+            There is no cheap LLM health probe — a check would need a
+            real @forge/llm chat call, which is metered by Atlassian —
+            so the tile states what is observed (Intelligence answers
+            live through askAtlasync) and claims no approval status.
+            The old copy ("Admin approval / upgrade approval required")
+            contradicted the live LLM answers (review 2026-11-21). */}
         <article className="integration-tile">
           <div className="integration-top">
             <span className="integration-icon">
               <BrainCircuit size={20} />
             </span>
-            <span className="connection-state limited">Admin approval</span>
+            <span className="connection-state ok">Live</span>
           </div>
           <h3>Forge Intelligence</h3>
           <p>Atlassian-hosted Claude analysis through Forge LLM.</p>
           <small>Read-only, bounded current-user source snapshot.</small>
           <div className="connection-detail">
-            App upgrade approval/reinstall is required. Usage is metered by Atlassian.
+            Answering live through Intelligence Q&amp;A (askAtlasync). Usage is metered by Atlassian.
           </div>
         </article>
       </div>
