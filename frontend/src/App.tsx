@@ -54,6 +54,27 @@ export default function App() {
   // flashed its loading line on every return visit (Run 103 audit).
   const briefing = useBriefingState();
 
+  // Fix #9: Sync Portfolio broadcast. Topbar reports each sync run
+  // here; the counter is the reload trigger for the Overview's live
+  // fetches (readiness + cards) and the briefing, and lastSyncedAt is
+  // the sidebar footer's time — the latest successful live fetch,
+  // whether from the app-start briefing load or a sync.
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  useEffect(() => {
+    if (briefing.state.status === 'ready') setLastSyncedAt(briefing.state.generatedAt);
+  }, [briefing.state]);
+  useEffect(() => {
+    if (refreshTick > 0) briefing.refresh();
+    // briefing.refresh is a fresh closure each render; the tick is the
+    // only intended trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshTick]);
+  const handleSync = (ok: boolean) => {
+    setRefreshTick((t) => t + 1);
+    if (ok) setLastSyncedAt(new Date().toISOString());
+  };
+
   const workspace = WORKSPACES.find((w) => w.id === workspaceId) ?? WORKSPACES[0];
 
   // Same pattern as Intelligence: the Settings form state must survive
@@ -90,7 +111,7 @@ export default function App() {
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         workspaceName={workspace.name}
-        lastSyncedAt={briefing.state.status === 'ready' ? briefing.state.generatedAt : null}
+        lastSyncedAt={lastSyncedAt}
       />
       <div className="main">
         <Topbar
@@ -102,10 +123,11 @@ export default function App() {
           dataMode={dataMode}
           onDataMode={handleDataMode}
           onMenu={() => setMenuOpen(true)}
+          onSync={handleSync}
         />
         <main id="main-content" tabIndex={-1}>
           <ErrorBoundary key={view}>
-            {view === 'overview' && <Overview workspaceId={workspace.id} onNavigate={setView} conversation={intelligence} briefingSummary={briefingSummary} dataMode={dataMode} onDataMode={handleDataMode} />}
+            {view === 'overview' && <Overview workspaceId={workspace.id} onNavigate={setView} conversation={intelligence} briefingSummary={briefingSummary} dataMode={dataMode} onDataMode={handleDataMode} refreshTick={refreshTick} />}
             {view === 'intelligence' && <Intelligence conversation={intelligence} briefing={briefing} />}
             {view === 'projects' && <Projects onNavigate={setView} conversation={intelligence} />}
             {view === 'integrations' && <Integrations />}

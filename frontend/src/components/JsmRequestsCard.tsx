@@ -18,9 +18,12 @@ import type { ViewId } from './Sidebar';
 export default function JsmRequestsCard({
   conversation,
   onNavigate,
+  // Fix #9: App's Sync Portfolio counter — a bump refetches the requests.
+  refreshTick = 0,
 }: {
   conversation: IntelligenceConversation;
   onNavigate: (view: ViewId) => void;
+  refreshTick?: number;
 }) {
   const siteUrl = useSiteUrl();
   const [requests, setRequests] = useState<LiveJsmRequest[]>([]);
@@ -38,7 +41,9 @@ export default function JsmRequestsCard({
 
   useEffect(() => {
     void load();
-  }, [load]);
+    // refreshTick is App's Sync Portfolio counter — a bump refetches.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load, refreshTick]);
 
   const askAboutThis = () => {
     conversation.ask(contextualQuestionFor('jsm'));

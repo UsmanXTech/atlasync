@@ -128,7 +128,7 @@ function LiveIssueRow({ issue }: { issue: LiveIssue }) {
  * live data and auto-loads it, so sample and live data are never mixed in
  * one view. In Sample mode the card keeps its own demo default + toggle.
  */
-export default function JiraIssuesCard({ dataMode = 'sample' }: { dataMode?: 'sample' | 'live' }) {
+export default function JiraIssuesCard({ dataMode = 'sample', refreshTick = 0 }: { dataMode?: 'sample' | 'live'; refreshTick?: number }) {
   const [mode, setMode] = useState<Mode>('demo');
   const [live, setLive] = useState<LiveState>({ status: 'idle' });
 
@@ -163,7 +163,7 @@ export default function JiraIssuesCard({ dataMode = 'sample' }: { dataMode?: 'sa
       setLive({ status: 'idle' });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataMode]);
+  }, [dataMode, refreshTick]);
 
   const switchMode = (next: Mode) => {
     setMode(next);

@@ -715,6 +715,14 @@ button {
   white-space: nowrap;
 }
 
+/* Fix #9: small success/failure line for the Sync Portfolio run,
+   shown next to the button (no toast system exists in the app). */
+.sync-notice {
+  font-size: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+}
+
 .forge-badge i {
   width: 7px;
   height: 7px;
