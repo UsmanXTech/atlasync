@@ -2,15 +2,24 @@
 // records written by invokeAgent / approveAgentAction (see
 // forge-app/src/memory.js). Validation mirrors agent.ts: unknown
 // shapes are dropped, never rendered as if they were runs.
-import { backendUnreachableError, UNEXPECTED_RESPONSE_MESSAGE } from './errors';
-import type { Citation, TraceEntry } from './agent';
+import { backendUnreachableError, UNEXPECTED_RESPONSE_MESSAGE } from './errors.ts';
+import type { Citation, TraceEntry } from './agent.ts';
 
 export type ExecutionRunStatus = 'COMPLETE' | 'AWAITING_APPROVAL' | 'ERROR' | 'APPROVED' | 'REJECTED' | 'EXECUTION_FAILED';
+
+// Live state of an AWAITING_APPROVAL run's proposal, annotated by the
+// backend at read time (forge-app/src/memory.js
+// annotateRunActionStates): 'awaiting' is the only actionable state;
+// 'expired' means the 10-min approval window lapsed with no decision;
+// 'decided' means a later run records the approve/reject outcome.
+// Absent on non-awaiting runs and on runs recorded before annotation.
+export type RunActionState = 'awaiting' | 'expired' | 'decided';
 
 export interface ExecutionRun {
   id: string;
   question: string;
   status: ExecutionRunStatus;
+  actionState?: RunActionState;
   tool: string | null;
   target: string | null;
   trace: TraceEntry[];
@@ -26,6 +35,16 @@ export interface ExecutionRun {
 }
 
 const RUN_STATUSES: ExecutionRunStatus[] = ['COMPLETE', 'AWAITING_APPROVAL', 'ERROR', 'APPROVED', 'REJECTED', 'EXECUTION_FAILED'];
+
+const RUN_ACTION_STATES: RunActionState[] = ['awaiting', 'expired', 'decided'];
+
+// The backend annotation, validated: an unknown value is dropped
+// (undefined), never rendered as a state.
+export function toActionState(value: unknown): RunActionState | undefined {
+  return typeof value === 'string' && (RUN_ACTION_STATES as string[]).includes(value)
+    ? (value as RunActionState)
+    : undefined;
+}
 
 function isTrace(value: unknown): value is TraceEntry[] {
   if (!Array.isArray(value)) return false;
@@ -82,6 +101,8 @@ function toRun(value: unknown): ExecutionRun | null {
     id: value.id,
     question: value.question,
     status: value.status,
+    // The backend annotation; an unknown value is dropped, not rendered.
+    ...(toActionState(v.actionState) ? { actionState: toActionState(v.actionState) as RunActionState } : {}),
     tool: typeof value.tool === 'string' && value.tool !== '' ? value.tool : null,
     target: typeof value.target === 'string' && value.target !== '' ? value.target : null,
     trace: value.trace,

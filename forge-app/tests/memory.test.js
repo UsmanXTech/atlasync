@@ -11,6 +11,7 @@ import {
   MAX_THREAD_TURNS,
   PENDING_ACTION_CLAIM_TTL_MS,
   PENDING_ACTION_TTL_MS,
+  annotateRunActionStates,
   appendConversationTurn,
   appendThreadTurn,
   claimPendingAction,
@@ -575,6 +576,94 @@ describe('execution history (Phase 2)', () => {
 
   it('listExecutionRuns returns an empty list when nothing is stored', async () => {
     assert.deepEqual(await listExecutionRuns(fakeStore(), 'c1'), []);
+  });
+});
+
+describe('annotateRunActionStates (expired-approval history)', () => {
+  const awaiting = (overrides = {}) => ({
+    id: 'run_awaiting',
+    question: 'What is blocking the release?',
+    status: 'AWAITING_APPROVAL',
+    tool: 'escalate_jira_blocker',
+    target: 'AT-1',
+    generatedAt: '2026-11-22T02:56:00.000Z',
+    ...overrides,
+  });
+  const pending = (overrides = {}) => ({
+    actionId: 'pa_1',
+    tool: 'escalate_jira_blocker',
+    prompt: 'What is blocking the release?',
+    createdAt: '2026-11-22T02:56:00.000Z',
+    ...overrides,
+  });
+
+  it('marks the run awaiting when a live pending action matches question + tool', () => {
+    const [out] = annotateRunActionStates([awaiting()], [pending()]);
+    assert.equal(out.actionState, 'awaiting');
+  });
+
+  it('marks the run expired when no live action matches and no decision exists (fail-safe, any age)', () => {
+    // The live review case: the proposal expired after its 10-min TTL,
+    // Pending approvals went empty, but history still said "awaiting".
+    // Even a 1-minute-old run with no live action is expired — the
+    // proposal can no longer be acted on.
+    const [out] = annotateRunActionStates([awaiting()], []);
+    assert.equal(out.actionState, 'expired');
+  });
+
+  it('marks the run decided when a later run records the decision for the same proposal', () => {
+    const runs = [
+      awaiting(),
+      {
+        id: 'run_decision',
+        question: 'What is blocking the release?',
+        status: 'APPROVED',
+        tool: 'escalate_jira_blocker',
+        target: 'AT-1',
+        generatedAt: '2026-11-22T03:00:00.000Z',
+      },
+    ];
+    const [out] = annotateRunActionStates(runs, []);
+    assert.equal(out.actionState, 'decided');
+  });
+
+  it('ignores a decision run that is earlier, or for a different question', () => {
+    const earlier = {
+      id: 'run_old',
+      question: 'What is blocking the release?',
+      status: 'REJECTED',
+      tool: 'escalate_jira_blocker',
+      target: 'AT-1',
+      generatedAt: '2026-11-22T02:00:00.000Z',
+    };
+    const otherQuestion = {
+      id: 'run_other',
+      question: 'Summarise the sprint',
+      status: 'APPROVED',
+      tool: 'escalate_jira_blocker',
+      target: 'AT-1',
+      generatedAt: '2026-11-22T03:00:00.000Z',
+    };
+    // A decision run only counts when it is later AND the same proposal.
+    const [d] = annotateRunActionStates([awaiting(), earlier], []);
+    assert.equal(d.actionState, 'expired');
+    const [e] = annotateRunActionStates([awaiting(), otherQuestion], []);
+    assert.equal(e.actionState, 'expired');
+  });
+
+  it('matches a long pending prompt against the 500-char run question', () => {
+    const longPrompt = `What is blocking the release? ${'detail '.repeat(100)}`;
+    const run = awaiting({ question: longPrompt.trim().slice(0, 500) });
+    const [out] = annotateRunActionStates([run], [pending({ prompt: longPrompt })]);
+    assert.equal(out.actionState, 'awaiting');
+  });
+
+  it('leaves non-awaiting runs untouched and does not mutate its input', () => {
+    const runs = [awaiting(), { id: 'run_done', question: 'q', status: 'COMPLETE', tool: null, generatedAt: '2026-11-22T03:00:00.000Z' }];
+    const out = annotateRunActionStates(runs, []);
+    assert.equal(out[0].actionState, 'expired');
+    assert.equal('actionState' in out[1], false);
+    assert.equal('actionState' in runs[0], false);
   });
 });
 
