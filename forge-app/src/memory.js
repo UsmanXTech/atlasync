@@ -139,6 +139,25 @@ export function sanitizeCitations(value) {
 // Append one Q/A turn, keeping at most the last 10. `lastReadiness`
 // (a { score, breakdown, generatedAt } object) is stored alongside
 // when the caller has a fresh one; otherwise the previous value stays.
+// Per-source row counts stored on a turn, so a restored answer keeps
+// the coverage the tools actually returned (loop.js sourceCounts) —
+// not a recount from the capped citations. Same storage rule as
+// citations: malformed values are dropped, never stored; all-zero or
+// absent counts are not stored at all (old turns are unaffected).
+const SOURCE_COUNT_BUCKETS = ['jira', 'confluence', 'jsm', 'bitbucket'];
+export function sanitizeSourceCounts(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const out = {};
+  let any = false;
+  for (const bucket of SOURCE_COUNT_BUCKETS) {
+    const n = value[bucket];
+    const count = typeof n === 'number' && Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+    out[bucket] = count;
+    if (count > 0) any = true;
+  }
+  return any ? out : null;
+}
+
 export async function appendThreadTurn(store, cloudId, accountId, turn, lastReadiness) {
   const thread = await loadThread(store, cloudId, accountId);
   const entry = {
@@ -148,6 +167,8 @@ export async function appendThreadTurn(store, cloudId, accountId, turn, lastRead
   };
   const citations = sanitizeCitations(turn.citations);
   if (citations.length > 0) entry.citations = citations;
+  const sourceCounts = sanitizeSourceCounts(turn.sourceCounts);
+  if (sourceCounts) entry.sourceCounts = sourceCounts;
   const turns = [...thread.turns, entry].slice(-MAX_THREAD_TURNS);
   const next = {
     turns,
@@ -419,6 +440,8 @@ export async function appendConversationTurn(store, cloudId, accountId, conversa
   };
   const citations = sanitizeCitations(turn?.citations);
   if (citations.length > 0) entry.citations = citations;
+  const sourceCounts = sanitizeSourceCounts(turn?.sourceCounts);
+  if (sourceCounts) entry.sourceCounts = sourceCounts;
   const turns = [...(Array.isArray(record.turns) ? record.turns : []), entry].slice(-MAX_THREAD_TURNS);
   const now = new Date().toISOString();
   const title = record.title === 'New conversation' ? conversationTitleFromQuestion(entry.question) : record.title;
@@ -461,6 +484,9 @@ export async function storePendingAction(store, cloudId, accountId, action, thre
     // Phase 1: the records the model read before proposing the write,
     // so the approval outcome can still cite them.
     citations: Array.isArray(action.citations) ? action.citations : [],
+    // Fix #4: the per-source row counts at halt time, so the approval
+    // outcome can still show the coverage the tools returned.
+    sourceCounts: sanitizeSourceCounts(action.sourceCounts) ?? undefined,
     prompt: typeof action.prompt === 'string' ? action.prompt.slice(0, 1500) : '',
     createdAt: new Date().toISOString(),
   };

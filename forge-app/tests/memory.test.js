@@ -36,6 +36,7 @@ import {
   releasePendingActionClaim,
   renameConversation,
   resolveScope,
+  sanitizeSourceCounts,
   saveSettings,
   settingsKey,
   snapshotKey,
@@ -569,5 +570,55 @@ describe('conversations (Phase 1)', () => {
     assert.equal(conversationTitleFromQuestion('  hello   world  '), 'hello world');
     assert.equal(conversationTitleFromQuestion(''), 'New conversation');
     assert.equal(conversationTitleFromQuestion('x'.repeat(50)).length, 41);
+  });
+});
+
+describe('sourceCounts on turns (fix #4)', () => {
+  it('sanitizeSourceCounts keeps the four buckets, drops malformed values', () => {
+    assert.deepEqual(sanitizeSourceCounts({ jira: 3, confluence: 1, jsm: 0, bitbucket: 2 }), {
+      jira: 3,
+      confluence: 1,
+      jsm: 0,
+      bitbucket: 2,
+    });
+    assert.deepEqual(sanitizeSourceCounts({ jira: '3', jsm: -1, bitbucket: 1.9 }), {
+      jira: 0,
+      confluence: 0,
+      jsm: 0,
+      bitbucket: 1,
+    });
+    assert.equal(sanitizeSourceCounts({ jira: 0, confluence: 0, jsm: 0, bitbucket: 0 }), null);
+    assert.equal(sanitizeSourceCounts(null), null);
+    assert.equal(sanitizeSourceCounts('junk'), null);
+  });
+
+  it('appendThreadTurn stores sourceCounts on the turn, omits them when all zero', async () => {
+    const store = fakeStore();
+    await appendThreadTurn(store, 'c1', 'a1', {
+      question: 'q',
+      answer: 'a',
+      sourceCounts: { jira: 3, confluence: 1, jsm: 0, bitbucket: 2 },
+    });
+    await appendThreadTurn(store, 'c1', 'a1', {
+      question: 'q2',
+      answer: 'a2',
+      sourceCounts: { jira: 0, confluence: 0, jsm: 0, bitbucket: 0 },
+    });
+    const thread = await loadThread(store, 'c1', 'a1');
+    assert.deepEqual(thread.turns[0].sourceCounts, { jira: 3, confluence: 1, jsm: 0, bitbucket: 2 });
+    assert.equal('sourceCounts' in thread.turns[1], false);
+  });
+
+  it('storePendingAction keeps sanitized sourceCounts for the approval outcome', async () => {
+    const store = fakeStore();
+    const record = await storePendingAction(store, 'c1', 'a1', {
+      tool: 'escalate_jira_blocker',
+      args: { issueKey: 'AT-1' },
+      preview: { tool: 'escalate_jira_blocker', target: 'AT-1', params: {} },
+      sourceCounts: { jira: 2, confluence: 0, jsm: 0, bitbucket: 1 },
+    });
+    assert.deepEqual(record.sourceCounts, { jira: 2, confluence: 0, jsm: 0, bitbucket: 1 });
+    const loaded = await loadPendingAction(store, 'c1', 'a1', record.actionId);
+    assert.deepEqual(loaded.sourceCounts, { jira: 2, confluence: 0, jsm: 0, bitbucket: 1 });
   });
 });

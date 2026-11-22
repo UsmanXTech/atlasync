@@ -675,20 +675,23 @@ resolver.define('invokeAgent', async ({ payload, context }) => {
         trace: result.trace,
         messages: [],
         citations: result.citations ?? [],
+        sourceCounts: result.sourceCounts ?? null,
         generatedAt: result.generatedAt ?? null,
       };
     }
     // Complete: append the turn to the conversation (best-effort, like askAtlasync).
-    // Citations ride along so a restored answer keeps its Sources links.
+    // Citations ride along so a restored answer keeps its Sources links;
+    // sourceCounts ride along so it keeps its coverage too.
     try {
       if (conversation) {
         await appendConversationTurn(kvs, cloudId, accountId, conversation.id, {
           question: prompt,
           answer: result.answer,
           citations: result.citations ?? [],
+          sourceCounts: result.sourceCounts ?? null,
         });
       } else {
-        await appendThreadTurn(kvs, cloudId, accountId, { question: prompt, answer: result.answer, citations: result.citations ?? [] });
+        await appendThreadTurn(kvs, cloudId, accountId, { question: prompt, answer: result.answer, citations: result.citations ?? [], sourceCounts: result.sourceCounts ?? null });
       }
     } catch (error) {
       console.error('[atlasync] thread append failed:', error instanceof Error ? error.name : typeof error);
@@ -712,6 +715,7 @@ resolver.define('invokeAgent', async ({ payload, context }) => {
       answer: result.answer,
       trace: result.trace,
       citations: result.citations ?? [],
+      sourceCounts: result.sourceCounts ?? null,
       generatedAt: result.generatedAt ?? null,
     };
   } catch (error) {
@@ -781,12 +785,16 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
   const conversationId =
     typeof pending.threadId === 'string' && pending.threadId.startsWith('conv_') ? pending.threadId : null;
   const citations = Array.isArray(pending.citations) ? pending.citations : [];
+  // Coverage the loop measured before it halted on the write tool
+  // (stored on the pending record by storePendingAction); the outcome
+  // turn keeps it, so the approval answer shows real coverage.
+  const sourceCounts = pending.sourceCounts ?? null;
   const appendOutcomeTurn = async (question, answer) => {
     try {
       if (conversationId) {
-        await appendConversationTurn(kvs, cloudId, accountId, conversationId, { question, answer, citations });
+        await appendConversationTurn(kvs, cloudId, accountId, conversationId, { question, answer, citations, sourceCounts });
       } else {
-        await appendThreadTurn(kvs, cloudId, accountId, { question, answer, citations });
+        await appendThreadTurn(kvs, cloudId, accountId, { question, answer, citations, sourceCounts });
       }
     } catch {
       // best-effort only
@@ -823,7 +831,7 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
       });
       await appendOutcomeTurn(pending.prompt || 'Agent action', answer);
       await recordDecision('REJECTED');
-      return { ok: true, status: 'COMPLETE', answer, trace, executed: null, citations, generatedAt: new Date().toISOString() };
+      return { ok: true, status: 'COMPLETE', answer, trace, executed: null, citations, sourceCounts, generatedAt: new Date().toISOString() };
     }
     const started = Date.now();
     const execution = await executeWriteTool(pending.tool, validation.args);
@@ -842,7 +850,7 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
       });
       await appendOutcomeTurn(pending.prompt || 'Agent action', answer);
       await recordDecision('EXECUTION_FAILED', execution.error?.message ?? 'Unknown error.');
-      return { ok: true, status: 'COMPLETE', answer, trace, executed: null, executionError: execution.error, citations, generatedAt: new Date().toISOString() };
+      return { ok: true, status: 'COMPLETE', answer, trace, executed: null, executionError: execution.error, citations, sourceCounts, generatedAt: new Date().toISOString() };
     }
     const answer = await summarizeAfterApproval({
       chat,
@@ -851,7 +859,7 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
     });
     await appendOutcomeTurn(pending.prompt || 'Agent action', answer);
     await recordDecision('APPROVED');
-    return { ok: true, status: 'COMPLETE', answer, trace, executed: execution.result, citations, generatedAt: new Date().toISOString() };
+    return { ok: true, status: 'COMPLETE', answer, trace, executed: execution.result, citations, sourceCounts, generatedAt: new Date().toISOString() };
   } catch (error) {
     console.error('[atlasync] approveAgentAction failed:', error instanceof Error ? error.name : typeof error);
     return { ok: false, error: { kind: 'API_ERROR', message: 'The approval could not be completed. Check Forge LLM access/credits and try again.' } };

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { approveAgentAction, invokeAgent, toCitations, type Citation, type PendingAction, type TraceEntry } from '../services/agent';
+import { approveAgentAction, invokeAgent, toCitations, toSourceCounts, type Citation, type PendingAction, type SourceCounts, type TraceEntry } from '../services/agent';
 import type { IntelligenceSources } from '../services/intelligence';
 import {
   createConversation,
@@ -48,8 +48,36 @@ function sourcesFromCitations(citations: Citation[]): IntelligenceSources {
     jiraIssues: citations.filter((c) => c.kind === 'jira').length,
     confluencePages: citations.filter((c) => c.kind === 'confluence').length,
     jsmRequests: citations.filter((c) => c.kind === 'jsm').length,
+    // Bitbucket rows used to have no bucket at all, so their coverage
+    // was silently dropped even when the answer linked PRs.
+    bitbucketPullRequests: citations.filter((c) => c.kind === 'bitbucket').length,
     unavailable: [],
   };
+}
+
+// Coverage from the tool results themselves (loop.js sourceCounts):
+// rows each read tool actually returned. Citations stay the Sources
+// link list only — they are capped at 10 and miss tools that returned
+// rows without a citable record.
+function sourcesFromCounts(counts: SourceCounts): IntelligenceSources {
+  return {
+    jiraIssues: counts.jira,
+    confluencePages: counts.confluence,
+    jsmRequests: counts.jsm,
+    bitbucketPullRequests: counts.bitbucket,
+    unavailable: [],
+  };
+}
+
+function sourcesForAnswer(citations: Citation[], sourceCounts: SourceCounts | null): IntelligenceSources {
+  return sourceCounts ? sourcesFromCounts(sourceCounts) : sourcesFromCitations(citations);
+}
+
+// A restored turn keeps the coverage stored with it when present;
+// older turns (no sourceCounts) fall back to counting citations.
+function sourcesForTurn(turn: { citations?: Citation[]; sourceCounts?: unknown }): IntelligenceSources {
+  const counts = toSourceCounts(turn.sourceCounts);
+  return counts ? sourcesFromCounts(counts) : sourcesFromCitations(toCitations(turn.citations ?? []));
 }
 
 // Owns the Intelligence conversation state. The hook lives in App (above the
@@ -128,7 +156,7 @@ export function useIntelligenceConversation(): IntelligenceConversation {
       // Sources links instead of rendering plain text (dead links).
       const restoredCitations = toCitations(last.citations ?? []);
       setCitations(restoredCitations);
-      setSources(sourcesFromCitations(restoredCitations));
+      setSources(sourcesForTurn(last));
       setRestored(true);
       setThreadTurns(full.conversation.turns.length);
     });
@@ -198,13 +226,13 @@ export function useIntelligenceConversation(): IntelligenceConversation {
         setTrace(r.trace);
         setCitations(r.citations);
         setGeneratedAt(r.generatedAt);
-        setSources(sourcesFromCitations(r.citations));
+        setSources(sourcesForAnswer(r.citations, r.sourceCounts));
       } else {
         setAnswer(r.answer);
         setTrace(r.trace);
         setCitations(r.citations);
         setGeneratedAt(r.generatedAt);
-        setSources(sourcesFromCitations(r.citations));
+        setSources(sourcesForAnswer(r.citations, r.sourceCounts));
         // The backend appended this turn to the conversation (max 10)
         // and may have auto-titled it from the first question.
         setThreadTurns((n) => Math.min(n + 1, 10));
@@ -242,7 +270,7 @@ export function useIntelligenceConversation(): IntelligenceConversation {
         setTrace(r.trace);
         setCitations(r.citations);
         setGeneratedAt(r.generatedAt);
-        setSources(sourcesFromCitations(r.citations));
+        setSources(sourcesForAnswer(r.citations, r.sourceCounts));
         setPendingAction(null);
         setThreadTurns((n) => Math.min(n + 1, 10));
         void refreshConversations();
@@ -318,7 +346,7 @@ export function useIntelligenceConversation(): IntelligenceConversation {
       // Citations persist with the turn — see the mount restore above.
       const restoredCitations = toCitations(last.citations ?? []);
       setCitations(restoredCitations);
-      setSources(sourcesFromCitations(restoredCitations));
+      setSources(sourcesForTurn(last));
       setRestored(true);
       setThreadTurns(r.conversation.turns.length);
     });

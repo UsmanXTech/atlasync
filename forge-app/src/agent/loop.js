@@ -56,6 +56,25 @@ function isCitation(value) {
   );
 }
 
+// Source coverage counts rows the tools actually returned, not the
+// capped citations list. Coverage used to count citations[] only, so
+// it read 0 whenever a tool returned rows but produced no citation
+// (get_pr_bottlenecks with no open PRs, get_jsm_incidents whose exact
+// priority filter dropped every row, bitbucket rows with no bucket).
+// Each successful read tool contributes its own row count (its `count`
+// field, else records.length) to its source bucket; failed calls add
+// nothing. A tool that ran and found nothing honestly counts 0 for
+// its source — the trace still shows the call ran.
+const TOOL_SOURCE_BUCKETS = {
+  get_jira_blockers: 'jira',
+  get_jsm_incidents: 'jsm',
+  search_confluence_runbooks: 'confluence',
+  get_pr_bottlenecks: 'bitbucket',
+};
+function emptySourceCounts() {
+  return { jira: 0, confluence: 0, jsm: 0, bitbucket: 0 };
+}
+
 function collectCitations(into, records) {
   if (!Array.isArray(records)) return;
   for (const r of records) {
@@ -120,6 +139,7 @@ export async function runAgentLoop({
   ];
   const trace = [];
   const citations = [];
+  const sourceCounts = emptySourceCounts();
 
   for (let step = 1; step <= MAX_AGENT_STEPS; step++) {
     const response = await chat({
@@ -137,6 +157,7 @@ export async function runAgentLoop({
         trace,
         messages,
         citations: [...citations],
+        sourceCounts: { ...sourceCounts },
         generatedAt: new Date().toISOString(),
       };
     }
@@ -164,6 +185,7 @@ export async function runAgentLoop({
         trace,
         messages: [...messages, { role: 'assistant', content: answer }],
         citations: [...citations],
+        sourceCounts: { ...sourceCounts },
         generatedAt: new Date().toISOString(),
       };
     }
@@ -191,6 +213,7 @@ export async function runAgentLoop({
           trace: [...trace],
           messages: [...messages],
           citations: [...citations],
+          sourceCounts: { ...sourceCounts },
         });
         trace.push(
           shapeTraceEntry({ step, tool: call.name, args: validation.args, status: 'awaiting-approval', durationMs: 0 }),
@@ -203,6 +226,18 @@ export async function runAgentLoop({
       const durationMs = Date.now() - started;
       if (result.ok) {
         collectCitations(citations, result.records);
+        // Coverage from the tool result itself: the tool's own row
+        // count, falling back to the records it returned.
+        const bucket = TOOL_SOURCE_BUCKETS[call.name];
+        if (bucket) {
+          const rows =
+            typeof result.count === 'number' && Number.isFinite(result.count) && result.count >= 0
+              ? result.count
+              : Array.isArray(result.records)
+                ? result.records.length
+                : 0;
+          sourceCounts[bucket] += rows;
+        }
         trace.push(shapeTraceEntry({ step, tool: call.name, args: validation.args, status: 'ok', durationMs }));
         messages.push({
           role: 'tool',
@@ -227,6 +262,7 @@ export async function runAgentLoop({
         trace: halted.trace,
         messages,
         citations: [...citations],
+        sourceCounts: { ...sourceCounts },
         generatedAt: new Date().toISOString(),
       };
     }
@@ -239,6 +275,7 @@ export async function runAgentLoop({
     trace,
     messages,
     citations: [...citations],
+    sourceCounts: { ...sourceCounts },
     generatedAt: new Date().toISOString(),
   };
 }
