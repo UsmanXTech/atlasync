@@ -19,7 +19,9 @@ export type JiraErrorKind =
   | 'PERMISSION_DENIED'
   | 'RATE_LIMITED'
   | 'API_ERROR'
-  | 'INVALID_INPUT';
+  | 'INVALID_INPUT'
+  | 'BAD_REQUEST'
+  | 'NOT_FOUND';
 
 export interface JiraError {
   kind: JiraErrorKind;
@@ -107,7 +109,7 @@ export async function fetchIssueDevStatus(issueId: string): Promise<DevStatusRes
     if (
       isRecord(result.error) &&
       typeof result.error.kind === 'string' &&
-      (['BACKEND_UNREACHABLE', 'PERMISSION_DENIED', 'RATE_LIMITED', 'API_ERROR', 'INVALID_INPUT'] as const).includes(
+      (['BACKEND_UNREACHABLE', 'PERMISSION_DENIED', 'RATE_LIMITED', 'API_ERROR', 'INVALID_INPUT', 'BAD_REQUEST', 'NOT_FOUND'] as const).includes(
         result.error.kind as JiraErrorKind,
       ) &&
       typeof result.error.message === 'string'
@@ -163,7 +165,7 @@ export async function fetchLiveJiraIssues(maxResults = 25): Promise<JiraIssuesRe
     if (
       isRecord(result.error) &&
       typeof result.error.kind === 'string' &&
-      (['BACKEND_UNREACHABLE', 'PERMISSION_DENIED', 'RATE_LIMITED', 'API_ERROR', 'INVALID_INPUT'] as const).includes(
+      (['BACKEND_UNREACHABLE', 'PERMISSION_DENIED', 'RATE_LIMITED', 'API_ERROR', 'INVALID_INPUT', 'BAD_REQUEST', 'NOT_FOUND'] as const).includes(
         result.error.kind as JiraErrorKind,
       ) &&
       typeof result.error.message === 'string'

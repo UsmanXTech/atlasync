@@ -54,7 +54,38 @@ function cleanPullRequest(raw) {
   return { id, name, status, url };
 }
 
-// Normalizes a dev-status detail response to { pullRequests: [...] }.
+// Distinct error mapping for the dev-status endpoint only. The shared
+// mapJiraErrorStatus collapses everything except 401/403/429 into one
+// identical "Jira could not be reached" — which made every linked-PR
+// failure indistinguishable (and unfixable without Forge logs). These
+// kinds/messages are per status class, with static wording: no status
+// number, body, or header ever reaches the frontend (same rule as the
+// shared mapper's tests). 401/403/429 still fall through to the shared
+// mapper; anything unlisted keeps the generic fallback.
+export function mapDevStatusErrorStatus(status) {
+  if (status === 400) {
+    return {
+      kind: 'BAD_REQUEST',
+      message:
+        'Jira rejected the linked-PR request — the dev-status endpoint did not accept it. The exact error is in the Forge logs.',
+    };
+  }
+  if (status === 404) {
+    return {
+      kind: 'NOT_FOUND',
+      message:
+        'Jira could not find the linked-PR endpoint — the dev-status API may not be available on this site. The exact error is in the Forge logs.',
+    };
+  }
+  if (status >= 500 && status <= 599) {
+    return {
+      kind: 'API_ERROR',
+      message:
+        'Jira returned a server error for the linked-PR request. Try again shortly — the exact error is in the Forge logs.',
+    };
+  }
+  return null;
+}
 // The response nests PRs under detail[].pullRequests and under
 // detail[].repositories[].pullRequests; both are walked defensively,
 // because Jira omits empty containers instead of sending empty arrays.
