@@ -3,6 +3,7 @@ import { RefreshCw, Sparkles } from 'lucide-react';
 import Card from './Card';
 import RecordLink from './RecordLink';
 import { fetchConfluencePages } from '../services/confluence';
+import { LIVE_FETCH_LIMITS } from '../utils/liveSnapshot';
 import type { LiveConfluencePage } from '../data/types';
 import { useSiteUrl } from '../hooks/useSiteUrl';
 import { formatUpdated } from '../utils/formatUpdated';
@@ -31,7 +32,7 @@ export default function ConfluencePagesCard({
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const result = await fetchConfluencePages(20);
+    const result = await fetchConfluencePages(LIVE_FETCH_LIMITS.cards.confluence);
     if (result.ok) setPages(result.pages);
     else setError(result.error.message);
     setLoading(false);

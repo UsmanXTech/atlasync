@@ -3,6 +3,7 @@ import { RefreshCw, Sparkles } from 'lucide-react';
 import Card from './Card';
 import RecordLink from './RecordLink';
 import { fetchJsmRequests } from '../services/jsm';
+import { LIVE_FETCH_LIMITS } from '../utils/liveSnapshot';
 import type { LiveJsmRequest } from '../data/types';
 import { useSiteUrl } from '../hooks/useSiteUrl';
 import { jsmRequestUrl } from '../utils/recordLinks';
@@ -29,7 +30,7 @@ export default function JsmRequestsCard({
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const result = await fetchJsmRequests(20);
+    const result = await fetchJsmRequests(LIVE_FETCH_LIMITS.cards.jsm);
     if (result.ok) setRequests(result.requests);
     else setError(result.error.message);
     setLoading(false);

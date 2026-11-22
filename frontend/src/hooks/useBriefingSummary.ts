@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react';
-import { askAtlasync } from '../services/intelligence';
+import { askAtlasync, type IntelligenceSources } from '../services/intelligence';
 import { BRIEFING_SUMMARY_QUESTION } from '../utils/briefingSummary';
 import { RequestGeneration } from '../utils/requestGeneration';
 
 export type BriefingSummaryState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; answer: string }
+  | { status: 'ready'; answer: string; sources: IntelligenceSources }
   | { status: 'error'; message: string };
 
 export interface BriefingSummary {
@@ -25,10 +25,10 @@ export interface BriefingSummary {
 // sentence again. A full page reload still starts fresh.
 //
 // The summary is bound to the snapshot it was answered from (the card
-// labels it "live snapshot (10 Jira issues · 10 Confluence pages ·
-// 10 JSM requests)"), so keeping it while the teaser rows refresh is
-// the same staleness the Intelligence answer already has (Run 3): the
-// label states the scope, the answer is never re-presented as fresh.
+// labels it with the real counts askAtlasync returned — fix #7), so
+// keeping it while the teaser rows refresh is the same staleness the
+// Intelligence answer already has (Run 3): the label states the scope,
+// the answer is never re-presented as fresh.
 // `reset()` is the card's call when a NEW teaser snapshot arrives —
 // the old summary no longer describes the rows on screen.
 export function useBriefingSummary(): BriefingSummary {
@@ -48,7 +48,7 @@ export function useBriefingSummary(): BriefingSummary {
     try {
       const r = await askAtlasync(BRIEFING_SUMMARY_QUESTION);
       if (!generations.isCurrent(generation)) return; // superseded — ignore
-      if (r.ok) setSummary({ status: 'ready', answer: r.answer });
+      if (r.ok) setSummary({ status: 'ready', answer: r.answer, sources: r.sources });
       else setSummary({ status: 'error', message: r.error.message });
     } catch (e) {
       if (!generations.isCurrent(generation)) return; // superseded — ignore

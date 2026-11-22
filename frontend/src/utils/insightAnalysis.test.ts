@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { jiraPriorityDistribution, jsmAgeBuckets, jiraStaleness } from './insightAnalysis.ts';
+import { isDoneStatus, jiraPriorityDistribution, jiraPriorityDistributionByStatus, jsmAgeBuckets, jiraStaleness } from './insightAnalysis.ts';
 import type { LiveIssue, LiveJsmRequest } from '../data/types.ts';
 
 const NOW = Date.parse('2026-11-21T12:00:00.000Z');
@@ -62,4 +62,25 @@ test('jiraStaleness counts updated-in-window and never invents older work', () =
   assert.equal(last7, 1);
   assert.equal(last30, 2);
   assert.equal(unknown, 1);
+});
+
+test('jiraPriorityDistributionByStatus splits open vs done (fix #7)', () => {
+  const split = jiraPriorityDistributionByStatus([
+    issue('AT-1', 'Highest', '2026-11-20T00:00:00.000Z'),
+    { ...issue('AT-2', 'Highest', '2026-11-20T00:00:00.000Z'), status: 'Done' },
+    { ...issue('AT-3', 'High', '2026-11-20T00:00:00.000Z'), status: 'Closed' },
+    issue('AT-4', 'High', '2026-11-20T00:00:00.000Z'),
+    { ...issue('AT-5', 'Medium', '2026-11-20T00:00:00.000Z'), status: 'Resolved' },
+  ]);
+  assert.deepEqual(
+    split.open.map((b) => b.count),
+    [1, 1, 0, 0, 0],
+  );
+  assert.deepEqual(
+    split.done.map((b) => b.count),
+    [1, 1, 1, 0, 0],
+  );
+  // The open column is what the briefing counts: Highest open is 1,
+  // even though Highest total is 2.
+  assert.equal(split.open[0].count, 1);
 });

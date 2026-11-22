@@ -27,5 +27,16 @@ export const BRIEFING_SUMMARY_QUESTION =
 // The snapshot the summary is answered from, as the resolver builds
 // it — stated next to the summary so the one-line answer never looks
 // more comprehensive than it is.
-export const BRIEFING_SUMMARY_SNAPSHOT_LABEL =
-  '10 Jira issues · 10 Confluence pages · 10 JSM requests';
+//
+// Fix #7: this used to be a hardcoded '10 Jira issues · 10 Confluence
+// pages · 10 JSM requests' — the resolver's CAP, stated as if it were
+// the count. askAtlasync returns the REAL counts (fewer when the
+// workspace holds fewer records — e.g. 9 Jira · 10 Confluence ·
+// 1 JSM), so the label is built from those. Without sources (an older
+// response shape) it falls back to the honest cap wording.
+export function briefingSummarySnapshotLabel(
+  sources?: { jiraIssues: number; confluencePages: number; jsmRequests: number } | null,
+): string {
+  if (!sources) return 'up to 10 per source';
+  return `answered from ${sources.jiraIssues} Jira · ${sources.confluencePages} Confluence · ${sources.jsmRequests} JSM`;
+}

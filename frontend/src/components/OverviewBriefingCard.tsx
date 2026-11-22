@@ -5,7 +5,8 @@ import MarkdownText from './Markdown';
 import { fetchLiveJiraIssues, type JiraError } from '../services/jira';
 import { computeBriefingDigest } from '../utils/briefing';
 import { pickBriefingTeaser, STALE_THRESHOLD_DAYS, type BriefingTeaser } from '../utils/overviewBriefing';
-import { BRIEFING_SUMMARY_SNAPSHOT_LABEL } from '../utils/briefingSummary';
+import { briefingSummarySnapshotLabel } from '../utils/briefingSummary';
+import { LIVE_FETCH_LIMITS } from '../utils/liveSnapshot';
 import type { BriefingSummary } from '../hooks/useBriefingSummary';
 import type { ViewId } from './Sidebar';
 
@@ -52,7 +53,7 @@ export default function OverviewBriefingCard({
 
   const load = async (): Promise<boolean> => {
     setState({ status: 'loading' });
-    const result = await fetchLiveJiraIssues(25);
+    const result = await fetchLiveJiraIssues(LIVE_FETCH_LIMITS.teaser.jira);
     if (!result.ok) {
       setState({ status: 'error', error: result.error });
       return false;
@@ -128,7 +129,7 @@ export default function OverviewBriefingCard({
             <p className="source-empty">No open issue untouched for {STALE_THRESHOLD_DAYS}+ days.</p>
           )}
           <p className="source-footnote">
-            Rules-based · latest 25 Jira issues ·{' '}
+            Rules-based · latest {LIVE_FETCH_LIMITS.teaser.jira} Jira issues ·{' '}
             <button className="briefing-link" onClick={() => onNavigate('intelligence')}>
               Full briefing in Intelligence <ArrowRight size={12} />
             </button>
@@ -143,7 +144,7 @@ export default function OverviewBriefingCard({
       {summary.status === 'ready' && (
         <div className="briefing-ai-summary">
           <MarkdownText text={summary.answer} />
-          <p className="source-footnote">AI summary · live snapshot ({BRIEFING_SUMMARY_SNAPSHOT_LABEL})</p>
+          <p className="source-footnote">AI summary · live snapshot ({briefingSummarySnapshotLabel(summary.sources)})</p>
         </div>
       )}
       {summary.status === 'error' && (

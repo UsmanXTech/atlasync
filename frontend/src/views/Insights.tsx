@@ -7,7 +7,8 @@ import { fetchLiveJiraIssues } from '../services/jira';
 import { fetchConfluencePages } from '../services/confluence';
 import { fetchJsmRequests } from '../services/jsm';
 import { fetchSnapshots, type ReadinessSnapshot } from '../services/snapshots';
-import { jiraPriorityDistribution, jsmAgeBuckets, jiraStaleness } from '../utils/insightAnalysis';
+import { jiraPriorityDistributionByStatus, jsmAgeBuckets, jiraStaleness } from '../utils/insightAnalysis';
+import { LIVE_FETCH_LIMITS, snapshotDefinitionLine } from '../utils/liveSnapshot';
 import type { LiveConfluencePage, LiveIssue, LiveJsmRequest } from '../data/types';
 
 type Counts = {
@@ -54,9 +55,9 @@ export default function Insights() {
     setLoading(true);
     try {
       const [j, c, s] = await Promise.all([
-        fetchLiveJiraIssues(50),
-        fetchConfluencePages(50),
-        fetchJsmRequests(50),
+        fetchLiveJiraIssues(LIVE_FETCH_LIMITS.insights.jira),
+        fetchConfluencePages(LIVE_FETCH_LIMITS.insights.confluence),
+        fetchJsmRequests(LIVE_FETCH_LIMITS.insights.jsm),
       ]);
       const errors: string[] = [];
       if (!j.ok) errors.push('Jira: ' + j.error.message);
@@ -96,7 +97,7 @@ export default function Insights() {
   // load. `now` is captured here so all buckets share one clock.
   const analysis = records
     ? {
-        priority: jiraPriorityDistribution(records.jira),
+        priority: jiraPriorityDistributionByStatus(records.jira),
         jsmAge: jsmAgeBuckets(records.jsm, Date.now()),
         staleness: jiraStaleness(records.jira, Date.now()),
       }
@@ -259,7 +260,7 @@ export default function Insights() {
         )}
       </Card>
 
-      <Card title="Aging & priority" subtitle="Derived from this refresh — same snapshot as the counts above">
+      <Card title="Aging & priority" subtitle={`Derived from this refresh — ${snapshotDefinitionLine('insights')}`}>
         {loading && !records && (
           <p role="status" className="source-empty">
             Reading Jira, Confluence and JSM…
@@ -270,10 +271,13 @@ export default function Insights() {
             <div className="data-row">
               <div className="row-main">
                 <strong>Jira issues by priority</strong>
-                <small>Open and closed issues in the 30-day snapshot</small>
+                <small>Split open vs done — the briefing counts open only, so its Highest count matches the open column here</small>
               </div>
             </div>
-            <BarList items={analysis.priority} tone="amber" compact />
+            <p className="source-footnote">Open</p>
+            <BarList items={analysis.priority.open} tone="amber" compact />
+            <p className="source-footnote">Done (Done / Closed / Resolved)</p>
+            <BarList items={analysis.priority.done} tone="green" compact />
             <div className="data-row" style={{ marginTop: 12 }}>
               <div className="row-main">
                 <strong>JSM requests by age</strong>

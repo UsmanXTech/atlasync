@@ -33,6 +33,32 @@ export function jiraPriorityDistribution(issues: LiveIssue[]): IssueBucket[] {
   return labels.map((label) => ({ label, count: counts.get(label) ?? 0 }));
 }
 
+// Done statuses — the same set the backend treats as closed
+// (blockers JQL `status NOT IN (Done, Closed, Resolved)`, readiness).
+// Status is the raw Jira name; no normalization exists anywhere.
+export function isDoneStatus(status: string | null | undefined): boolean {
+  return status === 'Done' || status === 'Closed' || status === 'Resolved';
+}
+
+// Fix #7: the priority chart used to count open + closed together, so
+// its Highest count (2) disagreed with the briefing's open-only
+// Highest (1) and nobody could tell why. Same buckets, split by
+// status — the open column is what the briefing counts.
+export function jiraPriorityDistributionByStatus(issues: LiveIssue[]): { open: IssueBucket[]; done: IssueBucket[] } {
+  const labels = ['Highest', 'High', 'Medium', 'Low', 'No priority'] as const;
+  const open = new Map<string, number>(labels.map((l) => [l, 0]));
+  const done = new Map<string, number>(labels.map((l) => [l, 0]));
+  for (const issue of issues) {
+    const priority = issue.priority ?? '';
+    const label = labels.includes(priority as (typeof labels)[number]) ? priority : 'No priority';
+    const bucket = isDoneStatus(issue.status) ? done : open;
+    bucket.set(label, (bucket.get(label) ?? 0) + 1);
+  }
+  const toBuckets = (counts: Map<string, number>): IssueBucket[] =>
+    labels.map((label) => ({ label, count: counts.get(label) ?? 0 }));
+  return { open: toBuckets(open), done: toBuckets(done) };
+}
+
 export function jsmAgeBuckets(requests: LiveJsmRequest[], now: number): { buckets: IssueBucket[]; unknown: number } {
   const labels = ['0–7 days', '8–30 days', '31–90 days', '90+ days'] as const;
   const counts = new Map<string, number>(labels.map((l) => [l, 0]));
