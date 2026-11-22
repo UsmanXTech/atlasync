@@ -29,6 +29,8 @@ import { fetchConfluencePages } from '../services/confluence';
 import { fetchJsmRequests } from '../services/jsm';
 import { LiveSearchLoader, type LiveSearchSnapshot, type LiveSourceFetchers, type LiveSourceKey } from '../utils/liveSearch';
 import { DATA_MODE_LABELS, type DataMode } from '../utils/dataMode';
+import { useSiteUrl } from '../hooks/useSiteUrl';
+import { openRecordUrl, recordUrl, type SearchRecordIdentity } from '../utils/recordLinks';
 
 export type ForgeMode = 'loading' | 'forge' | 'standalone';
 
@@ -39,6 +41,10 @@ interface SearchResult {
   detail: string;
   source: 'live' | 'demo';
   view: ViewId;
+  // Live results carry the record's identity so a click can open the
+  // ORIGINAL record (router.open) instead of just navigating to a view.
+  // Demo results have no record and keep navigating to their view.
+  record?: SearchRecordIdentity;
 }
 
 interface TopbarProps {
@@ -102,6 +108,7 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
   const [profileOpen, setProfileOpen] = useState(false);
   const [notes, setNotes] = useState(NOTIFICATIONS);
   const [syncing, setSyncing] = useState(false);
+  const siteUrl = useSiteUrl();
 
   // Live search cache and loader
   const [liveIssues, setLiveIssues] = useState<LiveIssue[]>([]);
@@ -212,12 +219,13 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
           detail: `${issue.status}${issue.priority ? ` · ${issue.priority}` : ''}`,
           source: 'live',
           view: 'overview',
+          record: { kind: 'issue', key: issue.key },
         });
       }
     }
     for (const page of livePages) {
       if (page.title.toLowerCase().includes(q)) {
-        out.push({ id: `live-page-${page.id}`, kind: 'Doc', title: page.title, detail: `Confluence · ${page.status}`, source: 'live', view: 'overview' });
+        out.push({ id: `live-page-${page.id}`, kind: 'Doc', title: page.title, detail: `Confluence · ${page.status}`, source: 'live', view: 'overview', record: { kind: 'page', id: page.id, spaceId: page.spaceId, webui: page.webui } });
       }
     }
     for (const request of liveRequests) {
@@ -229,6 +237,7 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
           detail: `${request.requestType} · ${request.status}`,
           source: 'live',
           view: 'overview',
+          record: { kind: 'request', key: request.key },
         });
       }
     }
@@ -329,7 +338,12 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
                       className="drop-row"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
-                        onNavigate(r.view);
+                        // Live results open the ORIGINAL record; only
+                        // fall back to navigating to the view when no
+                        // record URL can be built (site URL unknown).
+                        const url = r.record ? recordUrl(siteUrl, r.record) : null;
+                        if (url) void openRecordUrl(url);
+                        else onNavigate(r.view);
                         setQuery('');
                       }}
                     >

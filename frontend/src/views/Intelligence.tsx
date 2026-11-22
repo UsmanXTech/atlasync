@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Send, Sparkles, Database, ShieldCheck, Square, Check, X, Wrench, Plus, Pencil, Trash2 } from 'lucide-react';
 import Card from '../components/Card';
+import RecordLink from '../components/RecordLink';
 import IntelligenceBriefing from '../components/IntelligenceBriefing';
 import MarkdownText from '../components/Markdown';
 import { INTELLIGENCE_PRESETS, type IntelligenceConversation } from '../hooks/useIntelligenceConversation';
 import type { Briefing } from '../hooks/useBriefingState';
+import { citationUrl } from '../utils/recordLinks';
 
 /**
  * Screen 2: Intelligence (Jira Rovo / Atlassian Forge LLM Ask & Answer)
@@ -21,9 +23,6 @@ export default function Intelligence({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-
-  const citationHref = (c: { path?: string; url?: string }) =>
-    c.url ?? (siteUrl && c.path ? `${siteUrl}${c.path}` : undefined);
 
   return (
     <div className="view workspace-view intelligence-view">
@@ -216,18 +215,13 @@ export default function Intelligence({
                       </div>
                     </div>
                     {citations.map((c) => {
-                      const href = citationHref(c);
                       return (
                         <div className="data-row" key={`${c.kind}-${c.key}`}>
                           <div className="row-main">
                             <strong>
-                              {href ? (
-                                <a href={href} target="_blank" rel="noreferrer">
-                                  {c.key}
-                                </a>
-                              ) : (
+                              <RecordLink url={citationUrl(siteUrl, c)} label={`Open ${c.key} in the original source`}>
                                 <span className="issue-key">{c.key}</span>
-                              )}
+                              </RecordLink>
                             </strong>
                             <small>{c.title}</small>
                           </div>

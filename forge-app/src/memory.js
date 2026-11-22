@@ -113,6 +113,29 @@ export async function loadThread(store, cloudId, accountId) {
   return validateThread(await store.get(threadKey(cloudId, accountId)));
 }
 
+// Citations stored on a turn, so a restored answer keeps its Sources
+// links (the fix for dead links after reload). Same shape as the
+// frontend Citation: kind/key/title required, path/url optional. Anything
+// malformed is dropped, never stored; capped at 20 so one turn cannot
+// bloat the KVS record. Old turns without citations are unaffected.
+const CITATION_KINDS = new Set(['jira', 'jsm', 'confluence', 'bitbucket']);
+export function sanitizeCitations(value) {
+  if (!Array.isArray(value)) return [];
+  const out = [];
+  for (const c of value) {
+    if (!c || typeof c !== 'object' || Array.isArray(c)) continue;
+    if (!CITATION_KINDS.has(c.kind)) continue;
+    if (typeof c.key !== 'string' || c.key === '') continue;
+    if (typeof c.title !== 'string') continue;
+    const entry = { kind: c.kind, key: c.key, title: c.title };
+    if (typeof c.path === 'string' && c.path !== '') entry.path = c.path;
+    if (typeof c.url === 'string' && c.url !== '') entry.url = c.url;
+    out.push(entry);
+    if (out.length >= 20) break;
+  }
+  return out;
+}
+
 // Append one Q/A turn, keeping at most the last 10. `lastReadiness`
 // (a { score, breakdown, generatedAt } object) is stored alongside
 // when the caller has a fresh one; otherwise the previous value stays.
@@ -123,6 +146,8 @@ export async function appendThreadTurn(store, cloudId, accountId, turn, lastRead
     answer: String(turn.answer ?? '').slice(0, 12000),
     at: new Date().toISOString(),
   };
+  const citations = sanitizeCitations(turn.citations);
+  if (citations.length > 0) entry.citations = citations;
   const turns = [...thread.turns, entry].slice(-MAX_THREAD_TURNS);
   const next = {
     turns,
@@ -392,6 +417,8 @@ export async function appendConversationTurn(store, cloudId, accountId, conversa
     answer: typeof turn?.answer === 'string' ? turn.answer : '',
     at: new Date().toISOString(),
   };
+  const citations = sanitizeCitations(turn?.citations);
+  if (citations.length > 0) entry.citations = citations;
   const turns = [...(Array.isArray(record.turns) ? record.turns : []), entry].slice(-MAX_THREAD_TURNS);
   const now = new Date().toISOString();
   const title = record.title === 'New conversation' ? conversationTitleFromQuestion(entry.question) : record.title;

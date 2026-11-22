@@ -13,7 +13,7 @@ export async function fetchConfluencePages(limit = 20): Promise<Result> {
       return { ok: false, error: { kind: typeof error.kind === 'string' ? error.kind : 'API_ERROR', message: typeof error.message === 'string' ? error.message : serviceUnreachableMessage('Confluence') } };
     }
     if (!Array.isArray(result.pages)) return { ok: false, error: { kind: 'API_ERROR', message: UNEXPECTED_RESPONSE_MESSAGE } };
-    const pages: LiveConfluencePage[] = result.pages.filter(record).flatMap((p) => typeof p.id === 'string' && typeof p.title === 'string' ? [{ id: p.id, title: p.title, status: typeof p.status === 'string' ? p.status : 'Unknown', spaceId: typeof p.spaceId === 'string' ? p.spaceId : null, updated: typeof p.updated === 'string' ? p.updated : '' }] : []);
+    const pages: LiveConfluencePage[] = result.pages.filter(record).flatMap((p) => typeof p.id === 'string' && typeof p.title === 'string' ? [{ id: p.id, title: p.title, status: typeof p.status === 'string' ? p.status : 'Unknown', spaceId: typeof p.spaceId === 'string' ? p.spaceId : null, webui: typeof p.webui === 'string' ? p.webui : null, updated: typeof p.updated === 'string' ? p.updated : '' }] : []);
     return { ok: true, pages };
   } catch { return { ok: false, error: backendUnreachableError('Confluence') }; }
 }

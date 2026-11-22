@@ -165,12 +165,15 @@ export interface LiveIssue {
 }
 
 
-// Live read-only Confluence page metadata.
+// Live read-only Confluence page metadata. `webui` is the record URL
+// the API returns (_links.webui, e.g. "/spaces/AT/pages/12") — kept so
+// the row can link to the original page; null when the API omits it.
 export interface LiveConfluencePage {
   id: string;
   title: string;
   status: string;
   spaceId: string | null;
+  webui: string | null;
   updated: string;
 }
 

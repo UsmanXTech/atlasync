@@ -196,6 +196,45 @@ describe('thread', () => {
     assert.equal(thread.turns.length, 2);
   });
 
+  it('appendThreadTurn stores citations on the turn, sanitized', async () => {
+    const store = fakeStore();
+    await appendThreadTurn(store, 'c1', 'a1', {
+      question: 'q',
+      answer: 'a',
+      citations: [
+        { kind: 'jira', key: 'AT-1', title: 'Checkout timeout', path: '/browse/AT-1' },
+        { kind: 'confluence', key: '12', title: 'Runbook', url: 'https://x/wiki/spaces/AT/pages/12' },
+        { kind: 'jira', key: '', title: 'no key' },
+        { kind: 'unknown', key: 'X-1', title: 'bad kind' },
+        { kind: 'jira', key: 'AT-2', title: 42 },
+        'junk',
+      ],
+    });
+    const thread = await loadThread(store, 'c1', 'a1');
+    assert.deepEqual(thread.turns[0].citations, [
+      { kind: 'jira', key: 'AT-1', title: 'Checkout timeout', path: '/browse/AT-1' },
+      { kind: 'confluence', key: '12', title: 'Runbook', url: 'https://x/wiki/spaces/AT/pages/12' },
+    ]);
+  });
+
+  it('appendThreadTurn omits citations when none are given', async () => {
+    const store = fakeStore();
+    await appendThreadTurn(store, 'c1', 'a1', { question: 'q', answer: 'a' });
+    assert.equal('citations' in (await loadThread(store, 'c1', 'a1')).turns[0], false);
+  });
+
+  it('appendConversationTurn stores citations on the turn', async () => {
+    const store = fakeStore();
+    const created = await createConversation(store, 'c1', 'a1');
+    await appendConversationTurn(store, 'c1', 'a1', created.id, {
+      question: 'q',
+      answer: 'a',
+      citations: [{ kind: 'jsm', key: 'AS-1', title: 'VPN access', path: '/browse/AS-1' }],
+    });
+    const loaded = await loadConversation(store, 'c1', 'a1', created.id);
+    assert.deepEqual(loaded.turns[0].citations, [{ kind: 'jsm', key: 'AS-1', title: 'VPN access', path: '/browse/AS-1' }]);
+  });
+
   it('updateLastReadiness changes the score without appending a turn', async () => {
     const store = fakeStore();
     await appendThreadTurn(store, 'c1', 'a1', { question: 'q', answer: 'a' });

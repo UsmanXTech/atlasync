@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Check, FolderKanban, RefreshCw, Search, Layers3, Sparkles } from 'lucide-react';
+import RecordLink from '../components/RecordLink';
 import { fetchLiveJiraIssues, fetchLiveJiraProjects, type LiveJiraProject } from '../services/jira';
 import type { LiveIssue } from '../data/types';
+import { useSiteUrl } from '../hooks/useSiteUrl';
 import { contextualQuestionFor, questionForProject } from '../utils/contextualQuestions';
 import { countIssuesByProject } from '../utils/projectIssueCounts';
+import { jiraProjectUrl } from '../utils/recordLinks';
 import type { IntelligenceConversation } from '../hooks/useIntelligenceConversation';
 import type { ViewId } from '../components/Sidebar';
 
@@ -25,6 +28,7 @@ export default function Projects({
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState('all');
+  const siteUrl = useSiteUrl();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -190,7 +194,11 @@ export default function Projects({
                   <span className="project-key-pill">{p.key}</span>
                   <span className="chip chip-compact active">{p.projectType || 'Jira'}</span>
                 </div>
-                <h3>{p.name}</h3>
+                <h3>
+                  <RecordLink url={jiraProjectUrl(siteUrl, p)} label={`Open ${p.key} in Jira`}>
+                    {p.name}
+                  </RecordLink>
+                </h3>
                 <div className="tile-bottom">
                   <span>
                     <Layers3 size={14} />

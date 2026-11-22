@@ -679,14 +679,16 @@ resolver.define('invokeAgent', async ({ payload, context }) => {
       };
     }
     // Complete: append the turn to the conversation (best-effort, like askAtlasync).
+    // Citations ride along so a restored answer keeps its Sources links.
     try {
       if (conversation) {
         await appendConversationTurn(kvs, cloudId, accountId, conversation.id, {
           question: prompt,
           answer: result.answer,
+          citations: result.citations ?? [],
         });
       } else {
-        await appendThreadTurn(kvs, cloudId, accountId, { question: prompt, answer: result.answer });
+        await appendThreadTurn(kvs, cloudId, accountId, { question: prompt, answer: result.answer, citations: result.citations ?? [] });
       }
     } catch (error) {
       console.error('[atlasync] thread append failed:', error instanceof Error ? error.name : typeof error);
@@ -782,9 +784,9 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
   const appendOutcomeTurn = async (question, answer) => {
     try {
       if (conversationId) {
-        await appendConversationTurn(kvs, cloudId, accountId, conversationId, { question, answer });
+        await appendConversationTurn(kvs, cloudId, accountId, conversationId, { question, answer, citations });
       } else {
-        await appendThreadTurn(kvs, cloudId, accountId, { question, answer });
+        await appendThreadTurn(kvs, cloudId, accountId, { question, answer, citations });
       }
     } catch {
       // best-effort only
