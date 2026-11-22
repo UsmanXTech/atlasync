@@ -29,6 +29,7 @@ import {
   loadSettings,
   loadThread,
   listExecutionRuns,
+  listPendingActions,
   normalizeExecutionRun,
   pendingActionClaimKey,
   pendingActionKey,
@@ -282,6 +283,61 @@ describe('pending actions (Phase B)', () => {
     assert.equal(await loadPendingAction(store, 'c1', 'a1', ''), null);
     await deletePendingAction(store, 'c1', 'a1', record.actionId);
     assert.equal(await loadPendingAction(store, 'c1', 'a1', record.actionId), null);
+  });
+
+  it('listPendingActions returns unexpired actions, newest first', async () => {
+    const store = fakeStore();
+    const first = await storePendingAction(store, 'c1', 'a1', {
+      tool: 'escalate_jira_blocker',
+      args: { issueKey: 'AT-1', comment: 'c', priority: 'Highest' },
+      preview: { tool: 'escalate_jira_blocker', target: 'AT-1', params: {} },
+      trace: [],
+      messages: [],
+      prompt: 'Escalate AT-1.',
+    });
+    const second = await storePendingAction(store, 'c1', 'a1', {
+      tool: 'transition_jira_issue',
+      args: { issueKey: 'AT-2', transitionName: 'In Progress' },
+      preview: { tool: 'transition_jira_issue', target: 'AT-2', params: {} },
+      trace: [],
+      messages: [],
+      prompt: 'Move AT-2.',
+    });
+    // Pin distinct createdAt values near now: two stores in the same
+    // millisecond would tie on the sort and make newest-first flaky,
+    // and fixed old dates would trip the 10-min TTL filter.
+    const nowMs = Date.now();
+    const firstRecord = await store.get(pendingActionKey('c1', 'a1', first.actionId));
+    const secondRecord = await store.get(pendingActionKey('c1', 'a1', second.actionId));
+    await store.set(pendingActionKey('c1', 'a1', first.actionId), { ...firstRecord, createdAt: new Date(nowMs - 60 * 1000).toISOString() });
+    await store.set(pendingActionKey('c1', 'a1', second.actionId), { ...secondRecord, createdAt: new Date(nowMs - 30 * 1000).toISOString() });
+    // A stale record (past the 10-min TTL) and a malformed one are
+    // filtered out, never surfaced as an approval card.
+    await store.set(pendingActionKey('c1', 'a1', 'act_old'), {
+      actionId: 'act_old',
+      threadId: 'agent-thread:c1:a1',
+      tool: 'escalate_jira_blocker',
+      preview: { tool: 'escalate_jira_blocker', target: 'AT-9', params: {} },
+      createdAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
+    });    await store.set(pendingActionKey('c1', 'a1', 'act_bad'), {
+      actionId: 'act_bad',
+      threadId: 'agent-thread:c1:a1',
+      tool: 'escalate_jira_blocker',
+      createdAt: new Date().toISOString(),
+    });
+    // Another user's record must not leak across accounts.
+    await storePendingAction(store, 'c1', 'a2', {
+      tool: 'escalate_jira_blocker',
+      args: { issueKey: 'AT-3', comment: 'c', priority: 'Highest' },
+      preview: { tool: 'escalate_jira_blocker', target: 'AT-3', params: {} },
+      trace: [],
+      messages: [],
+      prompt: 'Escalate AT-3.',
+    });
+    const list = await listPendingActions(store, 'c1', 'a1');
+    assert.equal(list.length, 2);
+    assert.equal(list[0].actionId, second.actionId);
+    assert.equal(list[1].actionId, first.actionId);
   });
 });
 

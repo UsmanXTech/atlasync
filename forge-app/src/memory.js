@@ -512,6 +512,43 @@ export async function deletePendingAction(store, cloudId, accountId, actionId) {
   await store.delete(pendingActionKey(cloudId, accountId, actionId));
 }
 
+export function pendingActionPrefix(cloudId, accountId) {
+  return `pending-action:${cloudId}:${accountId}:`;
+}
+
+// List every pending (unexpired, well-formed) approval for this user,
+// newest first. The read side of the approval flow: without this, a
+// proposal survived only in volatile React state and vanished on
+// reload/remount while the KVS record lived on until its 10-min TTL —
+// the phantom-approval bug (Intelligence said "pending approval", AI
+// Agents said "no pending approvals"). Expired and malformed records
+// are filtered out, never surfaced; claim keys
+// (pending-action-claim:...) do not match this prefix.
+export async function listPendingActions(store, cloudId, accountId) {
+  const { WhereConditions } = await import('@forge/kvs');
+  const prefix = pendingActionPrefix(cloudId, accountId);
+  const all = [];
+  let cursor;
+  for (let page = 0; page < 10; page++) {
+    let qb = store.query().where('key', WhereConditions.beginsWith(prefix)).limit(100);
+    if (cursor) qb = qb.cursor(cursor);
+    const result = await qb.getMany();
+    const results = Array.isArray(result?.results) ? result.results : [];
+    for (const r of results) {
+      const record = r && r.value && typeof r.value === 'object' ? r.value : null;
+      if (!record) continue;
+      if (typeof record.actionId !== 'string' || record.actionId === '') continue;
+      if (!record.preview || typeof record.preview !== 'object' || Array.isArray(record.preview)) continue;
+      if (typeof record.preview.tool !== 'string' || typeof record.preview.target !== 'string') continue;
+      if (isPendingActionExpired(record)) continue;
+      all.push(record);
+    }
+    cursor = result?.nextCursor;
+    if (!cursor || results.length === 0) break;
+  }
+  return all.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+}
+
 // Refresh only the thread's lastReadiness — no turn is appended.
 // Used by getReadiness so Intelligence follow-ups can cite the latest
 // score without duplicating a turn.

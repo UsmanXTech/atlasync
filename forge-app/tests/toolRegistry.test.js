@@ -193,6 +193,9 @@ describe('buildAgentSystemPrompt', () => {
     assert.match(prompt, /Never claim a write has happened/);
     assert.doesNotMatch(prompt, /The app is read-only/);
     assert.match(prompt, /No readiness score is available/);
+    // Stopgap for phantom proposals: a write narrated in prose never
+    // reaches the user for approval — it must be a tool call.
+    assert.match(prompt, /PROPOSE WRITES WITH THE TOOL, NEVER IN PROSE/);
   });
 
   it('includes the exact readiness breakdown when available', () => {
