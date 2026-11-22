@@ -4,6 +4,7 @@ import { fetchConfluencePages } from '../services/confluence';
 import { fetchJsmRequests } from '../services/jsm';
 import { fetchLiveReadiness } from '../services/readiness';
 import { RequestGeneration } from '../utils/requestGeneration';
+import { LIVE_FETCH_LIMITS } from '../utils/liveSnapshot';
 import { reduceBriefingResults, type BriefingState } from '../utils/briefingState';
 
 export interface Briefing {
@@ -37,10 +38,8 @@ export function useBriefingState(): Briefing {
   const load = async () => {
     const generation = generations.next();
     setState({ status: 'loading' });
-    // Readiness comes from the backend getReadiness resolver — the
-    // same number Overview shows — never a second local formula.
     const [jira, confluence, jsm, readiness] = await Promise.all([
-      fetchLiveJiraIssues(25), fetchConfluencePages(20), fetchJsmRequests(20), fetchLiveReadiness(),
+      fetchLiveJiraIssues(LIVE_FETCH_LIMITS.briefing.jira), fetchConfluencePages(LIVE_FETCH_LIMITS.briefing.confluence), fetchJsmRequests(LIVE_FETCH_LIMITS.briefing.jsm), fetchLiveReadiness(),
     ]);
     if (!generations.isCurrent(generation)) return; // superseded — ignore
     setState(reduceBriefingResults({ jira, confluence, jsm, readiness }));

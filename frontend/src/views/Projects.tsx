@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Check, FolderKanban, RefreshCw, Search, Layers3, Sparkles } from 'lucide-react';
 import RecordLink from '../components/RecordLink';
 import { fetchLiveJiraIssues, fetchLiveJiraProjects, type LiveJiraProject } from '../services/jira';
+import { LIVE_FETCH_LIMITS } from '../utils/liveSnapshot';
 import type { LiveIssue } from '../data/types';
 import { useSiteUrl } from '../hooks/useSiteUrl';
 import { contextualQuestionFor, questionForProject } from '../utils/contextualQuestions';
@@ -45,7 +46,7 @@ export default function Projects({
     // A failure here is non-fatal: the tiles still render, with
     // "Counts unavailable" instead of numbers.
     try {
-      const issuesResult = await fetchLiveJiraIssues(50);
+      const issuesResult = await fetchLiveJiraIssues(LIVE_FETCH_LIMITS.projects.jira);
       if (issuesResult.ok) setIssues(issuesResult.issues);
       else setIssuesFailed(true);
     } catch {

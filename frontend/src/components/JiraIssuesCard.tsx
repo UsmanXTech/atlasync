@@ -10,6 +10,7 @@ import { fetchIssueDevStatus, fetchLiveJiraIssues, type JiraError, type LinkedPu
 import { formatUpdated } from '../utils/formatUpdated';
 import { jiraIssueUrl } from '../utils/recordLinks';
 import { RequestGeneration } from '../utils/requestGeneration';
+import { LIVE_FETCH_LIMITS } from '../utils/liveSnapshot';
 
 type Mode = 'demo' | 'live';
 type LiveState =
@@ -143,7 +144,7 @@ export default function JiraIssuesCard({ dataMode = 'sample' }: { dataMode?: 'sa
   const loadLive = async () => {
     const generation = generations.next();
     setLive({ status: 'loading' });
-    const result = await fetchLiveJiraIssues();
+    const result = await fetchLiveJiraIssues(LIVE_FETCH_LIMITS.cards.jira);
     if (!generations.isCurrent(generation)) return; // superseded — ignore
     setLive(
       result.ok

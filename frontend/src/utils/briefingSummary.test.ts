@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BRIEFING_SUMMARY_QUESTION, BRIEFING_SUMMARY_SNAPSHOT_LABEL } from './briefingSummary.ts';
+import { BRIEFING_SUMMARY_QUESTION, briefingSummarySnapshotLabel } from './briefingSummary.ts';
 
 test('summary question asks for exactly one sentence about what needs attention', () => {
   assert.match(BRIEFING_SUMMARY_QUESTION, /exactly one sentence/i);
@@ -32,6 +32,18 @@ test('summary question carries no sample/demo wording and no numbers', () => {
   assert.ok(BRIEFING_SUMMARY_QUESTION.length < 300, 'well inside the resolver 1,500-char limit');
 });
 
-test('snapshot label states the resolver limits for all three sources', () => {
-  assert.equal(BRIEFING_SUMMARY_SNAPSHOT_LABEL, '10 Jira issues · 10 Confluence pages · 10 JSM requests');
+test('snapshot label states the real counts askAtlasync returned (fix #7)', () => {
+  assert.equal(
+    briefingSummarySnapshotLabel({ jiraIssues: 9, confluencePages: 10, jsmRequests: 1 }),
+    'answered from 9 Jira · 10 Confluence · 1 JSM',
+  );
+  assert.equal(
+    briefingSummarySnapshotLabel({ jiraIssues: 10, confluencePages: 10, jsmRequests: 10 }),
+    'answered from 10 Jira · 10 Confluence · 10 JSM',
+  );
+});
+
+test('snapshot label falls back to the cap wording without sources', () => {
+  assert.equal(briefingSummarySnapshotLabel(null), 'up to 10 per source');
+  assert.equal(briefingSummarySnapshotLabel(undefined), 'up to 10 per source');
 });

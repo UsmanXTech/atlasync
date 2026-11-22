@@ -27,6 +27,7 @@ import type { ViewId } from './Sidebar';
 import { fetchLiveJiraIssues } from '../services/jira';
 import { fetchConfluencePages } from '../services/confluence';
 import { fetchJsmRequests } from '../services/jsm';
+import { LIVE_FETCH_LIMITS } from '../utils/liveSnapshot';
 import { LiveSearchLoader, type LiveSearchSnapshot, type LiveSourceFetchers, type LiveSourceKey } from '../utils/liveSearch';
 import { DATA_MODE_LABELS, type DataMode } from '../utils/dataMode';
 import { useSiteUrl } from '../hooks/useSiteUrl';
@@ -79,15 +80,15 @@ const LIVE_SOURCE_LABELS: Record<LiveSourceKey, string> = {
 function liveSourceFetchers(): LiveSourceFetchers {
   return {
     issues: async () => {
-      const result = await fetchLiveJiraIssues(25);
+      const result = await fetchLiveJiraIssues(LIVE_FETCH_LIMITS.search.jira);
       return result.ok ? { ok: true as const, data: result.issues } : { ok: false as const };
     },
     pages: async () => {
-      const result = await fetchConfluencePages(20);
+      const result = await fetchConfluencePages(LIVE_FETCH_LIMITS.search.confluence);
       return result.ok ? { ok: true as const, data: result.pages } : { ok: false as const };
     },
     requests: async () => {
-      const result = await fetchJsmRequests(20);
+      const result = await fetchJsmRequests(LIVE_FETCH_LIMITS.search.jsm);
       return result.ok ? { ok: true as const, data: result.requests } : { ok: false as const };
     },
   };
