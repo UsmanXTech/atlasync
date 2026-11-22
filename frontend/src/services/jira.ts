@@ -1,5 +1,5 @@
-import type { LiveIssue } from '../data/types';
-import { backendUnreachableError, serviceUnreachableMessage, UNEXPECTED_RESPONSE_MESSAGE } from './errors';
+import type { LiveIssue } from '../data/types.ts';
+import { backendUnreachableError, serviceUnreachableMessage, UNEXPECTED_RESPONSE_MESSAGE } from './errors.ts';
 
 // Jira data service — the frontend's only path to Jira data.
 //
@@ -26,6 +26,30 @@ export type JiraErrorKind =
 export interface JiraError {
   kind: JiraErrorKind;
   message: string;
+}
+
+// Deterministic client-side order for live Jira issues (fix #6): the
+// JQL already asks for updated DESC, but the raw API order is not a
+// stable contract — the same query re-run with different limits (card
+// 25, briefing 25, Insights/Projects 50) and every navigation remount
+// returned a different order, so the list shuffled. Sort by updated
+// desc, then key asc as the tiebreak; rows with no parseable updated
+// date sort last. Every fetchLiveJiraIssues caller (card, briefing,
+// Topbar, Insights, Projects) gets the same order from this one place.
+export function sortLiveIssues(issues: LiveIssue[]): LiveIssue[] {
+  const timeOf = (issue: LiveIssue): number => {
+    if (!issue.updated) return Number.NEGATIVE_INFINITY;
+    const t = Date.parse(issue.updated);
+    return Number.isNaN(t) ? Number.NEGATIVE_INFINITY : t;
+  };
+  return [...issues].sort((a, b) => {
+    // No subtraction: two dateless rows are both -Infinity, and
+    // -Infinity - -Infinity is NaN, which would skip the tiebreak.
+    const ta = timeOf(a);
+    const tb = timeOf(b);
+    if (ta !== tb) return tb > ta ? 1 : -1;
+    return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+  });
 }
 
 export type JiraIssuesResult =
@@ -160,7 +184,7 @@ export async function fetchLiveJiraIssues(maxResults = 25): Promise<JiraIssuesRe
         const issue = cleanIssue(raw);
         if (issue) issues.push(issue);
       }
-      return { ok: true, issues };
+      return { ok: true, issues: sortLiveIssues(issues) };
     }
     if (
       isRecord(result.error) &&

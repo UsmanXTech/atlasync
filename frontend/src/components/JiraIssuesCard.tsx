@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import Card from './Card';
 import RecordLink from './RecordLink';
@@ -9,12 +9,13 @@ import { useSiteUrl } from '../hooks/useSiteUrl';
 import { fetchIssueDevStatus, fetchLiveJiraIssues, type JiraError, type LinkedPullRequest } from '../services/jira';
 import { formatUpdated } from '../utils/formatUpdated';
 import { jiraIssueUrl } from '../utils/recordLinks';
+import { RequestGeneration } from '../utils/requestGeneration';
 
 type Mode = 'demo' | 'live';
 type LiveState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; issues: LiveIssue[] }
+  | { status: 'ready'; issues: LiveIssue[]; fetchedAt: string }
   | { status: 'error'; error: JiraError };
 
 function IssueRow({ issue }: { issue: LiveIssue }) {
@@ -130,12 +131,23 @@ export default function JiraIssuesCard({ dataMode = 'sample' }: { dataMode?: 'sa
   const [mode, setMode] = useState<Mode>('demo');
   const [live, setLive] = useState<LiveState>({ status: 'idle' });
 
+  // Generation guard (same pattern as useBriefingState): @forge/bridge
+  // invoke() has no abort, so a stale response is discarded instead.
+  // Without this, StrictMode's double-mount and a refresh-while-loading
+  // could resolve out of order — the list would show an older fetch's
+  // rows (and statuses) over a newer one.
+  const generationsRef = useRef<RequestGeneration | null>(null);
+  if (generationsRef.current === null) generationsRef.current = new RequestGeneration();
+  const generations = generationsRef.current;
+
   const loadLive = async () => {
+    const generation = generations.next();
     setLive({ status: 'loading' });
     const result = await fetchLiveJiraIssues();
+    if (!generations.isCurrent(generation)) return; // superseded — ignore
     setLive(
       result.ok
-        ? { status: 'ready', issues: result.issues }
+        ? { status: 'ready', issues: result.issues, fetchedAt: new Date().toISOString() }
         : { status: 'error', error: result.error },
     );
   };
@@ -263,7 +275,12 @@ export default function JiraIssuesCard({ dataMode = 'sample' }: { dataMode?: 'sa
           <div style={{ marginBottom: 10 }}>
             <span className="pill healthy">LIVE</span>
             <span className="row-meta" style={{ marginLeft: 8 }}>
-              {live.issues.length} issue{live.issues.length === 1 ? '' : 's'} · read-only
+              {live.issues.length} issue{live.issues.length === 1 ? '' : 's'} · read-only · fetched at{' '}
+              {new Date(live.fetchedAt).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              })}
             </span>
           </div>
           <div className="row-list">
