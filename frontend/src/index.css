@@ -913,26 +913,13 @@ button {
   margin-bottom: 8px;
 }
 
-.grid-2 {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.grid-3 {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
 .stat {
   background: var(--md-sys-color-surface-container-lowest);
   border: 1px solid rgba(195, 198, 214, 0.4);
   border-radius: var(--md-sys-shape-corner-md);
   padding: 14px 16px;
   box-shadow: none;
+  min-width: 0;
 }
 
 /* Phase 3.1 — a clickable stat is a real <button>: reset the native
@@ -2686,7 +2673,10 @@ button.stat-clickable:focus-visible {
   gap: 8px;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--md-sys-color-outline-variant) transparent;
 }
 
 .overview-column > .card {
@@ -3025,9 +3015,20 @@ button.stat-clickable:focus-visible {
   .integration-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .overview-view {
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
   .overview-main-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    overflow: auto;
+    grid-auto-rows: max-content;
+    overflow: visible;
+    min-height: 0;
+  }
+  .overview-column {
+    overflow: visible;
   }
   .overview-column:last-child {
     grid-column: 1 / -1;
