@@ -7,7 +7,7 @@ import {
   parseJiraSearchResponse,
   validateJiraInput,
 } from './jira.js';
-import { parseDevStatusResponse, validateDevStatusInput } from './devstatus.js';
+import { mapDevStatusErrorStatus, parseDevStatusResponse, validateDevStatusInput } from './devstatus.js';
 import { parseConfluencePages, validateConfluenceInput } from './confluence.js';
 import { parseJsmRequests, validateJsmInput } from './jsm.js';
 import { parseJiraProjects, validateProjectInput } from './projects.js';
@@ -154,7 +154,9 @@ resolver.define('getIssueDevStatus', async ({ payload }) => {
     );
 
     const status = typeof response.status === 'number' ? response.status : 500;
-    console.log('[atlasync] Jira dev-status status:', status);
+    // Log the issueId actually sent: without it the Forge logs cannot
+    // tell a bad id from a broken endpoint (diagnostics fix).
+    console.log('[atlasync] Jira dev-status status:', status, 'issueId:', input.issueId);
     if (status >= 400) {
       try {
         const errText = await response.text();
@@ -162,7 +164,7 @@ resolver.define('getIssueDevStatus', async ({ payload }) => {
       } catch {
         console.error('[atlasync] Jira dev-status error body: (unreadable)');
       }
-      return { ok: false, error: mapJiraErrorStatus(status) };
+      return { ok: false, error: mapDevStatusErrorStatus(status) ?? mapJiraErrorStatus(status) };
     }
 
     let data;
@@ -177,7 +179,7 @@ resolver.define('getIssueDevStatus', async ({ payload }) => {
     }
     return { ok: true, ...parseDevStatusResponse(data) };
   } catch (error) {
-    console.error('[atlasync] Jira dev-status request threw:', error instanceof Error ? error.name : typeof error);
+    console.error('[atlasync] Jira dev-status request threw:', error instanceof Error ? error.name : typeof error, 'issueId:', input.issueId);
     return { ok: false, error: { kind: 'API_ERROR', message: 'Jira could not be reached. Try again shortly.' } };
   }
 });

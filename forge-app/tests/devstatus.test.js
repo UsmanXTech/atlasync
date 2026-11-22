@@ -5,7 +5,7 @@
 // exercised here (it needs a real Forge installation; see README).
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
-import { MAX_PULL_REQUESTS, parseDevStatusResponse, validateDevStatusInput } from '../src/devstatus.js';
+import { MAX_PULL_REQUESTS, mapDevStatusErrorStatus, parseDevStatusResponse, validateDevStatusInput } from '../src/devstatus.js';
 
 describe('validateDevStatusInput', () => {
   it('accepts a numeric string issue id', () => {
@@ -71,5 +71,29 @@ describe('parseDevStatusResponse', () => {
     }));
     assert.equal(parseDevStatusResponse({ detail: [{ pullRequests: [pr, pr] }] }).pullRequests.length, 1);
     assert.equal(parseDevStatusResponse({ detail: [{ pullRequests: many }] }).pullRequests.length, MAX_PULL_REQUESTS);
+  });
+});
+
+describe('mapDevStatusErrorStatus', () => {
+  it('returns a distinct kind and message per status class', () => {
+    assert.equal(mapDevStatusErrorStatus(400).kind, 'BAD_REQUEST');
+    assert.match(mapDevStatusErrorStatus(400).message, /did not accept it/);
+    assert.equal(mapDevStatusErrorStatus(404).kind, 'NOT_FOUND');
+    assert.match(mapDevStatusErrorStatus(404).message, /may not be available/);
+    assert.equal(mapDevStatusErrorStatus(500).kind, 'API_ERROR');
+    assert.equal(mapDevStatusErrorStatus(503).kind, 'API_ERROR');
+    assert.match(mapDevStatusErrorStatus(500).message, /server error/);
+    assert.notEqual(mapDevStatusErrorStatus(400).message, mapDevStatusErrorStatus(404).message);
+    assert.notEqual(mapDevStatusErrorStatus(404).message, mapDevStatusErrorStatus(500).message);
+  });
+
+  it('returns null for statuses the shared mapper owns, and never echoes the status number', () => {
+    assert.equal(mapDevStatusErrorStatus(401), null);
+    assert.equal(mapDevStatusErrorStatus(403), null);
+    assert.equal(mapDevStatusErrorStatus(429), null);
+    assert.equal(mapDevStatusErrorStatus(418), null);
+    for (const status of [400, 404, 500]) {
+      assert.ok(!mapDevStatusErrorStatus(status).message.includes(String(status)), 'message must not echo the status');
+    }
   });
 });
