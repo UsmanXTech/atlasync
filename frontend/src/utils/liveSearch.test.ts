@@ -221,3 +221,78 @@ describe('LiveSearchLoader', () => {
     assert.deepEqual(calls, { issues: 2, pages: 1, requests: 1 });
   });
 });
+
+describe('LiveSearchLoader.refresh (fix #9)', () => {
+  it('refetches all three sources after they loaded — ensure alone would not', async () => {
+    const loader = new LiveSearchLoader();
+    const calls: Record<LiveSourceKey, number> = { issues: 0, pages: 0, requests: 0 };
+    const fetchers = succeedingFetchers(calls);
+    await loader.ensure(fetchers);
+    assert.deepEqual(calls, { issues: 1, pages: 1, requests: 1 });
+    // ensure() after load is a no-op: the old Sync Portfolio button.
+    await loader.ensure(fetchers);
+    assert.deepEqual(calls, { issues: 1, pages: 1, requests: 1 });
+    // refresh() does real network traffic again.
+    const refreshed = await loader.refresh(fetchers);
+    assert.deepEqual(calls, { issues: 2, pages: 2, requests: 2 });
+    assert.deepEqual(refreshed.sources, SOURCES);
+    assert.deepEqual(refreshed.failed, []);
+  });
+
+  it('refresh returns the in-flight batch instead of starting a second one', async () => {
+    const loader = new LiveSearchLoader();
+    const gates = {
+      issues: deferred<LiveIssue[]>(),
+      pages: deferred<LiveConfluencePage[]>(),
+      requests: deferred<LiveJsmRequest[]>(),
+    };
+    const calls: Record<LiveSourceKey, number> = { issues: 0, pages: 0, requests: 0 };
+    const fetchers: LiveSourceFetchers = {
+      issues: () => {
+        calls.issues += 1;
+        return gates.issues.promise.then((data) => ({ ok: true as const, data }));
+      },
+      pages: () => {
+        calls.pages += 1;
+        return gates.pages.promise.then((data) => ({ ok: true as const, data }));
+      },
+      requests: () => {
+        calls.requests += 1;
+        return gates.requests.promise.then((data) => ({ ok: true as const, data }));
+      },
+    };
+    const first = loader.ensure(fetchers);
+    const refreshed = loader.refresh(fetchers);
+    assert.equal(refreshed, first, 'same in-flight batch, no duplicate fetch');
+    gates.issues.resolve(SOURCES.issues);
+    gates.pages.resolve(SOURCES.pages);
+    gates.requests.resolve(SOURCES.requests);
+    const snapshot = await refreshed;
+    assert.deepEqual(snapshot.sources, SOURCES);
+    assert.deepEqual(calls, { issues: 1, pages: 1, requests: 1 });
+  });
+
+  it('refresh refetches a previously failed source and reports it when it still fails', async () => {
+    const loader = new LiveSearchLoader();
+    const calls: Record<LiveSourceKey, number> = { issues: 0, pages: 0, requests: 0 };
+    const failing: LiveSourceFetchers = {
+      issues: async () => {
+        calls.issues += 1;
+        return { ok: false as const };
+      },
+      pages: async () => {
+        calls.pages += 1;
+        return { ok: true as const, data: SOURCES.pages };
+      },
+      requests: async () => {
+        calls.requests += 1;
+        return { ok: true as const, data: SOURCES.requests };
+      },
+    };
+    const first = await loader.ensure(failing);
+    assert.deepEqual(first.failed, ['issues']);
+    const refreshed = await loader.refresh(failing);
+    assert.deepEqual(refreshed.failed, ['issues']);
+    assert.deepEqual(calls, { issues: 2, pages: 2, requests: 2 });
+  });
+});

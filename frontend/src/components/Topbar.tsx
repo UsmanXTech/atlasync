@@ -57,6 +57,10 @@ interface TopbarProps {
   dataMode: DataMode;
   onDataMode: (mode: DataMode) => void;
   onMenu: () => void;
+  // Fix #9: fired after a Sync Portfolio run with whether every
+  // source refreshed cleanly. App bumps its refresh counter (cards +
+  // readiness + briefing reload) and stamps lastSyncedAt on success.
+  onSync?: (ok: boolean) => void;
 }
 
 const KIND_ICONS: Record<string, typeof CircleDot> = {
@@ -102,7 +106,7 @@ function liveSourceFetchers(): LiveSourceFetchers {
  * - Exactly ONE filled primary button (SYNC PORTFOLIO, 40dp, pill)
  * - 30dp circular user avatar
  */
-export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate, forgeMode, dataMode, onDataMode, onMenu }: TopbarProps) {
+export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate, forgeMode, dataMode, onDataMode, onMenu, onSync }: TopbarProps) {
   const [query, setQuery] = useState('');
   const [searchFocus, setSearchFocus] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -110,6 +114,10 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
   const [notes, setNotes] = useState(NOTIFICATIONS);
   const [syncing, setSyncing] = useState(false);
   const siteUrl = useSiteUrl();
+  // Fix #9: small success/failure notice for the Sync Portfolio run.
+  // No toast system exists in the app, so this is a plain status line
+  // next to the button; it clears when the next sync starts.
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
 
   // Live search cache and loader
   const [liveIssues, setLiveIssues] = useState<LiveIssue[]>([]);
@@ -250,10 +258,29 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
     [query],
   );
 
-  const handleSyncPortfolio = () => {
+  // Fix #9: the old handler fired startLiveFetch() (ensure — a no-op
+  // once loaded) and cleared the spinner on a fixed 900ms timer, so
+  // Sync did zero network traffic and reported success regardless.
+  // The spinner is now tied to the refresh() promise, and the notice
+  // reports what actually happened per source.
+  const handleSyncPortfolio = async () => {
+    const loader = liveLoaderRef.current;
+    if (!loader || syncing) return;
     setSyncing(true);
-    startLiveFetch();
-    setTimeout(() => setSyncing(false), 900);
+    setSyncNotice(null);
+    try {
+      const snapshot = await loader.refresh(liveSourceFetchers());
+      applyLiveSnapshot(snapshot);
+      if (snapshot.failed.length === 0) {
+        setSyncNotice('Portfolio synced — all sources up to date.');
+      } else {
+        const names = snapshot.failed.map((key) => LIVE_SOURCE_LABELS[key]).join(', ');
+        setSyncNotice(`Synced with failures: ${names} could not be reached.`);
+      }
+      onSync?.(snapshot.failed.length === 0);
+    } finally {
+      setSyncing(false);
+    }
   };
 
   return (
@@ -461,6 +488,11 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
           <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
           <span>SYNC PORTFOLIO</span>
         </button>
+        {syncNotice && (
+          <span className="sync-notice" role="status">
+            {syncNotice}
+          </span>
+        )}
 
         <div className="menu-wrap">
           <button

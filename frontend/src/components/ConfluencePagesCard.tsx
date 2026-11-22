@@ -20,9 +20,12 @@ import type { ViewId } from './Sidebar';
 export default function ConfluencePagesCard({
   conversation,
   onNavigate,
+  // Fix #9: App's Sync Portfolio counter — a bump refetches the pages.
+  refreshTick = 0,
 }: {
   conversation: IntelligenceConversation;
   onNavigate: (view: ViewId) => void;
+  refreshTick?: number;
 }) {
   const siteUrl = useSiteUrl();
   const [pages, setPages] = useState<LiveConfluencePage[]>([]);
@@ -40,7 +43,9 @@ export default function ConfluencePagesCard({
 
   useEffect(() => {
     void load();
-  }, [load]);
+    // refreshTick is App's Sync Portfolio counter — a bump refetches.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load, refreshTick]);
 
   const askAboutThis = () => {
     conversation.ask(contextualQuestionFor('confluence'));

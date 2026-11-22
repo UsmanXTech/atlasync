@@ -73,6 +73,9 @@ export default function Overview({
   briefingSummary,
   dataMode,
   onDataMode,
+  // Fix #9: App's Sync Portfolio counter — a bump reloads the live
+  // readiness fetch and all three live cards below.
+  refreshTick,
 }: {
   workspaceId: WorkspaceId;
   onNavigate: (view: ViewId) => void;
@@ -80,6 +83,7 @@ export default function Overview({
   briefingSummary: BriefingSummary;
   dataMode: DataMode;
   onDataMode: (mode: DataMode) => void;
+  refreshTick: number;
 }) {
   const [resolved, setResolved] = useState<string[]>([]);
   const [prFilter, setPrFilter] = useState<'all' | PrStatus>('all');
@@ -99,7 +103,7 @@ export default function Overview({
     return () => {
       cancelled = true;
     };
-  }, [dataMode, liveRefresh]);
+  }, [dataMode, liveRefresh, refreshTick]);
 
   const askAboutThis = () => {
     conversation.ask(contextualQuestionFor('overview'));
@@ -306,13 +310,13 @@ export default function Overview({
               <OverviewBriefingCard onNavigate={onNavigate} briefingSummary={briefingSummary} />
             </Card>
             <Card className="overview-live-card" title="Jira issues" subtitle="Read-only · switch demo or live data">
-              <JiraIssuesCard dataMode={dataMode} />
+              <JiraIssuesCard dataMode={dataMode} refreshTick={refreshTick} />
             </Card>
             <Card className="overview-live-card" title="Confluence pages">
-              <ConfluencePagesCard conversation={conversation} onNavigate={onNavigate} />
+              <ConfluencePagesCard conversation={conversation} onNavigate={onNavigate} refreshTick={refreshTick} />
             </Card>
             <Card className="overview-live-card" title="JSM requests">
-              <JsmRequestsCard conversation={conversation} onNavigate={onNavigate} />
+              <JsmRequestsCard conversation={conversation} onNavigate={onNavigate} refreshTick={refreshTick} />
             </Card>
           </section>
 

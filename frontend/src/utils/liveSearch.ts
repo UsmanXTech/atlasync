@@ -86,6 +86,19 @@ export class LiveSearchLoader {
     return this.batch;
   }
 
+  /**
+   * Real refresh (fix #9): clears the loaded set and refetches all
+   * three sources, so "Sync portfolio" does network traffic even when
+   * everything already loaded — ensure() alone would return the
+   * cached snapshot and do nothing. A batch already in flight is
+   * returned as-is (it is current network traffic, not stale cache).
+   */
+  refresh(fetchers: LiveSourceFetchers): Promise<LiveSearchSnapshot> {
+    if (this.batch) return this.batch;
+    this.loaded.clear();
+    return this.ensure(fetchers);
+  }
+
   private async fetchOne(key: LiveSourceKey, fetchers: LiveSourceFetchers): Promise<void> {
     this.inflightKeys.add(key);
     try {
