@@ -688,3 +688,62 @@ export async function listExecutionRuns(store, cloudId, limit = MAX_EXECUTION_RU
     .sort((a, b) => (a.generatedAt < b.generatedAt ? 1 : a.generatedAt > b.generatedAt ? -1 : 0))
     .slice(0, limit);
 }
+
+const DECISION_RUN_STATUSES = ['APPROVED', 'REJECTED', 'EXECUTION_FAILED'];
+
+// A pending action's prompt is stored raw (up to 1500 chars) while a
+// run's question is cleanRunText(prompt, 500) — trim + first 500 chars.
+// Match the two the same way the recorder produced them.
+function sameQuestion(pendingPrompt, runQuestion) {
+  if (typeof pendingPrompt !== 'string' || typeof runQuestion !== 'string') return false;
+  return pendingPrompt.trim().slice(0, 500) === runQuestion;
+}
+
+function sameProposal(a, b) {
+  return (
+    sameQuestion(a.question ?? a.prompt, b.question) &&
+    (b.tool == null || a.tool == null || a.tool === b.tool)
+  );
+}
+
+// Annotate each AWAITING_APPROVAL run with its proposal's live state,
+// derived at read time — the stored record is never mutated, so the
+// annotation can never go stale the way a stored status would.
+//
+// Live review 2026-11-22: a proposal created ~02:56 AM expired after
+// its 10-min KVS TTL, Pending approvals correctly went empty, but
+// history still listed the run as "awaiting approval" forever — the
+// stored status was written once and nothing ever updated it.
+//
+// Rules (fail-safe — a dead proposal is never presented as actionable):
+// - 'awaiting': a live (unexpired) pending action matches this run's
+//   question + tool. This is the ONLY state that means actionable.
+// - 'decided': no live action matches, but a later run records the
+//   decision for the same proposal (APPROVED / REJECTED /
+//   EXECUTION_FAILED, same question + tool, later generatedAt).
+// - 'expired': anything else — the action is gone with no decision
+//   (TTL elapsed, superseded, or KVS loss), whatever the run's age.
+// Non-awaiting runs are returned unchanged (no actionState).
+export function annotateRunActionStates(runs, livePendingActions) {
+  const list = Array.isArray(runs) ? runs : [];
+  const pending = Array.isArray(livePendingActions) ? livePendingActions : [];
+  return list.map((run) => {
+    if (!run || run.status !== 'AWAITING_APPROVAL') return run;
+    const awaiting = pending.some(
+      (p) => p && typeof p === 'object' && sameQuestion(p.prompt, run.question) && (run.tool == null || p.tool == null || p.tool === run.tool),
+    );
+    if (awaiting) return { ...run, actionState: 'awaiting' };
+    const decided = list.some(
+      (other) =>
+        other &&
+        other !== run &&
+        DECISION_RUN_STATUSES.includes(other.status) &&
+        typeof other.generatedAt === 'string' &&
+        typeof run.generatedAt === 'string' &&
+        other.generatedAt > run.generatedAt &&
+        sameProposal(other, run),
+    );
+    if (decided) return { ...run, actionState: 'decided' };
+    return { ...run, actionState: 'expired' };
+  });
+}

@@ -4,7 +4,7 @@ import Card from '../components/Card';
 import type { ViewId } from '../components/Sidebar';
 import type { IntelligenceConversation } from '../hooks/useIntelligenceConversation';
 import { useExecutionHistory } from '../hooks/useExecutionHistory';
-import type { ExecutionRunStatus } from '../services/executionHistory';
+import type { ExecutionRun, ExecutionRunStatus } from '../services/executionHistory';
 import { AGENT_EXAMPLES } from '../utils/agentExamples';
 
 const RUN_STATUS: Record<ExecutionRunStatus, { label: string; pill: string }> = {
@@ -15,6 +15,16 @@ const RUN_STATUS: Record<ExecutionRunStatus, { label: string; pill: string }> = 
   ERROR: { label: 'error', pill: 'critical' },
   EXECUTION_FAILED: { label: 'execution failed', pill: 'critical' },
 };
+
+// A run whose proposal is no longer actionable must not wear the
+// "awaiting approval" pill: the 10-min approval window lapsed with no
+// decision ('expired'), or a later run already records the outcome
+// ('decided'). Only a live matching proposal stays "awaiting approval".
+function runStatus(run: ExecutionRun): { label: string; pill: string } {
+  if (run.status === 'AWAITING_APPROVAL' && run.actionState === 'expired') return { label: 'expired', pill: 'pending' };
+  if (run.status === 'AWAITING_APPROVAL' && run.actionState === 'decided') return { label: 'decided', pill: 'pending' };
+  return RUN_STATUS[run.status];
+}
 
 /**
  * Screen 5: AI Agents (Autonomous Workflows & Approval Queue)
@@ -175,8 +185,14 @@ export default function Agents({
                       {run.tool ? ` · ${run.tool}${run.target ? ` on ${run.target}` : ''}` : ''}
                     </span>
                     {run.error && <span className="source-error">{run.error}</span>}
+                    {run.status === 'AWAITING_APPROVAL' && run.actionState === 'expired' && (
+                      <span>Expired — no action taken</span>
+                    )}
+                    {run.status === 'AWAITING_APPROVAL' && run.actionState === 'decided' && (
+                      <span>Decided — see the approval outcome</span>
+                    )}
                   </span>
-                  <span className={`pill ${RUN_STATUS[run.status].pill}`}>{RUN_STATUS[run.status].label}</span>
+                  <span className={`pill ${runStatus(run).pill}`}>{runStatus(run).label}</span>
                 </button>
                 {expandedId === run.id && run.trace.length > 0 && (
                   <div className="row-list">

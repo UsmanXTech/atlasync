@@ -24,6 +24,7 @@ import {
   filterHealthChecks,
 } from './readiness.js';
 import {
+  annotateRunActionStates,
   appendConversationTurn,
   appendThreadTurn,
   claimPendingAction,
@@ -934,11 +935,24 @@ resolver.define('approveAgentAction', async ({ payload, context }) => {
 // Phase 2 — persistent execution history for the Agents view.
 // Newest first, capped at 20 runs. Read-only; runs are recorded by
 // invokeAgent and approveAgentAction, never written from here.
+// History is annotated at read time: a run whose proposal has
+// expired (10-min KVS TTL) or been decided must not read as
+// "awaiting approval" forever (live review 2026-11-22). The stored
+// records are never mutated — annotateRunActionStates derives the
+// state from the live pending list + decision runs on every read.
+// If the pending list cannot be read, the runs still load, annotated
+// fail-safe (no live action seen = expired); the failure is logged.
 resolver.define('listExecutionHistory', async ({ context }) => {
-  const { cloudId } = resolveScope(context);
+  const { cloudId, accountId } = resolveScope(context);
   try {
     const runs = await listExecutionRuns(kvs, cloudId);
-    return { ok: true, runs };
+    let pending = [];
+    try {
+      pending = await listPendingActions(kvs, cloudId, accountId);
+    } catch (error) {
+      console.error('[atlasync] listExecutionHistory pending-list failed:', error instanceof Error ? error.name : typeof error);
+    }
+    return { ok: true, runs: annotateRunActionStates(runs, pending) };
   } catch (error) {
     console.error('[atlasync] listExecutionHistory failed:', error instanceof Error ? error.name : typeof error);
     return { ok: false, error: { kind: 'API_ERROR', message: 'Execution history could not be loaded. Try again shortly.' } };
