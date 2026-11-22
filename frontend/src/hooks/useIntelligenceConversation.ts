@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { approveAgentAction, invokeAgent, listPendingActions, toCitations, toSourceCounts, type Citation, type PendingAction, type SourceCounts, type TraceEntry } from '../services/agent';
+import { approveAgentAction, invokeAgent, listPendingActions, toCitations, type Citation, type PendingAction, type TraceEntry } from '../services/agent';
 import type { IntelligenceSources } from '../services/intelligence';
+import { sourcesForAnswer, sourcesForTurn } from '../utils/intelligenceSources';
 import {
   createConversation,
   deleteConversation as deleteConversationService,
@@ -42,43 +43,6 @@ export interface IntelligenceConversation {
   newConversation: () => void;
   renameConversation: (conversationId: string, title: string) => void;
   deleteConversation: (conversationId: string) => void;
-}
-
-function sourcesFromCitations(citations: Citation[]): IntelligenceSources {
-  return {
-    jiraIssues: citations.filter((c) => c.kind === 'jira').length,
-    confluencePages: citations.filter((c) => c.kind === 'confluence').length,
-    jsmRequests: citations.filter((c) => c.kind === 'jsm').length,
-    // Bitbucket rows used to have no bucket at all, so their coverage
-    // was silently dropped even when the answer linked PRs.
-    bitbucketPullRequests: citations.filter((c) => c.kind === 'bitbucket').length,
-    unavailable: [],
-  };
-}
-
-// Coverage from the tool results themselves (loop.js sourceCounts):
-// rows each read tool actually returned. Citations stay the Sources
-// link list only — they are capped at 10 and miss tools that returned
-// rows without a citable record.
-function sourcesFromCounts(counts: SourceCounts): IntelligenceSources {
-  return {
-    jiraIssues: counts.jira,
-    confluencePages: counts.confluence,
-    jsmRequests: counts.jsm,
-    bitbucketPullRequests: counts.bitbucket,
-    unavailable: [],
-  };
-}
-
-function sourcesForAnswer(citations: Citation[], sourceCounts: SourceCounts | null): IntelligenceSources {
-  return sourceCounts ? sourcesFromCounts(sourceCounts) : sourcesFromCitations(citations);
-}
-
-// A restored turn keeps the coverage stored with it when present;
-// older turns (no sourceCounts) fall back to counting citations.
-function sourcesForTurn(turn: { citations?: Citation[]; sourceCounts?: unknown }): IntelligenceSources {
-  const counts = toSourceCounts(turn.sourceCounts);
-  return counts ? sourcesFromCounts(counts) : sourcesFromCitations(toCitations(turn.citations ?? []));
 }
 
 // Owns the Intelligence conversation state. The hook lives in App (above the
@@ -146,11 +110,15 @@ export function useIntelligenceConversation(): IntelligenceConversation {
       setPendingAction(null);
       return;
     }
+    // Restore ONLY the pending action. The displayed answer's trace,
+    // citations and coverage belong to the answer itself — overwriting
+    // them here with the pending action's pre-halt values corrupted
+    // the display (live review 2026-11-22: a correct coverage 2
+    // became 0 after visiting Agents with an escalation pending,
+    // while the answer text stayed put). The approval card renders
+    // the preview only; the backend re-checks its stored record at
+    // approve time, so nothing here needs the pre-halt trace.
     setPendingAction(first);
-    setTrace(first.trace ?? []);
-    const restoredCitations = toCitations(first.citations ?? []);
-    setCitations(restoredCitations);
-    setSources(sourcesFromCitations(restoredCitations));
   }, []);
 
   // Phase 1: restore the most recent conversation on mount. In the
