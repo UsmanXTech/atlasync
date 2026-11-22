@@ -74,6 +74,39 @@ describe('computeReadinessScore (v2.1.0 formula)', () => {
     assert.equal(r.breakdown.Dmissing, 10);
   });
 
+  it('scores the live 9-issue set at 78% — the set the 2026-11-21 review found', () => {
+    // Live workspace on 2026-11-21: 1 open Highest unassigned (AT-1),
+    // 1 High (AT-2), 4 Medium, 2 Low, 1 Done (AT-4); JSM has 1 open
+    // High request (AS-1). The review found Overview showing 78%
+    // while the Intelligence briefing showed 63% from its own
+    // frontend formula — the briefing now uses this backend score, so
+    // both surfaces must agree on 78%.
+    // The review named 7 of the 8 open issues; the briefing counts
+    // show a 4th Medium whose key was not in the report (AT-9 here is
+    // a stand-in — Medium deducts nothing in v2.1.0, so the key
+    // cannot affect the score).
+    const r = computeReadinessScore({
+      issues: [
+        issue({ key: 'AT-1', priority: 'Highest', status: 'In Progress', assignee: null }),
+        issue({ key: 'AT-2', priority: 'High', status: 'In Progress', assignee: 'Sara Khan' }),
+        issue({ key: 'AT-3', priority: 'Medium', status: 'Open' }),
+        issue({ key: 'AT-5', priority: 'Medium', status: 'Open' }),
+        issue({ key: 'AT-6', priority: 'Medium', status: 'Open' }),
+        issue({ key: 'AT-9', priority: 'Medium', status: 'Open' }),
+        issue({ key: 'AT-7', priority: 'Low', status: 'Open' }),
+        issue({ key: 'AT-8', priority: 'Low', status: 'Open' }),
+        issue({ key: 'AT-4', priority: 'Highest', status: 'Done', assignee: 'Sara Khan' }),
+      ],
+      jsmRequests: [request({ key: 'AS-1', priority: 'High', status: 'Open' })],
+      stalePrCount: 0,
+    });
+    // Bcrit=1 (AT-1, 12) + Dmissing=1 (AT-1 unassigned, 10) = 22 → 78.
+    // High/Medium/Low, the Done issue and the High JSM request deduct
+    // nothing in v2.1.0.
+    assert.equal(r.score, 78);
+    assert.deepEqual(r.breakdown, { Bcrit: 1, Isev: 0, Pstale: 0, Dmissing: 1 });
+  });
+
   it('counts only open issues and open JSM requests; terminal statuses never deduct', () => {
     const r = computeReadinessScore({
       issues: [issue({ priority: 'Highest', status: 'Done' }), issue({ priority: 'Highest', status: 'Closed' })],

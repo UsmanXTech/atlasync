@@ -29,15 +29,22 @@ test('briefing lists the oldest open work first, with age in whole days', () => 
   assert.equal(digest.staleItems[0].ageDays, 9);
 });
 
-test('briefing reuses the shared readiness estimate and reports empty snapshots honestly', () => {
+// The digest no longer scores readiness: the old frontend formula
+// (Highest −15 / High −8 / Medium −3 / Low −1) is REMOVED — the
+// briefing shows the backend getReadiness score instead, so it can
+// never disagree with Overview again (live review 2026-11-21: this
+// formula scored 63% while Overview showed 78% for the same
+// workspace). The backend score is covered by the readiness tests in
+// forge-app/tests/readiness.test.js; the previous assertions on
+// score 85 / total 2 are deleted with this test, not moved.
+test('briefing digest carries no readiness score of its own', () => {
   const digest = computeBriefingDigest([
     issue('ATL-1', 'Highest', 'Open', '2026-11-09T12:00:00.000Z'),
     issue('ATL-2', 'Low', 'Done', '2026-11-08T12:00:00.000Z'),
   ], now);
-  assert.equal(digest.readiness?.score, 85);
-  assert.equal(digest.readiness?.total, 2);
+  assert.equal('readiness' in digest, false);
+  assert.equal(digest.totalOpen, 1);
   const empty = computeBriefingDigest([], now);
-  assert.equal(empty.readiness, null);
   assert.equal(empty.totalOpen, 0);
 });
 

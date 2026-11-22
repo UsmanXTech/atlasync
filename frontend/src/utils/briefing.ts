@@ -1,5 +1,4 @@
 import type { LiveIssue } from '../data/types';
-import { computeReadiness, type ReadinessResult } from './readiness.ts';
 
 const DONE = new Set(['done', 'closed', 'resolved', 'complete', 'completed', 'cancelled', 'canceled']);
 const PRIORITY: Record<string, number> = { highest: 5, critical: 5, blocker: 5, high: 4, major: 4, medium: 3, normal: 3, low: 2, minor: 2, lowest: 1 };
@@ -14,13 +13,18 @@ export interface BriefingItem {
 }
 
 export interface BriefingDigest {
-  readiness: ReadinessResult | null;
   blockers: BriefingItem[];
   staleItems: BriefingItem[];
   totalOpen: number;
 }
 
-/** Rules-only digest over the bounded live Jira snapshot. No model/API calls. */
+/** Rules-only digest over the bounded live Jira snapshot. No model/API calls.
+ * Readiness is deliberately NOT computed here: the briefing shows the
+ * backend v2.1.0 score from the getReadiness resolver — the same number
+ * Overview shows — so the two surfaces can never disagree again (live
+ * review 2026-11-21: the frontend formula here scored 63% while
+ * Overview showed 78% for the same workspace). The hook fetches the
+ * backend score and hands it to the briefing state separately. */
 export function computeBriefingDigest(issues: LiveIssue[], now = new Date()): BriefingDigest {
   const open = issues.filter((issue) => !DONE.has(issue.status.trim().toLowerCase()));
   const toItem = (issue: LiveIssue): BriefingItem => {
@@ -52,5 +56,5 @@ export function computeBriefingDigest(issues: LiveIssue[], now = new Date()): Br
     })
     .slice(0, 5)
     .map(toItem);
-  return { readiness: computeReadiness(issues), blockers, staleItems, totalOpen: open.length };
+  return { blockers, staleItems, totalOpen: open.length };
 }

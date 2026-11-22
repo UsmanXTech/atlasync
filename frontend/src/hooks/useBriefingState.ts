@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { fetchLiveJiraIssues } from '../services/jira';
 import { fetchConfluencePages } from '../services/confluence';
 import { fetchJsmRequests } from '../services/jsm';
+import { fetchLiveReadiness } from '../services/readiness';
 import { RequestGeneration } from '../utils/requestGeneration';
 import { reduceBriefingResults, type BriefingState } from '../utils/briefingState';
 
@@ -36,11 +37,13 @@ export function useBriefingState(): Briefing {
   const load = async () => {
     const generation = generations.next();
     setState({ status: 'loading' });
-    const [jira, confluence, jsm] = await Promise.all([
-      fetchLiveJiraIssues(25), fetchConfluencePages(20), fetchJsmRequests(20),
+    // Readiness comes from the backend getReadiness resolver — the
+    // same number Overview shows — never a second local formula.
+    const [jira, confluence, jsm, readiness] = await Promise.all([
+      fetchLiveJiraIssues(25), fetchConfluencePages(20), fetchJsmRequests(20), fetchLiveReadiness(),
     ]);
     if (!generations.isCurrent(generation)) return; // superseded — ignore
-    setState(reduceBriefingResults({ jira, confluence, jsm }));
+    setState(reduceBriefingResults({ jira, confluence, jsm, readiness }));
   };
 
   // Auto-load once, when the app starts. StrictMode double-invokes
