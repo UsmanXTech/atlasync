@@ -5,12 +5,11 @@
 > Build with context. Ship with confidence.
 
 > Demo guide for judges and reviewers: [DEMO.md](./DEMO.md) — the 60–90
-> second flow, the "Are we ready to release Atlas v2?" scenario, what is
-> live, and what is demo data.
+> second flow and the "Are we ready to release?" scenario, all live data.
 
 Atlasync is an Atlassian Forge app built for **Codegeist 2026**. It gives teams one synced view across every Atlassian tool they use — Jira, Confluence, Bitbucket, and Jira Service Management — so the context behind work is always in one place, instead of scattered across silos.
 
-**Status:** Premium Forge dashboard with live read-only Jira issues/projects, Confluence pages, JSM requests, Jira-linked Bitbucket PRs, and Forge-hosted Intelligence. Overview sample metrics remain demo data; Projects, Insights source counts, Integrations health checks, and Intelligence now use live reads.
+**Status:** Premium Forge dashboard with live read-only Jira issues/projects, Confluence pages, JSM requests, Jira-linked Bitbucket PRs, and Forge-hosted Intelligence. Every surface reads live data — there is no demo dataset.
 
 ## Vision
 
@@ -77,8 +76,8 @@ atlasync/
 │       │                # intelligence) + shared error copy
 │       ├── hooks/       # useIntelligenceConversation (ask/cancel/reset)
 │       ├── utils/       # markdown, readiness, overview stats, request guard
-│       ├── data/        # types.ts + mock.ts (sample data layer)
-│       └── App.tsx      # Shell: nav, demo workspace, Forge bridge status
+│       ├── data/        # types.ts (live record types)
+│       └── App.tsx      # Shell: nav, Forge bridge status
 ├── forge-app/
 │   ├── manifest.yml     # Forge app definition (registered app id, scopes, llm module)
 │   └── src/             # Resolver (index.js) + per-source modules:
@@ -94,25 +93,25 @@ atlasync/
 
 ## Dashboard
 
-The frontend is a light, premium enterprise dashboard (white panels on a soft grey canvas, thin borders, restrained indigo accents, Lucide icons, subtle animations), screen-fitted to one page with scrolling confined to the main content area. It is a real, interactive React UI — not a static mockup — mixing live read-only data from the Forge backend with clearly labeled demo data; see [Feature status](#feature-status--what-is-live-what-is-demo) for the exact split.
+The frontend is a light, premium enterprise dashboard (white panels on a soft grey canvas, thin borders, restrained indigo accents, Lucide icons, subtle animations), screen-fitted to one page with scrolling confined to the main content area. It is a real, interactive React UI — not a static mockup — reading live data from the Forge backend; see [Feature status](#feature-status--what-is-live) for the exact coverage.
 
 ### Views (sidebar)
 
-- **Overview** — live Jira issues, Confluence pages, and JSM requests cards (the Jira card has a Demo / Live toggle), release readiness (sample estimate by default, with a "Calculate from live Jira" action), derived per-stat context, plus demo sections: active blockers (with local demo Resolve buttons), Confluence activity, Bitbucket PRs (status filters), JSM incident snapshot, and recent activity (Today/7D/30D range).
+- **Overview** — live release readiness (backend-computed from the 30-day snapshot, with an honest empty state when the snapshot is empty), live stat cards that ask Intelligence about their metric, live critical blockers, live SEV-1/2 incidents, today's briefing, and the live Jira issues, Confluence pages, and JSM requests cards.
 - **Intelligence** — live Forge LLM assistant over a bounded snapshot of Jira, Confluence, and JSM records (up to 10 each). Answers render as Markdown, report source coverage, and are read-only; they may be incomplete and are not release approvals. A Stop button cancels a running analysis (the late response is discarded) and "New analysis" resets the conversation.
-- **Projects** — live Jira project directory, filtered by the signed-in user's permissions. The demo workspace selection does not scope it.
+- **Projects** — live Jira project directory, filtered by the signed-in user's permissions, with per-project issue counts and Ask buttons.
 - **Integrations** — read-only connection probes for Jira, Confluence, and JSM (auto-checked when the view opens), plus owner setup guidance for Jira-linked Bitbucket PRs and Forge LLM.
 - **AI Agents** — Atlasync Release Intelligence entry point; no autonomous writes or background agent actions.
 - **Insights** — live record counts per source (latest refresh, max 50 per source) with per-source errors. Historical trend charts are withheld until a privacy-safe snapshot system exists.
-- **Settings** — demo workspace profile and preference toggles (preview-only — nothing persists).
+- **Settings** — workspace profile and preference toggles (the name/timezone are session-only; the three backend toggles persist in Forge).
 
 ### Interactive controls
 
-Demo workspace selector (scopes the sample sections only — blockers, PRs, incidents, activity — and never scopes live data), global search (live Jira issues, Confluence pages, and JSM requests inside a Forge install, plus clearly labeled demo results), notifications with mark-all-read, and the Forge connection badge (green when connected inside Forge, "Preview mode" otherwise).
+Global search (live Jira issues, Confluence pages, and JSM requests inside a Forge install), Sync Portfolio (real refresh of all live sources), and the Forge connection badge (green when connected inside Forge, "Preview" otherwise).
 
-### Mock data
+### Live data
 
-The sample dashboard data lives in `frontend/src/data/mock.ts`. Overview health cards, blocker lists, PR/incidents sample panels, and demo workspace state remain labeled as demo data. Live source cards do not mix sample rows into their live results. Stats on the Overview are derived from those arrays (workspace filters and Resolve buttons change them); only the small "vs last week" annotations are fixed display text. Release readiness shows a sample estimate (72) until "Calculate from live Jira" scores the most recently updated live issues instead.
+Every surface reads live data from the Forge backend through the signed-in user's own Atlassian permissions. There is no demo dataset: the former `frontend/src/data/mock.ts` sample layer was deleted, and empty live results render honest empty states (0 incidents, 0 stale PRs, no records to score) instead of sample estimates.
 
 ### Preview it
 
@@ -123,25 +122,25 @@ npm run build && npm run preview   # production build preview
 
 To see it inside Forge instead of preview mode, deploy and install the app on a dev site (see Feature status below) — the same build renders with the bridge connected.
 
-## Feature status — what is live, what is demo
+## Feature status — what is live
 
-This is the one authoritative split. **Live** means the data comes from the Forge backend through the signed-in user's own Atlassian permissions; **Demo** means sample data from `frontend/src/data/mock.ts`, labeled as such in the UI. Live cards never mix sample rows into their results.
+**Live** means the data comes from the Forge backend through the signed-in user's own Atlassian permissions. There is no demo dataset — every row below is live, and an empty result renders an honest empty state.
 
 | Surface | Data |
 |---|---|
-| Jira issues (Overview card, Live mode) | **Live** — key, summary, status, priority, assignee, updated timestamp, via `getJiraIssues` |
+| Jira issues (Overview card) | **Live** — key, summary, status, priority, assignee, updated timestamp, via `getJiraIssues` |
 | Jira projects (Projects view) | **Live** — project directory via `getJiraProjects`, filtered by the user's permissions |
 | Confluence pages (Overview card) | **Live** — via `getConfluencePages` (`requestConfluence`) |
 | JSM requests (Overview card) | **Live** — via `getJsmRequests` (`/rest/servicedeskapi/request`, normalized from the documented array shape) |
 | Linked Bitbucket PRs (Jira issue detail) | **Live when linked** — via the Jira dev-status API; shows 0 with owner setup guidance until a Bitbucket workspace is linked via DVCS |
 | Intelligence answers | **Live** — Forge LLM (`claude-sonnet-5`) over a bounded snapshot (up to 10 Jira issues, 10 Confluence pages, 10 JSM requests); Markdown answers, source coverage, Stop/cancel |
-| Release readiness | **Live on demand** — "Calculate from live Jira" scores the most recently updated issues; sample estimate (72) until then |
+| Release readiness | **Live** — backend-computed from the 30-day snapshot; honest "no records to score" state when the snapshot is empty |
 | Insights counts | **Live** — record counts per source, latest refresh, max 50 per source |
 | Integrations probes | **Live** — read-only health checks for Jira, Confluence, JSM, auto-run when the view opens |
-| Global search | **Live in Forge + Demo** — live Jira issues, Confluence pages, JSM requests under a Live heading; demo results under a Demo heading |
-| Overview stats, blockers, PR/incident panels, activity | **Live in Live Workspace** — live Jira/Confluence/JSM snapshot; Sample Dataset shows demo data |
+| Global search | **Live in Forge** — live Jira issues, Confluence pages, JSM requests under a Live heading |
+| Overview stats, blockers, incidents | **Live** — live Jira/Confluence/JSM snapshot |
 | AI Agents view | **Live** — Release Intelligence with approval-gated writes, session memory and daily snapshots; autonomous Rovo/MCP not enabled |
-| Settings | **Preview-only** — demo workspace profile; nothing persists |
+| Settings | **Live toggles + session profile** — name/timezone are session-only; daily sync / incident alerts / weekly digest persist in Forge |
 
 ### Deployed version vs main
 
@@ -177,15 +176,15 @@ Upgrading an existing installation to a version with new scopes or the `llm` mod
 - **User permission (enforced by Atlassian itself):** the signed-in user needs **Browse Projects** permission on the Jira projects being read, plus a Jira license on the site; Confluence and JSM reads likewise follow that user's own access. Calls run via `asUser()`, so the app never sees data the user cannot see.
 - **No writes, no tokens:** every integration is read-only, live lists request at most 50 records (default 25 for Jira issues, newest first), and no credential ever enters the codebase — Forge holds the authentication.
 
-### How to enable live mode
+### How to see live data
 
-In a Forge-installed app, open **Overview → Jira issues** and switch the toggle from **Demo data** to **Live Jira**. It loads automatically; **Refresh** re-loads, **Back to demo data** returns to samples. Confluence pages, JSM requests, Projects, Insights, and Integrations load live automatically in Forge. In the standalone preview the same controls show a backend-unreachable state — that is correct behavior, not an app error.
+In a Forge-installed app every card loads live automatically; **Refresh** re-loads it. Confluence pages, JSM requests, Projects, Insights, and Integrations load live automatically in Forge. In the standalone preview the same controls show a backend-unreachable state — that is correct behavior, not an app error.
 
 ### Limitations and troubleshooting
 
 - **Live behavior verified against a real Forge installation (v3.0.0, 2026-11-09)** — on the Codegeist dev site: 9 Jira issues incl. a live JSM request (AS-1), 12 Confluence pages, 2 projects, and an Intelligence answer that correctly listed the highest-priority open issues. The empty-state branch renders only when the query returns zero records.
 - **Project sidebar entry:** on Jira Service Management projects the Atlasync sidebar entry may not appear; the project page is still reachable via its direct URL (`/jira/servicedesk/projects/<KEY>/apps/<appId>/<envId>`).
-- **Permission denied** in Live mode → the signed-in user lacks Browse Projects permission; ask the Jira admin, or check the site's project permissions.
+- **Permission denied** → the signed-in user lacks Browse Projects permission; ask the Jira admin, or check the site's project permissions.
 - **Rate limited** → Jira throttled the request; wait a moment and press **Retry** (no automatic retry loop).
 - **Could not load** (backend unreachable) in the preview → expected: the app is running standalone, not inside Forge.
 - Custom JQL is supported by the resolver (`getJiraIssues` accepts an optional `jql`, max 500 chars) but is not exposed in the UI yet; the UI uses the default query (recently updated, newest first).

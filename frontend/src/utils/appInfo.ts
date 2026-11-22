@@ -8,10 +8,9 @@
 //     all 7 views with live data, Integrations 3/3).
 //   - app id: forge-app/manifest.yml (registered app id — do not re-run
 //     `forge register` for this app).
-//   - live/demo split: README "Feature status" — Jira, Confluence, JSM
-//     and Intelligence read live data inside the installed Forge app;
-//     in Live Workspace, Overview stats read live data too — Sample
-//     Dataset shows demo data.
+//   - live data: README "Feature status" — Jira, Confluence, JSM,
+//     Intelligence and Overview stats read live data inside the
+//     installed Forge app; there is no demo dataset.
 //   - deploy note: merges to main deploy automatically via GitHub
 //     Actions (latest run #23, 21 Nov 2026).
 // Keep this module in sync with the README when the deployed version
@@ -36,9 +35,9 @@ export const APP_INFO_ROWS: AppInfoRow[] = [
   { label: 'Forge app', value: APP_ID },
   { label: 'Built for', value: APP_BUILT_FOR },
   {
-    label: 'Live vs demo',
+    label: 'Live data',
     value:
-      'Jira, Confluence, JSM and Intelligence read live data inside the installed Forge app; in Live Workspace, Overview stats read live data too — Sample Dataset shows demo data.',
+      'Jira, Confluence, JSM, Intelligence and Overview stats read live data inside the installed Forge app; there is no demo dataset.',
   },
 ];
 

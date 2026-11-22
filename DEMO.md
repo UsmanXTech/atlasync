@@ -1,6 +1,6 @@
 # Atlasync — Demo Guide
 
-> **Mixed demo/live build.** The Overview's sample metrics and sample scenario remain mock data. Jira issues/projects, Confluence page metadata, JSM requests, linked PR lookups, and Forge LLM Intelligence are live-only inside an updated Forge install. Preview mode cannot access the Forge backend.
+> **Live-only build.** Every surface reads live data — Jira issues/projects, Confluence page metadata, JSM requests, linked PR lookups, and Forge LLM Intelligence — inside an updated Forge install. Preview mode cannot access the Forge backend, so it shows backend-unreachable states instead of fake data.
 
 ## The problem
 
@@ -23,49 +23,39 @@ traced to the exact issue, incident, PR, and doc behind it.
 |---|---|---|
 | 0–10s | Open **Overview**. Point at the four stat cards. | One screen already spans Jira, Bitbucket, and JSM. |
 | 10–30s | Go to **Intelligence** and ask: *"Are we ready to release Atlas v2?"* | The headline feature: a cross-tool verdict, not a chart. |
-| 30–55s | Read the answer out loud: **72% ready**, then its evidence — ATLAS-482 (Jira blocker), INC-91 (Sev1 incident), the failing Cart totals PR (Bitbucket). | Every claim traces to a record in another tool. That traceability *is* the product. |
-| 55–75s | Flip to **Overview → Active blockers**, resolve one, and show the counts move. Switch workspace to **Platform** and watch the whole dashboard re-filter. | The UI is live and data-driven, not a screenshot. |
-| 75–90s | Close on the roadmap: live reads replace the mock layer, same components. | Judges see exactly what is demo and what comes next. |
+| 30–55s | Read the answer out loud: the readiness score, then its evidence — the top Jira blocker, the open SEV-1/2 incident, the stale PR on a critical issue. | Every claim traces to a record in another tool. That traceability *is* the product. |
+| 55–75s | Flip to **Overview → Critical blockers** and open one record in Jira (clicks open the original record). Press **Sync Portfolio** and watch the counts refresh from live sources. | The UI is live and data-driven, not a screenshot. |
+| 75–90s | Close on the roadmap: scheduled snapshots and per-record navigation are next. | Judges see what is live today and what comes next. |
 
-## Recommended scenario: "Are we ready to release Atlas v2?"
+## Recommended scenario: "Are we ready to release?"
 
-The answer is **no — 72%, not yet**. Two critical items stand in the way:
-
-1. **ATLAS-482** (Jira, critical, 4 days open) — checkout timeout under load.
-2. **INC-91** (JSM, Sev1, investigating) — payments API latency spike.
-
-Plus the risk the answer names explicitly: the checkout path is touched by
-*both* the open blocker *and* the failing PR, so releasing now risks payment
-failures at peak traffic. Suggested next actions come with owners and dues
-(Sara Khan — today; on-call — today).
+Ask Intelligence the readiness question and read the verdict against the
+live snapshot: the score comes from the backend (critical blockers,
+SEV-1/2 incidents, stale PRs, unassigned work), and every claim in the
+answer cites the live record behind it — the top Jira blocker, the open
+SEV-1/2 incident, the stale PR on a critical issue. The numbers change
+with the site's real data; there are no fixed demo records to quote, so
+read the live values on the day.
 
 Use this scenario because it is the only one where all four tools matter to
 a single decision. A generic dashboard tour hides that; this question shows it.
 
-## What is currently mocked
+## What is live
 
-- All projects, blockers, docs, PRs, incidents, and activity
-  (`frontend/src/data/mock.ts`).
-- Jira issues everywhere **except** the Overview Jira card's Live mode
-  (see below) — the aggregates, blockers, and AI answers still use samples.
-- All AI answers, including the Atlas v2 verdict — fixed sample responses,
-  labeled "Sample response · Mock data". No AI service is called.
-- Mock workspace preferences and sample dashboard state.
-- Workspace switching, search, filters, toggles, and Resolve — real UI
-  state over the mock dataset.
+Nothing is mocked. Every surface reads live data through the Forge
+backend under the signed-in user's own permissions; empty results render
+honest empty states. The standalone preview has no backend, so it shows
+backend-unreachable states instead of fake data.
 
-## Live Jira (Forge only)
+## Live data (Forge only)
 
-The first live slice: in a Forge-installed app, the Overview **Jira
-issues** card toggles from **Demo data** to **Live Jira** and loads real
+In a Forge-installed app, the Overview **Jira issues** card loads real
 issues (key, summary, status, priority, assignee, updated) through the
-Forge backend — read-only, at most 50 issues, newest first. The demo flow
-above works unchanged in the standalone preview with demo data; in Forge,
-the same card proves the live path. Live behavior against a real Forge
-installation is verified (2026-11-05): after the Task 5.1 fixes, Live Jira
-returned HTTP 200 and rendered a real issues list. In
-the preview, Live shows a backend-unreachable state instead of fake live
-data.
+Forge backend — read-only, at most 50 issues, newest first. Live behavior
+against a real Forge installation is verified (2026-11-09 and 2026-11-21
+on the Codegeist dev site: 9 Jira issues, 12 Confluence pages, 1 JSM
+request, 2 projects, live Intelligence answers). In the preview, the same
+card shows a backend-unreachable state instead of fake live data.
 
 ### Linked pull requests (Task 6, Architecture A)
 
@@ -80,30 +70,24 @@ verification still pending at the time of writing.
 
 ## Live integration coverage
 
-1. **Jira** (read) — issues list is **live in Forge installs** (this slice); next: sprints, releases, per-issue blocker graph.
-2. **Bitbucket** (read) — PRs, reviewers, build statuses.
-3. **Confluence** (read) — spaces, pages, recent edits linked to issues.
-4. **JSM** (read) — incidents, severity, service health.
-5. **Forge storage + scheduled triggers** — hourly sync snapshots and
-   readiness history, replacing the mock layer without changing components.
-6. **Rovo agent + MCP tools** — the Intelligence panel backed by a real
-   agent over the synced context (read-only first; careful writes last).
+1. **Jira** (read) — issues, projects, blockers, readiness (backend-computed).
+2. **Bitbucket** (read) — linked PRs via the Jira dev-status API; 0 with owner setup guidance until a workspace is linked via DVCS.
+3. **Confluence** (read) — spaces, pages, recent edits.
+4. **JSM** (read) — requests, incidents by priority.
+5. **Forge Intelligence** — live LLM answers over a bounded snapshot, with approval-gated writes (escalate, transition, release report).
+6. **Forge storage** — session memory + execution history; scheduled snapshots are paused while the snapshot identity model is redesigned.
 
 ## Known limitations
 
-- Live data is Jira issues only, and only inside a Forge installation:
-  deploy needs an Atlassian login and dev site
-  (`forge login → register → deploy → install`).
-- The resolver exposes `getStatus` + read-only `getJiraIssues`; no sync
-  reads, no other tools, and no writes yet.
-- Live Jira behavior has NOT been tested against a real Forge install —
-  the preview verifies demo mode and every error state, not a live Jira
-  response.
+- Live data needs a Forge installation: deploy needs an Atlassian login
+  and dev site (`forge login → register → deploy → install`). The
+  standalone preview shows backend-unreachable states instead.
+- Snapshots are paused (snapshot identity is being redesigned), so the
+  Insights trend chart is empty by design.
 - `npm test` checks the resolver's structure, not live Forge execution
   (the official `new Resolver()` pattern resolves differently in plain Node).
 - Search is hidden below 640px width (mobile keeps nav + actions only).
 - The app is dark-first; no light theme.
-- Demo data covers two workspaces; a real install would page through many more.
 
 ## Run it yourself
 
@@ -113,5 +97,5 @@ npm run build
 npm run preview   # or: npm run dev
 ```
 
-Then open the printed localhost URL. The topbar shows "Preview mode"
+Then open the printed localhost URL. The topbar shows "Preview"
 outside Forge; inside a Forge iframe the same build shows "Forge connected".

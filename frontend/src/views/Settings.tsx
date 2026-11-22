@@ -28,8 +28,8 @@ export default function Settings({ settings }: { settings: SettingsState }) {
 
       <div className="settings-layout">
         <Card
-          title="Demo workspace profile"
-          subtitle="The demo workspace never scopes live data"
+          title="Workspace profile"
+          subtitle="Session-only — the name and timezone reset on reload"
         >
           <div className="settings-form">
             <div className="field">

@@ -4,16 +4,17 @@ import {
   DEFAULT_TIMEZONE,
   DEFAULT_TOGGLES,
   SETTINGS_ROWS,
-  defaultSettingsFor,
+  defaultSettings,
 } from './settingsState.ts';
 
 // Settings defaults (Run 17): the "Save preview" promise is only honest
-// if the defaults are stable and fresh per workspace, so changing one
-// workspace's snapshot can never leak into another.
-describe('defaultSettingsFor', () => {
-  it('uses the workspace name with the default timezone and toggles', () => {
-    const d = defaultSettingsFor('Platform');
-    assert.equal(d.name, 'Platform');
+// if the defaults are stable and fresh, so changing one snapshot can
+// never leak into another. No demo workspace exists to prefill the name,
+// so the default name is empty and the user types their own.
+describe('defaultSettings', () => {
+  it('uses an empty name with the default timezone and toggles', () => {
+    const d = defaultSettings();
+    assert.equal(d.name, '');
     assert.equal(d.timezone, 'Asia/Karachi');
     assert.equal(d.timezone, DEFAULT_TIMEZONE);
     assert.deepEqual(d.toggles, {
@@ -26,9 +27,9 @@ describe('defaultSettingsFor', () => {
   });
 
   it('returns a fresh toggles object on every call', () => {
-    const a = defaultSettingsFor('Atlasync HQ');
+    const a = defaultSettings();
     a.toggles.weeklyDigest = true;
-    const b = defaultSettingsFor('Atlasync HQ');
+    const b = defaultSettings();
     assert.equal(b.toggles.weeklyDigest, false, 'mutating one snapshot must not leak');
   });
 });

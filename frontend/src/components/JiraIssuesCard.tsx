@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import Card from './Card';
 import RecordLink from './RecordLink';
-import SegmentedButton from './SegmentedButton';
-import { SAMPLE_JIRA_ISSUES } from '../data/mock';
 import type { LiveIssue } from '../data/types';
 import { useSiteUrl } from '../hooks/useSiteUrl';
 import { fetchIssueDevStatus, fetchLiveJiraIssues, type JiraError, type LinkedPullRequest } from '../services/jira';
@@ -12,7 +10,6 @@ import { jiraIssueUrl } from '../utils/recordLinks';
 import { RequestGeneration } from '../utils/requestGeneration';
 import { LIVE_FETCH_LIMITS } from '../utils/liveSnapshot';
 
-type Mode = 'demo' | 'live';
 type LiveState =
   | { status: 'idle' }
   | { status: 'loading' }
@@ -121,15 +118,11 @@ function LiveIssueRow({ issue }: { issue: LiveIssue }) {
 
 /**
  * Jira Issues Card (M3 restyled)
- * Toggleable between sample demo data and live Jira API records.
- *
- * v2.1.0: `dataMode` is the global mode (Sample Dataset / Live Workspace).
- * In Live mode the demo option is removed entirely — the card is locked to
- * live data and auto-loads it, so sample and live data are never mixed in
- * one view. In Sample mode the card keeps its own demo default + toggle.
+ * Live Jira records only — the demo/sample mode was deleted: the app
+ * shows live project data, real-time, and an honest empty state when
+ * the site has no issues for the query.
  */
-export default function JiraIssuesCard({ dataMode = 'sample', refreshTick = 0 }: { dataMode?: 'sample' | 'live'; refreshTick?: number }) {
-  const [mode, setMode] = useState<Mode>('demo');
+export default function JiraIssuesCard({ refreshTick = 0 }: { refreshTick?: number }) {
   const [live, setLive] = useState<LiveState>({ status: 'idle' });
 
   // Generation guard (same pattern as useBriefingState): @forge/bridge
@@ -153,68 +146,24 @@ export default function JiraIssuesCard({ dataMode = 'sample', refreshTick = 0 }:
     );
   };
 
-  // Live mode locks the card to live data and fetches on entry.
   useEffect(() => {
-    if (dataMode === 'live') {
-      setMode('live');
-      void loadLive();
-    } else {
-      setMode('demo');
-      setLive({ status: 'idle' });
-    }
+    void loadLive();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataMode, refreshTick]);
-
-  const switchMode = (next: Mode) => {
-    setMode(next);
-    if (next === 'live') void loadLive();
-  };
+  }, [refreshTick]);
 
   return (
     <Card
       title="Jira issues"
-      subtitle={
-        mode === 'demo'
-          ? 'Sample issues · Demo data — switch to Live inside a Forge installation'
-          : 'Live data from your Jira site via the Forge backend (read-only)'
-      }
-      action={
-        // In Live mode there is no demo option to switch to.
-        dataMode === 'live' ? (
-          <span className="pill healthy">LIVE</span>
-        ) : (
-          <SegmentedButton
-            options={[
-              { value: 'demo', label: 'Demo data' },
-              { value: 'live', label: 'Live Jira' },
-            ]}
-            value={mode}
-            onChange={(v) => switchMode(v as Mode)}
-            ariaLabel="Jira data mode"
-          />
-        )
-      }
+      subtitle="Live data from your Jira site via the Forge backend (read-only)"
+      action={<span className="pill healthy">LIVE</span>}
     >
-      {mode === 'demo' && (
-        <>
-          <div style={{ marginBottom: 10 }}>
-            <span className="mock-badge">DEMO DATA</span>
-          </div>
-          <div className="row-list">
-            {SAMPLE_JIRA_ISSUES.map((issue) => (
-              <IssueRow key={issue.key} issue={issue} />
-            ))}
-          </div>
-        </>
-      )}
-
-      {mode === 'live' && live.status === 'loading' && (
+      {live.status === 'loading' && (
         <p role="status" style={{ color: 'var(--md-sys-color-on-surface-variant)', fontSize: '0.88rem' }}>
           Loading Jira issues via the Forge backend…
         </p>
       )}
 
-      {mode === 'live' && live.status === 'error' && (
+      {live.status === 'error' && (
         <div>
           <div className="note-box">
             <span
@@ -244,16 +193,11 @@ export default function JiraIssuesCard({ dataMode = 'sample', refreshTick = 0 }:
             <button className="btn btn-filled" onClick={() => void loadLive()}>
               <RefreshCw size={14} /> <span>Retry</span>
             </button>
-            {dataMode === 'sample' && (
-              <button className="btn" onClick={() => switchMode('demo')}>
-                <span>Back to demo data</span>
-              </button>
-            )}
           </div>
         </div>
       )}
 
-      {mode === 'live' && live.status === 'ready' && live.issues.length === 0 && (
+      {live.status === 'ready' && live.issues.length === 0 && (
         <div>
           <p style={{ color: 'var(--md-sys-color-on-surface-variant)', fontSize: '0.88rem' }}>
             No Jira issues found for the default query (recently updated, newest first).
@@ -262,16 +206,11 @@ export default function JiraIssuesCard({ dataMode = 'sample', refreshTick = 0 }:
             <button className="btn" onClick={() => void loadLive()}>
               <RefreshCw size={14} /> <span>Refresh</span>
             </button>
-            {dataMode === 'sample' && (
-              <button className="btn" onClick={() => switchMode('demo')}>
-                <span>Back to demo data</span>
-              </button>
-            )}
           </div>
         </div>
       )}
 
-      {mode === 'live' && live.status === 'ready' && live.issues.length > 0 && (
+      {live.status === 'ready' && live.issues.length > 0 && (
         <>
           <div style={{ marginBottom: 10 }}>
             <span className="pill healthy">LIVE</span>
@@ -293,11 +232,6 @@ export default function JiraIssuesCard({ dataMode = 'sample', refreshTick = 0 }:
             <button className="btn" onClick={() => void loadLive()}>
               <RefreshCw size={14} /> <span>Refresh</span>
             </button>
-            {dataMode === 'sample' && (
-              <button className="btn" onClick={() => switchMode('demo')}>
-                <span>Back to demo data</span>
-              </button>
-            )}
           </div>
         </>
       )}
