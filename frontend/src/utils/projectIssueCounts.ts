@@ -2,9 +2,10 @@
 // snapshot. The backend fetch is windowed (updated in the last 30
 // days, max 50 issues) and carries no status filter, so "open" is
 // derived here: any status other than Done / Resolved / Closed.
-// Blockers are the open Highest / Critical issues. Counts are
-// therefore honest snapshot counts, never full project totals — the
-// Projects footnote says so.
+// Blockers are the open issues at High priority or above — the ONE
+// blocker definition used everywhere user-facing (Overview stat,
+// briefing digest, agent tool). Counts are therefore honest snapshot
+// counts, never full project totals — the Projects footnote says so.
 import type { LiveIssue } from '../data/types';
 
 export interface ProjectIssueCounts {
@@ -13,6 +14,7 @@ export interface ProjectIssueCounts {
 }
 
 const CLOSED_STATUSES = new Set(['done', 'resolved', 'closed']);
+const BLOCKER_PRIORITIES = new Set(['highest', 'critical', 'blocker', 'high', 'major']);
 
 export function countIssuesByProject(issues: LiveIssue[]): Map<string, ProjectIssueCounts> {
   const counts = new Map<string, ProjectIssueCounts>();
@@ -23,7 +25,7 @@ export function countIssuesByProject(issues: LiveIssue[]): Map<string, ProjectIs
     if (!CLOSED_STATUSES.has(issue.status.toLowerCase())) {
       entry.open += 1;
       const priority = (issue.priority ?? '').toLowerCase();
-      if (priority === 'highest' || priority === 'critical') entry.blockers += 1;
+      if (BLOCKER_PRIORITIES.has(priority)) entry.blockers += 1;
     }
     counts.set(prefix, entry);
   }

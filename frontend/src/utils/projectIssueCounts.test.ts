@@ -12,10 +12,13 @@ test('countIssuesByProject groups by key prefix and counts open + blockers', () 
     issue('AT-1', 'In Progress', 'Highest'),
     issue('AT-2', 'To Do', 'Medium'),
     issue('AT-3', 'Done', 'Highest'),
+    issue('AT-4', 'To Do', 'High'),
     issue('AS-1', 'In Progress', 'Critical'),
     issue('AS-2', 'Resolved', 'Critical'),
   ]);
-  assert.deepEqual(counts.get('AT'), { open: 2, blockers: 1 });
+  // Blockers are open issues at High priority or above — AT-4 (High)
+  // counts; AT-2 (Medium) and AT-3 (Done) do not.
+  assert.deepEqual(counts.get('AT'), { open: 3, blockers: 2 });
   assert.deepEqual(counts.get('AS'), { open: 1, blockers: 1 });
 });
 

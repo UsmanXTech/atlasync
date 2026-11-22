@@ -110,9 +110,9 @@ export default function Overview({
         />
         <Stat
           label="Active blockers"
-          value={live ? String(b.Bcrit) : '—'}
-          delta={live ? `${b.Dmissing} unassigned` : 'Highest / Critical'}
-          tone={live && b.Bcrit > 0 ? 'bad' : 'flat'}
+          value={live ? String(live.blockerCount) : '—'}
+          delta={live ? `${live.blockersUnassigned} unassigned · High or above` : 'High priority or above'}
+          tone={live && live.blockerCount > 0 ? 'bad' : 'flat'}
           icon={ShieldAlert}
           onClick={() => askStat('blockers')}
           ariaLabel="Ask about active blockers"
@@ -215,7 +215,7 @@ export default function Overview({
             </div>
           </Card>
 
-          <Card title="Critical blockers" subtitle="Open Highest / Critical · live snapshot">
+          <Card title="Active blockers" subtitle="Open · High priority or above · live snapshot">
             <div className="row-list">
               {live?.blockers.map((blocker) => (
                 <div className="data-row" key={blocker.key}>
@@ -232,7 +232,7 @@ export default function Overview({
                 </div>
               ))}
               {live && live.blockers.length === 0 && (
-                <p className="source-empty">No open Highest / Critical blockers in the snapshot.</p>
+                <p className="source-empty">No open blockers at High priority or above in the snapshot.</p>
               )}
               {!live && <p className="source-empty">Loading live blockers…</p>}
             </div>

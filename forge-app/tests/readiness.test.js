@@ -9,8 +9,10 @@ import {
   countStalePrs,
   diagnoseHealthStatus,
   isOpenPrStatus,
+  isTopBlocker,
   selectCriticalBlockers,
   selectSevIncidents,
+  selectTopBlockers,
 } from '../src/readiness.js';
 
 const issue = (overrides = {}) => ({
@@ -206,6 +208,28 @@ describe('live-list selectors', () => {
     assert.equal(out[1].assignee, null);
   });
 
+  // The ONE user-facing blocker definition: open, High priority or
+  // above. Live review 2026-11-22: the stat card counted Highest/
+  // Critical only (1) while the briefing counted High+ (2).
+  it('selectTopBlockers keeps open High or above, including High and Major', () => {
+    const list = [
+      issue({ key: 'A-1', priority: 'Highest' }),
+      issue({ key: 'A-2', priority: 'High' }),
+      issue({ key: 'A-3', priority: 'Major' }),
+      issue({ key: 'A-4', priority: 'Medium' }),
+      issue({ key: 'A-5', priority: 'Critical', status: 'Done' }),
+      issue({ key: 'A-6', priority: 'High', status: 'Resolved' }),
+    ];
+    const out = selectTopBlockers(list);
+    assert.deepEqual(
+      out.map((b) => b.key),
+      ['A-1', 'A-2', 'A-3'],
+    );
+    assert.equal(isTopBlocker(issue({ priority: 'High' })), true);
+    assert.equal(isTopBlocker(issue({ priority: 'Medium' })), false);
+    assert.equal(isTopBlocker(issue({ priority: 'Highest', status: 'Done' })), false);
+  });
+
   it('selectSevIncidents keeps only open Highest/Critical JSM requests', () => {
     const out = selectSevIncidents([
       request({ key: 'S-1', priority: 'Highest' }),
@@ -220,6 +244,7 @@ describe('live-list selectors', () => {
 
   it('selectors tolerate non-array input', () => {
     assert.deepEqual(selectCriticalBlockers(null), []);
+    assert.deepEqual(selectTopBlockers(undefined), []);
     assert.deepEqual(selectSevIncidents(undefined), []);
   });
 });

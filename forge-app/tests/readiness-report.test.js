@@ -53,7 +53,17 @@ describe('buildReadinessReport', () => {
     assert.deepEqual(report.breakdown, { Bcrit: 2, Isev: 1, Pstale: 2, Dmissing: 1 });
     assert.equal(report.counts.jiraOpen, 3);
     assert.equal(report.counts.jsmOpen, 2);
-    assert.equal(report.blockers.length, 2);
+    // The blocker list is the ONE user-facing definition — open, High
+    // priority or above — so ATLAS-3 (High) joins ATLAS-1/ATLAS-2.
+    // The score still uses the Highest/Critical-only formula inputs
+    // (Bcrit 2, Dmissing 1), so it stays 41.
+    assert.equal(report.blockers.length, 3);
+    assert.deepEqual(
+      report.blockers.map((b) => b.key),
+      ['ATLAS-1', 'ATLAS-2', 'ATLAS-3'],
+    );
+    assert.equal(report.blockerCount, 3);
+    assert.equal(report.blockersUnassigned, 1);
     assert.equal(report.incidents.length, 1);
     assert.deepEqual(report.unavailable, []);
     assert.ok(typeof report.generatedAt === 'string');
