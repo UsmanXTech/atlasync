@@ -39,3 +39,25 @@ test('about card: deploy note is honest about how deploys happen', () => {
     'deploy note must say merges to main deploy automatically',
   );
 });
+
+test('about card: no invented deploy number anywhere', () => {
+  for (const row of APP_INFO_ROWS) {
+    assert.doesNotMatch(
+      row.value,
+      /deploy #\d+/,
+      `row "${row.label}" must not show an invented deploy number`,
+    );
+  }
+  assert.doesNotMatch(APP_DEPLOY_NOTE, /deploy #\d+/, 'deploy note must not show an invented deploy number');
+});
+
+test('about card: version row shows build identity (commit + build date)', () => {
+  const version = APP_INFO_ROWS.find((r) => r.label === 'Version');
+  assert.ok(version, 'expected a Version row');
+  // Under `npm test` no build vars are set, so the honest fallbacks apply.
+  assert.match(
+    version.value,
+    /build (dev|[0-9a-f]{7})/,
+    'version row must name the build commit or the dev fallback',
+  );
+});
