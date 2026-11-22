@@ -1,5 +1,5 @@
 import { backendUnreachableError, serviceUnreachableMessage, UNEXPECTED_RESPONSE_MESSAGE } from './errors';
-export interface IntelligenceSources { jiraIssues: number; confluencePages: number; jsmRequests: number; unavailable: string[] }
+export interface IntelligenceSources { jiraIssues: number; confluencePages: number; jsmRequests: number; bitbucketPullRequests: number; unavailable: string[] }
 export type IntelligenceResult = { ok: true; answer: string; sources: IntelligenceSources } | { ok: false; error: { kind: string; message: string } };
 export async function askAtlasync(prompt: string): Promise<IntelligenceResult> {
   try {
@@ -12,6 +12,6 @@ export async function askAtlasync(prompt: string): Promise<IntelligenceResult> {
       return { ok: false, error: { kind: typeof error.kind === 'string' ? error.kind : 'API_ERROR', message: typeof error.message === 'string' ? error.message : serviceUnreachableMessage('Intelligence') } };
     }
     const raw = value.sources && typeof value.sources === 'object' ? value.sources as Record<string, unknown> : {};
-    return { ok: true, answer: value.answer, sources: { jiraIssues: typeof raw.jiraIssues === 'number' ? raw.jiraIssues : 0, confluencePages: typeof raw.confluencePages === 'number' ? raw.confluencePages : 0, jsmRequests: typeof raw.jsmRequests === 'number' ? raw.jsmRequests : 0, unavailable: Array.isArray(raw.unavailable) ? raw.unavailable.filter((s): s is string => typeof s === 'string') : [] } };
+    return { ok: true, answer: value.answer, sources: { jiraIssues: typeof raw.jiraIssues === 'number' ? raw.jiraIssues : 0, confluencePages: typeof raw.confluencePages === 'number' ? raw.confluencePages : 0, jsmRequests: typeof raw.jsmRequests === 'number' ? raw.jsmRequests : 0, bitbucketPullRequests: typeof raw.bitbucketPullRequests === 'number' ? raw.bitbucketPullRequests : 0, unavailable: Array.isArray(raw.unavailable) ? raw.unavailable.filter((s): s is string => typeof s === 'string') : [] } };
   } catch { return { ok: false, error: backendUnreachableError('Intelligence') }; }
 }

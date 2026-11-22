@@ -363,7 +363,7 @@ export default function Intelligence({
             <div className="coverage-total">
               <Database size={18} />
               <strong className="tabular-nums">
-                {sources ? sources.jiraIssues + sources.confluencePages + sources.jsmRequests : '—'}
+                {sources ? sources.jiraIssues + sources.confluencePages + sources.jsmRequests + sources.bitbucketPullRequests : '—'}
               </strong>
               <span>records</span>
             </div>
@@ -371,6 +371,7 @@ export default function Intelligence({
               { name: 'Jira issues', value: sources?.jiraIssues },
               { name: 'Confluence pages', value: sources?.confluencePages },
               { name: 'JSM requests', value: sources?.jsmRequests },
+              { name: 'Bitbucket pull requests', value: sources?.bitbucketPullRequests },
             ].map((x) => (
               <div className="coverage-row" key={x.name}>
                 <span>{x.name}</span>

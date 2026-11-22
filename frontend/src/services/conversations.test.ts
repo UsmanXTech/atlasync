@@ -37,3 +37,44 @@ describe('sanitizeConversationTurn', () => {
     assert.deepEqual(sanitizeConversationTurn(turn), turn);
   });
 });
+
+describe('sanitizeConversationTurn sourceCounts (fix #4)', () => {
+  it('keeps valid sourceCounts on the turn', () => {
+    const turn = sanitizeConversationTurn({
+      question: 'q',
+      answer: 'a',
+      at: '2026-11-22T00:00:00.000Z',
+      sourceCounts: { jira: 3, confluence: 1, jsm: 0, bitbucket: 2 },
+    });
+    assert.deepEqual(turn.sourceCounts, { jira: 3, confluence: 1, jsm: 0, bitbucket: 2 });
+  });
+
+  it('drops the sourceCounts field when nothing usable remains', () => {
+    const allZero = sanitizeConversationTurn({
+      question: 'q',
+      answer: 'a',
+      at: '2026-11-22T00:00:00.000Z',
+      sourceCounts: { jira: 0, confluence: 0, jsm: 0, bitbucket: 0 },
+    });
+    assert.equal('sourceCounts' in allZero, false);
+    const malformed = sanitizeConversationTurn({
+      question: 'q',
+      answer: 'a',
+      at: '2026-11-22T00:00:00.000Z',
+      sourceCounts: { jira: '3', jsm: -1 },
+    });
+    assert.equal('sourceCounts' in malformed, false);
+  });
+
+  it('keeps citations and sourceCounts together', () => {
+    const turn = sanitizeConversationTurn({
+      question: 'q',
+      answer: 'a',
+      at: '2026-11-22T00:00:00.000Z',
+      citations: [{ kind: 'jira', key: 'AT-1', title: 'Checkout timeout', path: '/browse/AT-1' }],
+      sourceCounts: { jira: 3, confluence: 0, jsm: 0, bitbucket: 0 },
+    });
+    assert.equal(turn.citations?.length, 1);
+    assert.deepEqual(turn.sourceCounts, { jira: 3, confluence: 0, jsm: 0, bitbucket: 0 });
+  });
+});

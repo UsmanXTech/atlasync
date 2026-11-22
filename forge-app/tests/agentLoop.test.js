@@ -353,3 +353,107 @@ describe('runAgentLoop citations (Phase 1)', () => {
     assert.equal(stored.citations.length, 1);
   });
 });
+
+describe('sourceCounts (fix #4)', () => {
+  it('counts coverage from the tool results, per source, including bitbucket', async () => {
+    const chat = fakeChat([
+      toolCall('c1', 'get_jira_blockers', { projectKey: 'AT' }),
+      toolCall('c2', 'get_jsm_incidents', { severity: 'Highest' }),
+      toolCall('c3', 'get_pr_bottlenecks', { projectKey: 'AT' }),
+      toolCall('c4', 'search_confluence_runbooks', { query: 'deploy' }),
+      textAnswer('AT-1 blocks the release; two PRs are stale.'),
+    ]);
+    const executeRead = async (name) => {
+      switch (name) {
+        case 'get_jira_blockers':
+          // 3 rows read, but no citable records — coverage must still
+          // count 3, where the old citation count read 0.
+          return { ok: true, output: '{}', count: 3, records: [] };
+        case 'get_jsm_incidents':
+          // Exact-priority filter dropped every row: honestly 0.
+          return { ok: true, output: '{}', count: 0, records: [] };
+        case 'get_pr_bottlenecks':
+          return {
+            ok: true,
+            output: '{}',
+            count: 2,
+            records: [
+              { kind: 'bitbucket', key: 'Fix login', title: 'AT-1 — Fix login', url: 'https://bitbucket.example/pr/1' },
+              { kind: 'bitbucket', key: 'Bump deps', title: 'AT-2 — Bump deps', url: 'https://bitbucket.example/pr/2' },
+            ],
+          };
+        default:
+          return {
+            ok: true,
+            output: '{}',
+            count: 1,
+            records: [{ kind: 'confluence', key: '7', title: 'Deploy runbook', path: '/wiki/spaces/AT/pages/7' }],
+          };
+      }
+    };
+    const result = await runAgentLoop({ chat, prompt: 'What blocks the release?', executeRead });
+    assert.equal(result.status, 'COMPLETE');
+    assert.deepEqual(result.sourceCounts, { jira: 3, confluence: 1, jsm: 0, bitbucket: 2 });
+    // Citations (the Sources link list) are NOT the coverage: only 3
+    // records were citable, but 6 rows were read.
+    assert.equal(result.citations.length, 3);
+  });
+
+  it('falls back to records.length when a tool returns no count', async () => {
+    const chat = fakeChat([
+      toolCall('c1', 'get_jira_blockers', { projectKey: 'AT' }),
+      textAnswer('done'),
+    ]);
+    const executeRead = async () => ({
+      ok: true,
+      output: '{}',
+      records: [
+        { kind: 'jira', key: 'AT-1', title: 'a', path: '/browse/AT-1' },
+        { kind: 'jira', key: 'AT-2', title: 'b', path: '/browse/AT-2' },
+      ],
+    });
+    const result = await runAgentLoop({ chat, prompt: 'q', executeRead });
+    assert.deepEqual(result.sourceCounts, { jira: 2, confluence: 0, jsm: 0, bitbucket: 0 });
+  });
+
+  it('a failed read tool adds nothing to coverage', async () => {
+    const chat = fakeChat([
+      toolCall('c1', 'get_jira_blockers', { projectKey: 'AT' }),
+      toolCall('c2', 'get_jsm_incidents', { severity: 'Highest' }),
+      textAnswer('done'),
+    ]);
+    const executeRead = async (name) => {
+      if (name === 'get_jsm_incidents') return { ok: false, error: { kind: 'API_ERROR', message: 'JSM down' } };
+      return { ok: true, output: '{}', count: 1, records: [] };
+    };
+    const result = await runAgentLoop({ chat, prompt: 'q', executeRead });
+    assert.deepEqual(result.sourceCounts, { jira: 1, confluence: 0, jsm: 0, bitbucket: 0 });
+  });
+
+  it('a no-tool answer reports zero coverage', async () => {
+    const chat = fakeChat([textAnswer('All clear.')]);
+    const result = await runAgentLoop({ chat, prompt: 'Are we ready?' });
+    assert.deepEqual(result.sourceCounts, { jira: 0, confluence: 0, jsm: 0, bitbucket: 0 });
+  });
+
+  it('carries sourceCounts into the pending record on a write halt', async () => {
+    const chat = fakeChat([
+      toolCall('c1', 'get_jira_blockers', { projectKey: 'AT' }),
+      toolCall('c2', 'escalate_jira_blocker', { issueKey: 'AT-1', comment: 'Escalate.', priority: 'Highest' }),
+    ]);
+    const executeRead = async () => ({ ok: true, output: '{}', count: 2, records: [] });
+    let stored = null;
+    const result = await runAgentLoop({
+      chat,
+      prompt: 'Escalate AT-1.',
+      executeRead,
+      storePending: async (action) => {
+        stored = action;
+        return { actionId: 'act_test1', threadId: 'agent-thread:c1:a1' };
+      },
+    });
+    assert.equal(result.status, 'AWAITING_APPROVAL');
+    assert.deepEqual(result.sourceCounts, { jira: 2, confluence: 0, jsm: 0, bitbucket: 0 });
+    assert.deepEqual(stored.sourceCounts, { jira: 2, confluence: 0, jsm: 0, bitbucket: 0 });
+  });
+});

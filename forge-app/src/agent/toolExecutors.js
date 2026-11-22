@@ -170,6 +170,7 @@ export async function executeReadTool(name, args) {
           ok: true,
           output: JSON.stringify({ projectKey: args.projectKey, count: rows.length, issues: rows }),
           records,
+          count: rows.length,
         };
       }
       case 'get_jsm_incidents': {
@@ -201,6 +202,7 @@ export async function executeReadTool(name, args) {
           ok: true,
           output: JSON.stringify({ query: args.query, count: rows.length, pages: rows }),
           records,
+          count: rows.length,
         };
       }
       case 'get_pr_bottlenecks': {
@@ -256,6 +258,7 @@ export async function executeReadTool(name, args) {
             note: countStalePrs([]).note,
           }),
           records,
+          count: rows.length,
         };
       }
       default:

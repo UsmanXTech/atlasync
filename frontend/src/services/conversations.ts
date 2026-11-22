@@ -1,10 +1,13 @@
 import { backendUnreachableError, serviceUnreachableMessage, UNEXPECTED_RESPONSE_MESSAGE } from './errors.ts';
-import { toCitations, type Citation } from './agent.ts';
+import { toCitations, toSourceCounts, type Citation, type SourceCounts } from './agent.ts';
 export interface ConversationSummary { id: string; title: string; createdAt: string; updatedAt: string; turnCount: number }
 // Citations ride on the turn (backend memory.js sanitizeCitations), so
 // a restored answer keeps its Sources links. Absent on turns stored
-// before this change — callers treat missing as [].
-export interface ConversationTurn { question: string; answer: string; at: string; citations?: Citation[] }
+// before this change — callers treat missing as []. sourceCounts ride
+// on the turn the same way (memory.js sanitizeSourceCounts), so a
+// restored answer keeps the coverage the tools actually returned.
+// Absent on older turns — the hook falls back to counting citations.
+export interface ConversationTurn { question: string; answer: string; at: string; citations?: Citation[]; sourceCounts?: SourceCounts }
 export interface ConversationLastReadiness { score: number | null; breakdown: { Bcrit: number; Isev: number; Pstale: number; Dmissing: number }; generatedAt: string }
 export interface Conversation { id: string; title: string; turns: ConversationTurn[]; lastReadiness: ConversationLastReadiness | null; createdAt: string; updatedAt: string }
 export type ConversationsResult = { ok: true; conversations: ConversationSummary[] } | { ok: false; error: { kind: string; message: string } };
@@ -25,14 +28,24 @@ function isTurn(value: unknown): value is ConversationTurn {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const v = value as Record<string, unknown>;
   return typeof v.question === 'string' && typeof v.answer === 'string' && typeof v.at === 'string'
-    && (v.citations === undefined || Array.isArray(v.citations));
+    && (v.citations === undefined || Array.isArray(v.citations))
+    && (v.sourceCounts === undefined || (typeof v.sourceCounts === 'object' && v.sourceCounts !== null && !Array.isArray(v.sourceCounts)));
 }
 // Drop malformed citations from a stored turn (the backend already
 // sanitizes on write; this is defense in depth for older records).
+// sourceCounts get the same treatment; an all-zero/malformed value is
+// dropped so the hook falls back to counting citations.
 export function sanitizeConversationTurn(value: ConversationTurn): ConversationTurn {
-  if (value.citations === undefined) return value;
-  const citations = toCitations(value.citations);
-  return citations.length > 0 ? { ...value, citations } : { question: value.question, answer: value.answer, at: value.at };
+  const out: ConversationTurn = { question: value.question, answer: value.answer, at: value.at };
+  if (value.citations !== undefined) {
+    const citations = toCitations(value.citations);
+    if (citations.length > 0) out.citations = citations;
+  }
+  if (value.sourceCounts !== undefined) {
+    const counts = toSourceCounts(value.sourceCounts);
+    if (counts && (counts.jira > 0 || counts.confluence > 0 || counts.jsm > 0 || counts.bitbucket > 0)) out.sourceCounts = counts;
+  }
+  return out;
 }
 function cleanConversation(value: Conversation): Conversation {
   return { ...value, turns: value.turns.map(sanitizeConversationTurn) };
