@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
-import { normalizeJsmRequest, parseJsmRequests, validateJsmInput } from '../src/jsm.js';
+import { normalizeJsmRequest, parseJsmRequests, summarizeJsmRequests, validateJsmInput } from '../src/jsm.js';
 
 // Fixture shaped like the documented GET /rest/servicedeskapi/request
 // response (developer.atlassian.com, "Get customer requests"): top-level
@@ -68,5 +68,36 @@ describe('JSM request normalization', () => {
     assert.equal(validateJsmInput({ limit: 100 }).limit, 50);
     assert.equal(validateJsmInput({ limit: 0 }).limit, 1);
     assert.equal(validateJsmInput({ limit: 'x' }).ok, false);
+  });
+});
+
+describe('summarizeJsmRequests (fix #11)', () => {
+  const rows = [
+    { key: 'AS-1', summary: 'VPN down', status: 'Open', requestType: 'Incident', priority: 'Highest' },
+    { key: 'AS-2', summary: 'New laptop', status: 'Open', requestType: 'Service request', priority: 'Medium' },
+    { key: 'AS-3', summary: 'Access request', status: 'Waiting for support', requestType: 'Service request', priority: 'Low' },
+    { key: 'AS-4', summary: 'Printer jam', status: 'Resolved', requestType: 'Incident', priority: 'Low' },
+  ];
+
+  it('counts the full set by type and status, then filters + slices', () => {
+    const out = summarizeJsmRequests(rows, { status: 'Open' });
+    assert.equal(out.total, 4);
+    assert.deepEqual(out.countsByType, { Incident: 2, 'Service request': 2 });
+    assert.deepEqual(out.countsByStatus, { Open: 2, 'Waiting for support': 1, Resolved: 1 });
+    assert.equal(out.count, 2);
+    assert.deepEqual(out.requests.map((r) => r.key), ['AS-1', 'AS-2']);
+  });
+
+  it('filters by request type and caps the limit at 10', () => {
+    const out = summarizeJsmRequests(rows, { requestType: 'Incident', limit: 1 });
+    assert.equal(out.count, 1);
+    assert.equal(out.requests[0].key, 'AS-1');
+    // The grouping still describes the whole desk, not the slice.
+    assert.deepEqual(out.countsByType, { Incident: 2, 'Service request': 2 });
+  });
+
+  it('returns empty rows and zero counts for an empty desk', () => {
+    assert.deepEqual(summarizeJsmRequests([], {}), { total: 0, countsByType: {}, countsByStatus: {}, count: 0, requests: [] });
+    assert.deepEqual(summarizeJsmRequests(null, {}), { total: 0, countsByType: {}, countsByStatus: {}, count: 0, requests: [] });
   });
 });

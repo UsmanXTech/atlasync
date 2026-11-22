@@ -27,3 +27,17 @@ export function parseConfluencePages(data) {
   const rows = Array.isArray(data?.results) ? data.results : Array.isArray(data?.pages) ? data.pages : [];
   return rows.map(normalizeConfluencePage).filter(Boolean).slice(0, MAX_CONFLUENCE_LIMIT);
 }
+
+// URL for the Confluence v2 pages list (fix #11). Space scoping needs
+// the numeric space id — resolved from the space key first (see
+// toolExecutors.js) — because the v2 endpoint takes `space-id`, not a
+// key. Sort is newest first so "least recently updated" questions are
+// answerable from the returned order + updated dates.
+export function buildConfluencePagesUrl({ spaceId, status, limit = 10 } = {}) {
+  const params = new URLSearchParams();
+  if (spaceId !== undefined && spaceId !== null && String(spaceId) !== '') params.set('space-id', String(spaceId));
+  if (status !== undefined && status !== null && String(status) !== '') params.set('status', String(status));
+  params.set('sort', '-modified-date');
+  params.set('limit', String(Math.max(1, Math.min(50, Math.floor(limit) || 10))));
+  return `/wiki/api/v2/pages?${params.toString()}`;
+}

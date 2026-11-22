@@ -3,14 +3,36 @@
 // tests can import it without pulling in the hook's React/services graph —
 // the same pattern as intelligencePresets.ts (Run 16).
 //
-// The question names the view's TOPICS, never its numbers: the Overview
-// stats are sample/demo data, and the resolver's system prompt tells the
-// LLM to analyze only the supplied live source snapshot and never invent
-// facts. Embedding demo counts in the prompt would leak them into the
-// answer as if they were live. The LLM answers from the live snapshot
-// (10 Jira issues / 10 Confluence pages / 10 JSM requests) it already
-// receives server-side; the question only tells it which slice of the
-// workspace the user is looking at.
+// These questions are submitted through the Intelligence AGENT
+// (invokeAgent's tool loop), not through askAtlasync. The agent
+// receives NO live snapshot server-side — only a readiness score and
+// the project list are injected into its system prompt. It answers by
+// calling READ TOOLS live, per question. Each question's scope must
+// therefore match what the read tools can actually prove — a question
+// about evidence no tool returns can only be answered by guessing.
+// (An earlier version of this comment claimed the LLM answers from a
+// live 10/10/10 snapshot it receives server-side. That is true only
+// for askAtlasync's briefing path, never for these questions.)
+//
+// The question names the view's TOPICS, never its numbers: the
+// resolver's system prompt tells the LLM to analyze only what the
+// tools return and never invent facts. Embedding displayed counts in
+// the prompt would leak them into the answer as if the agent had read
+// them. The tools the agent can call:
+//   get_jira_blockers — open Highest/Critical Jira issues, with updated
+//     dates (so "least recently updated" is provable);
+//   get_pr_bottlenecks — open linked Bitbucket PRs on critical issues
+//     (name/status/url only — PRs carry no updated date, so PR "staleness"
+//     by age is NOT provable; only the issue's recency is);
+//   get_jsm_incidents — JSM requests at one priority severity;
+//   list_jsm_requests — JSM requests by status/request type, with counts
+//     grouped by type and status (so "which type is piling up" is provable);
+//   search_confluence_runbooks — Confluence pages matching text, with the
+//     spaceId of each hit;
+//   list_confluence_pages — Confluence pages in one space (by key) and/or
+//     one status, most recently updated first (so per-space status and
+//     cleanup questions are provable — this closes the old blind spot
+//     where agent evidence was a global top-10 with no space scoping).
 //
 // Projects nuance: the snapshot carries no project list — but every Jira
 // issue key carries its project prefix, so project-level grouping is
@@ -19,19 +41,20 @@
 // list itself, and the system prompt's state-when-evidence-is-missing rule
 // covers the 10-issue bound.
 //
-// Confluence nuance: the snapshot's Confluence slice carries title + status
-// + spaceId only — no updated dates and no page bodies. The confluence
-// question therefore asks about page status (archived / drafted / current)
-// and cleanup, never about recency or page contents; the card's own
-// "Updated …" line comes from the card's separate 20-page fetch, not from
-// the ask snapshot.
+// Confluence nuance: list_confluence_pages returns id + title + status +
+// spaceId + updated per page, most recently updated first; search returns
+// text matches with spaceId. The confluence question therefore asks about
+// page status (archived / drafted / current) and cleanup — now provable
+// per space, not just globally.
 //
-// JSM nuance: the snapshot's JSM slice carries key + summary + status +
-// requestType + priority only — no created dates, no requester, no comments
-// or request bodies. The jsm question therefore asks about request types,
-// statuses, and priorities, never about age/recency, who asked, or what a
-// request says beyond its summary; the card's own 20-request fetch is a
-// wider list than the 10-request ask snapshot.
+// JSM nuance: list_jsm_requests returns key + summary + status +
+// requestType + priority, plus counts grouped by type and status; the
+// jsm question therefore asks about request types, statuses, and
+// priorities, never about age/recency, who asked, or what a request
+// says beyond its summary. (One honest limit: the JSM list endpoint
+// carries requestTypeId only, so the request-type NAME defaults to
+// "Service request" when the type object is absent — the status counts
+// are the reliable half of the grouping.)
 export const CONTEXTUAL_QUESTIONS = {
   overview:
     'From this workspace overview — open issues, active blockers, PRs awaiting action, open incidents, and release readiness — what are the top risks right now, and what should we tackle first?',
@@ -45,20 +68,20 @@ export const CONTEXTUAL_QUESTIONS = {
 
 // The same no-numbers rule governs the per-stat questions below
 // (Phase 3.1): a stat click asks about that metric's TOPIC in the
-// live snapshot — never the number shown on the tile, which the
+// live tool reads — never the number shown on the tile, which the
 // agent cannot see and which may come from a different fetch window
-// than the ask snapshot. Sample-mode stats stay inert (no onClick):
-// clicking demo numbers into a live agent prompt would leak demo
-// data as if it were live.
+// than the ask. Sample-mode stats stay inert (no onClick): clicking
+// demo numbers into a live agent prompt would leak demo data as if
+// it were live.
 export const OVERVIEW_STAT_QUESTIONS = {
   openIssues:
-    'From this workspace — looking at the currently open Jira issues in the live snapshot, which ones matter most and what should we tackle first?',
+    'From this workspace — looking at the currently open Jira issues, which ones matter most and what should we tackle first?',
   blockers:
-    'From this workspace — looking at the active Highest and Critical Jira blockers in the live snapshot, what is blocking delivery and what should we unblock first?',
+    'From this workspace — looking at the active Highest and Critical Jira blockers, what is blocking delivery and what should we unblock first?',
   stalePrs:
-    'From this workspace — looking at the pull requests on critical issues in the live snapshot, which PRs are stale or blocking, and what should move first?',
+    'From this workspace — looking at the open critical issues least recently updated, and the open pull requests on critical issues, which PRs are blocking, and what should move first?',
   incidents:
-    'From this workspace — looking at the open Highest and Critical JSM incidents in the live snapshot, which incidents need attention first and what is their impact?',
+    'From this workspace — looking at the open Highest and Critical JSM incidents, which incidents need attention first and what is their impact?',
 } as const;
 
 export type OverviewStatKey = keyof typeof OVERVIEW_STAT_QUESTIONS;

@@ -22,7 +22,7 @@ export const MAX_AGENT_STEPS = 5;
 export const MAX_TOOL_OUTPUT_CHARS = 4000;
 export const MAX_TRACE_ARG_CHARS = 500;
 
-export const READ_TOOLS = ['get_jira_blockers', 'get_jsm_incidents', 'search_confluence_runbooks', 'get_pr_bottlenecks'];
+export const READ_TOOLS = ['get_jira_blockers', 'get_jsm_incidents', 'list_jsm_requests', 'search_confluence_runbooks', 'list_confluence_pages', 'get_pr_bottlenecks'];
 export const WRITE_TOOLS = ['escalate_jira_blocker', 'transition_jira_issue', 'create_confluence_release_report'];
 
 export function isReadTool(name) {
@@ -38,6 +38,8 @@ const ISSUE_KEY = /^[A-Z][A-Z0-9]{1,9}-\d{1,6}$/;
 const SPACE_KEY = /^[A-Z][A-Z0-9]{0,9}$/;
 const SEVERITIES = ['Highest', 'Critical', 'High', 'Medium', 'Low'];
 const PRIORITIES = ['Highest', 'High', 'Medium', 'Low'];
+// Confluence v2 page statuses (list_confluence_pages filter).
+const PAGE_STATUSES = ['current', 'archived', 'draft'];
 
 const invalid = (message) => ({ ok: false, error: { kind: 'INVALID_INPUT', message } });
 
@@ -62,7 +64,7 @@ function checkString(value, field, { min = 1, max, pattern } = {}) {
 }
 
 // Tool definitions for the LLM (JSON Schema parameters). Kept tight on
-// purpose: the model may only call these 7 tools with these args.
+// purpose: the model may only call these 9 tools with these args.
 export const TOOL_DEFINITIONS = [
   {
     type: 'function',
@@ -93,12 +95,45 @@ export const TOOL_DEFINITIONS = [
   {
     type: 'function',
     function: {
+      name: 'list_jsm_requests',
+      description: 'List JSM requests with counts grouped by request type and status (max 10 rows). Optionally filtered by status and/or request type. Read-only. Use this (not get_jsm_incidents) when the question is about request types, statuses, or which type is piling up.',
+      parameters: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', description: 'JSM request status to filter by, e.g. Open' },
+          requestType: { type: 'string', description: 'JSM request type to filter by' },
+          limit: { type: 'integer', description: 'Max rows to return (1-10, default 10)' },
+        },
+        required: [],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'search_confluence_runbooks',
       description: 'Search Confluence pages matching a query (max 10). Read-only.',
       parameters: {
         type: 'object',
         properties: { query: { type: 'string', description: 'Search text, e.g. "release runbook"' } },
         required: ['query'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_confluence_pages',
+      description: 'List Confluence pages, most recently updated first (max 10). Optionally scoped to one space by key and/or filtered by page status. Read-only. Use this (not text search) when the question is about pages in a space or page status/cleanup.',
+      parameters: {
+        type: 'object',
+        properties: {
+          spaceKey: { type: 'string', description: 'Confluence space key, e.g. AT' },
+          status: { type: 'string', enum: PAGE_STATUSES, description: 'Page status to filter by' },
+        },
+        required: [],
         additionalProperties: false,
       },
     },
@@ -202,6 +237,47 @@ export function validateToolArgs(toolName, rawArgs) {
       const bad = checkString(args.query, 'query', { max: 200 });
       if (bad) return invalid(bad);
       return { ok: true, args: { query: args.query.trim() } };
+    }
+    case 'list_confluence_pages': {
+      error = checkUnknownKeys(args, ['spaceKey', 'status'], toolName);
+      if (error) return error;
+      const out = {};
+      if (args.spaceKey !== undefined) {
+        if (typeof args.spaceKey !== 'string') return invalid('spaceKey must be a string.');
+        const spaceKey = args.spaceKey.trim().toUpperCase();
+        const badSpace = checkString(spaceKey, 'spaceKey', { max: 10, pattern: SPACE_KEY });
+        if (badSpace) return invalid(badSpace);
+        out.spaceKey = spaceKey;
+      }
+      if (args.status !== undefined) {
+        if (typeof args.status !== 'string' || !PAGE_STATUSES.includes(args.status.trim().toLowerCase())) {
+          return invalid(`status must be one of ${PAGE_STATUSES.join(', ')}.`);
+        }
+        out.status = args.status.trim().toLowerCase();
+      }
+      return { ok: true, args: out };
+    }
+    case 'list_jsm_requests': {
+      error = checkUnknownKeys(args, ['status', 'requestType', 'limit'], toolName);
+      if (error) return error;
+      const out = {};
+      if (args.status !== undefined) {
+        const bad = checkString(args.status, 'status', { max: 50 });
+        if (bad) return invalid(bad);
+        out.status = args.status.trim();
+      }
+      if (args.requestType !== undefined) {
+        const bad = checkString(args.requestType, 'requestType', { max: 100 });
+        if (bad) return invalid(bad);
+        out.requestType = args.requestType.trim();
+      }
+      if (args.limit !== undefined) {
+        if (typeof args.limit !== 'number' || !Number.isInteger(args.limit) || args.limit < 1 || args.limit > 10) {
+          return invalid('limit must be an integer between 1 and 10.');
+        }
+        out.limit = args.limit;
+      }
+      return { ok: true, args: out };
     }
     case 'escalate_jira_blocker': {
       error = checkUnknownKeys(args, ['issueKey', 'comment', 'priority'], toolName);
@@ -347,10 +423,12 @@ export function buildAgentSystemPrompt({ readiness, projects = [] } = {}) {
       : 'No readiness score is available for this workspace yet.';
   // Project keys are injected server-side (invokeAgent fetches them
   // with the same getJiraProjects call) so the model never has to
-  // guess or ask for one — and the tools payload stays at the 7-tool
-  // shape that worked live. A dedicated list_jira_projects tool was
-  // tried in PRs #56/#57 and the agent ask failed 4x in a row with
-  // it in the payload, while the plain Summarize call worked.
+  // guess or ask for one — and the tools payload stays at the 9-tool
+  // shape. A dedicated list_jira_projects tool was tried in PRs
+  // #56/#57 and the agent ask failed 4x in a row with it in the
+  // payload, while the plain Summarize call worked — so any payload
+  // change (including the two list_* tools added here) needs a live
+  // agent ask re-verified after deploy, not just passing tests.
   const projectsLine =
     Array.isArray(projects) && projects.length > 0
       ? `Available Jira projects: ${projects.map((p) => `${p.key} (${p.name})`).join(', ')}.`
@@ -367,5 +445,6 @@ export function buildAgentSystemPrompt({ readiness, projects = [] } = {}) {
     '5. PROJECT KEYS: the available Jira projects are listed above when known — use their keys directly and never ask the user for a project key the workspace already has.',
     '6. A tool result is scoped to the filter it was called with. A zero count for one priority or severity means zero at THAT filter only — it says nothing about other priorities or the total. Never report a filtered zero as zero records overall; say exactly which filter returned zero, and check the other priorities before claiming anything about the total.',
     '7. PROPOSE WRITES WITH THE TOOL, NEVER IN PROSE: when you want to change something (escalate, transition, create a page), emit the write tool call with its exact arguments — do not describe the proposal in text and stop. A proposal written only in prose never reaches the user for approval and is lost.',
+    '8. LIST TOOLS: when a question asks about pages in a specific Confluence space or about page status/cleanup, use list_confluence_pages — search_confluence_runbooks only matches text. When a question asks about JSM requests by status or request type, or which type is piling up, use list_jsm_requests — get_jsm_incidents only filters by priority.',
   ].join('\n');
 }
