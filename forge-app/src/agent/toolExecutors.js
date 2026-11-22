@@ -83,9 +83,14 @@ export function markdownToStorage(markdown) {
 // Any `"` in the key is stripped — the PROJECT_KEY validator in
 // toolRegistry.js already restricts keys to [A-Z0-9], so this is
 // defense-in-depth for unvalidated callers.
+// The priority set matches the briefing predicate
+// (frontend/src/utils/briefing.ts): blockers are open issues at
+// priority High or above. The tool used to stop at Critical, so a High
+// blocker such as AT-2 showed in the briefing but was invisible to
+// the agent — the blocker question omitted it (live review 2026-11-21).
 export function buildBlockerJql(projectKey) {
   const key = String(projectKey ?? '').replaceAll('"', '');
-  return `project = "${key}" AND priority IN (Highest, Critical) AND status NOT IN (Done, Closed, Resolved) ORDER BY updated DESC`;
+  return `project = "${key}" AND priority IN (Highest, Critical, High) AND status NOT IN (Done, Closed, Resolved) ORDER BY updated DESC`;
 }
 
 async function fetchBlockerIssues(projectKey) {
