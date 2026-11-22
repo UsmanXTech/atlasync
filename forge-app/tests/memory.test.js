@@ -448,6 +448,35 @@ describe('execution history (Phase 2)', () => {
     assert.equal(entry.citations.length, 10);
   });
 
+  // Fix #5: the stored counts survive the trace/citation caps, so a
+  // long run still reports its true call/source numbers in history.
+  it('stores the count snapshot passed by the caller, past the array caps', () => {
+    const entry = normalizeExecutionRun(
+      run({
+        trace: Array.from({ length: 30 }, (_, i) => ({ step: i, tool: 't', args: '{}', status: 'ok', durationMs: 1 })),
+        citations: Array.from({ length: 15 }, (_, i) => ({ kind: 'jira', key: `AT-${i}`, title: 't' })),
+        toolCallCount: 30,
+        sourceCount: 15,
+      }),
+    );
+    assert.equal(entry.trace.length, 20);
+    assert.equal(entry.citations.length, 10);
+    assert.equal(entry.toolCallCount, 30);
+    assert.equal(entry.sourceCount, 15);
+  });
+
+  it('defaults the counts to the array lengths when the caller passes none', () => {
+    const entry = normalizeExecutionRun(run({}));
+    assert.equal(entry.toolCallCount, 1);
+    assert.equal(entry.sourceCount, 1);
+  });
+
+  it('drops invalid counts instead of storing them', () => {
+    const entry = normalizeExecutionRun(run({ toolCallCount: -1, sourceCount: 'three' }));
+    assert.equal(entry.toolCallCount, 1);
+    assert.equal(entry.sourceCount, 1);
+  });
+
   it('listExecutionRuns returns an empty list when nothing is stored', async () => {
     assert.deepEqual(await listExecutionRuns(fakeStore(), 'c1'), []);
   });

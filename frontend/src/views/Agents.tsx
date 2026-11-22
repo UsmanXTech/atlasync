@@ -161,8 +161,8 @@ export default function Agents({
                   <span className="example-copy">
                     <strong>{run.question}</strong>
                     <span>
-                      {new Date(run.generatedAt).toLocaleString()} · {run.trace.length} tool calls ·{' '}
-                      {run.citations.length} sources
+                      {new Date(run.generatedAt).toLocaleString()} · {(run.toolCallCount ?? run.trace.length)} tool calls ·{' '}
+                      {(run.sourceCount ?? run.citations.length)} sources
                       {run.tool ? ` · ${run.tool}${run.target ? ` on ${run.target}` : ''}` : ''}
                     </span>
                     {run.error && <span className="source-error">{run.error}</span>}

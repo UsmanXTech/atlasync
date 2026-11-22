@@ -556,6 +556,15 @@ export function normalizeExecutionRun(input) {
     target: cleanRunText(input.target, 200),
     trace,
     citations,
+    // Fix #5: count snapshot taken at record time. The trace is capped
+    // at 20 and citations at 10, so the arrays alone undercount a long
+    // run; the stored counts keep the true number even after the cap.
+    // When the caller passes no counts they default to the array
+    // lengths, so old callers stay honest.
+    toolCallCount:
+      Number.isInteger(input.toolCallCount) && input.toolCallCount >= 0 ? input.toolCallCount : trace.length,
+    sourceCount:
+      Number.isInteger(input.sourceCount) && input.sourceCount >= 0 ? input.sourceCount : citations.length,
     generatedAt,
     conversationId: typeof input.conversationId === 'string' && input.conversationId !== '' ? input.conversationId : null,
     error: cleanRunText(input.error, 500),
