@@ -623,6 +623,31 @@ describe('conversations (Phase 1)', () => {
     assert.equal(list[0].turnCount, 10);
   });
 
+  it('loads the right turns for each conversation when switching back and forth', async () => {
+    // Conversation switcher regression (live review 2026-11-22): the
+    // frontend guard blocked switching, so the backend side of the
+    // switch is pinned here — loadConversation must return the
+    // SELECTED conversation's own turns, not the first or the last.
+    const store = fakeStore();
+    const first = await createConversation(store, 'c1', 'a1', 'Blockers');
+    const second = await createConversation(store, 'c1', 'a1', 'Readiness');
+    await appendConversationTurn(store, 'c1', 'a1', first.id, {
+      question: 'What are the current blockers?',
+      answer: 'AT-1 and AT-2.',
+    });
+    await appendConversationTurn(store, 'c1', 'a1', second.id, {
+      question: 'What is the readiness score?',
+      answer: '78%.',
+    });
+    const loadedFirst = await loadConversation(store, 'c1', 'a1', first.id);
+    const loadedSecond = await loadConversation(store, 'c1', 'a1', second.id);
+    assert.equal(loadedFirst.turns[0].question, 'What are the current blockers?');
+    assert.equal(loadedSecond.turns[0].question, 'What is the readiness score?');
+    // And back again: re-loading the first still returns its own turn.
+    const loadedFirstAgain = await loadConversation(store, 'c1', 'a1', first.id);
+    assert.equal(loadedFirstAgain.turns[0].answer, 'AT-1 and AT-2.');
+  });
+
   it('migrates the legacy thread once, and never re-migrates after delete-all', async () => {
     const store = fakeStore();
     await appendThreadTurn(store, 'c1', 'a1', { question: 'Old question', answer: 'Old answer' });
