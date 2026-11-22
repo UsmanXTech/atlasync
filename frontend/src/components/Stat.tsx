@@ -7,8 +7,8 @@ interface StatProps {
   tone: 'up' | 'down' | 'flat' | 'bad';
   icon: LucideIcon;
   // Phase 3.1 — when present the stat is a button that asks
-  // Intelligence about this metric. Sample/demo stats stay inert
-  // (no onClick) so demo numbers never leak into a live prompt.
+  // Intelligence about this metric. A stat without onClick stays inert
+  // so no number leaks into a live prompt unasked.
   onClick?: () => void;
   ariaLabel?: string;
 }

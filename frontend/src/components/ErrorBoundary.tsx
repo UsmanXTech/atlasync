@@ -1,8 +1,8 @@
 import { Component, type ReactNode } from 'react';
 
 // Catches render errors in a dashboard view so one broken view cannot
-// whitescreen the whole app. The fallback names the demo build honestly
-// and offers the two sensible recoveries: another view, or a reload.
+// whitescreen the whole app. The fallback offers the two sensible
+// recoveries: another view, or a reload.
 interface ErrorBoundaryProps {
   children: ReactNode;
 }
@@ -25,7 +25,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
           <div className="card">
             <h3 style={{ marginTop: 0 }}>This view hit an error</h3>
             <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.55 }}>
-              The demo build could not render this view. Your other views are unaffected — pick one
+              Atlasync could not render this view. Your other views are unaffected — pick one
               from the sidebar, or reload the page to try again.
             </p>
             <button className="btn btn-primary" onClick={() => window.location.reload()}>

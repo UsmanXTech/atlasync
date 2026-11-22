@@ -1,144 +1,10 @@
-// Dashboard domain types. All data in mock.ts is sample data — no live
-// Atlassian connection exists yet. Types stay UI-shaped on purpose: the
-// integration adapters (integrations/) will map real API payloads onto
-// these shapes later.
-
-export type WorkspaceId = 'hq' | 'platform';
-
-// A workspace is a DEMO-DATA grouping only. It scopes the labelled sample
-// sections (Overview demo panels, demo search results) and nothing else.
-// It NEVER scopes live data: live Jira issues/projects, Confluence pages
-// and JSM requests are permission-filtered by the current Atlassian user
-// and are shown in full regardless of the selected workspace. Any UI that
-// shows the selector or a workspace name must say so (see Topbar).
-export interface Workspace {
-  id: WorkspaceId;
-  name: string;
-  plan: string;
-}
-
-export type HealthStatus = 'healthy' | 'at-risk' | 'blocked';
-export type Severity = 'critical' | 'high' | 'medium' | 'low';
-
-export interface Project {
-  id: string;
-  key: string;
-  name: string;
-  workspace: WorkspaceId;
-  owner: string;
-  health: HealthStatus;
-  progress: number; // 0–100
-  openIssues: number;
-  blockers: number;
-  nextMilestone: string;
-  updatedDaysAgo: number;
-}
+// Dashboard domain types. Live data only — the demo/sample dataset was
+// deleted, so every type here describes a live Atlassian record (or a
+// live-derived aggregate) returned by the Forge backend.
 
 export interface IssueBucket {
   label: string;
   count: number;
-}
-
-export interface Blocker {
-  id: string;
-  key: string;
-  title: string;
-  workspace: WorkspaceId;
-  severity: Severity;
-  owner: string;
-  blockedBy: string;
-  ageDays: number;
-}
-
-export interface DocActivity {
-  id: string;
-  title: string;
-  space: string;
-  workspace: WorkspaceId;
-  editor: string;
-  edits: number;
-  daysAgo: number;
-}
-
-export type PrStatus = 'review' | 'approved' | 'merged' | 'changes';
-
-export interface PullRequest {
-  id: string;
-  title: string;
-  repo: string;
-  workspace: WorkspaceId;
-  author: string;
-  status: PrStatus;
-  checks: 'pass' | 'fail' | 'pending';
-  daysAgo: number;
-}
-
-export type IncidentSeverity = 'sev1' | 'sev2' | 'sev3';
-
-export interface Incident {
-  id: string;
-  title: string;
-  service: string;
-  workspace: WorkspaceId;
-  severity: IncidentSeverity;
-  status: 'open' | 'investigating' | 'resolved';
-  minutesOpen: number;
-}
-
-export type ActivityKind = 'jira' | 'confluence' | 'bitbucket' | 'jsm' | 'ai';
-
-export interface ActivityItem {
-  id: string;
-  kind: ActivityKind;
-  title: string;
-  detail: string;
-  actor: string;
-  workspace: WorkspaceId;
-  daysAgo: number;
-}
-
-export interface Agent {
-  id: string;
-  name: string;
-  description: string;
-  capability: string;
-  enabled: boolean;
-  lastRun: string;
-  runsThisWeek: number;
-}
-
-export interface Integration {
-  id: string;
-  tool: 'Jira' | 'Confluence' | 'Bitbucket' | 'Jira Service Management';
-  connected: boolean;
-  lastSync: string;
-  itemsSynced: number;
-  note: string;
-}
-
-export interface NotificationItem {
-  id: string;
-  title: string;
-  detail: string;
-  daysAgo: number;
-  unread: boolean;
-}
-
-export interface AiNextAction {
-  title: string;
-  owner: string;
-  due: string;
-}
-
-export interface AiResponse {
-  prompt: string;
-  readiness: number; // 0–100
-  verdict: string;
-  summary: string;
-  blockers: string[];
-  risks: string[];
-  issues: string[];
-  actions: AiNextAction[];
 }
 
 export interface InsightPoint {
@@ -155,7 +21,7 @@ export interface InsightPoint {
 export interface LiveIssue {
   key: string;
   // Numeric Jira issue id (Task 6, Architecture A): the dev-status
-  // endpoint needs it; null for sample issues, which never call it.
+  // endpoint needs it; null when the issue has no numeric id.
   id: string | null;
   summary: string;
   status: string;

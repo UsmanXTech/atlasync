@@ -57,9 +57,10 @@ export interface SettingsSnapshot {
   toggles: SettingsToggles;
 }
 
-// Fresh defaults for a demo workspace: its name, the default timezone,
-// and the default toggles. A fresh toggles object is returned every call,
-// so mutating one snapshot never leaks into the next.
-export function defaultSettingsFor(workspaceName: string): SettingsSnapshot {
-  return { name: workspaceName, timezone: DEFAULT_TIMEZONE, toggles: { ...DEFAULT_TOGGLES } };
+// Fresh defaults: an empty workspace name (the user types their own —
+// no demo workspace exists to prefill it), the default timezone, and the
+// default toggles. A fresh toggles object is returned every call, so
+// mutating one snapshot never leaks into the next.
+export function defaultSettings(): SettingsSnapshot {
+  return { name: '', timezone: DEFAULT_TIMEZONE, toggles: { ...DEFAULT_TOGGLES } };
 }

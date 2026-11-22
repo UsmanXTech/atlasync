@@ -501,51 +501,6 @@ button {
   box-shadow: none;
 }
 
-.workspace-select {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.workspace-select > span {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--md-sys-color-on-surface-variant);
-}
-
-.select-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.select-wrap select {
-  appearance: none;
-  background: var(--md-sys-color-surface-container-lowest);
-  color: var(--md-sys-color-on-surface);
-  border: 1px solid var(--md-sys-color-outline-variant);
-  border-radius: var(--md-sys-shape-corner-sm);
-  padding: 6px 28px 6px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: border-color 0.15s ease;
-}
-
-.select-wrap select:focus {
-  border-color: var(--md-sys-color-primary);
-}
-
-.select-wrap svg {
-  position: absolute;
-  right: 8px;
-  color: var(--md-sys-color-on-surface-variant);
-  pointer-events: none;
-}
-
 /* M3 Contained Search Bar */
 .search {
   position: relative;
@@ -738,25 +693,6 @@ button {
   background: var(--md-sys-color-at-risk-on-container);
 }
 
-/* v2.1.0 data-mode toggle: the badge is a button now, so the global
-   40dp pill button chrome is reset back to the badge look. */
-.forge-badge.mode-toggle {
-  height: auto;
-  min-height: 0;
-  padding: 6px 10px;
-  border: 1px solid var(--md-sys-color-outline-variant);
-  border-radius: var(--md-sys-shape-corner-full);
-  background: transparent;
-  color: var(--md-sys-color-on-surface-variant);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.forge-badge.mode-toggle:hover {
-  background: rgba(29, 26, 34, 0.08);
-}
-
 .icon-btn {
   position: relative;
   display: grid;
@@ -775,23 +711,6 @@ button {
   border-color: var(--md-sys-color-outline);
 }
 
-.bell-count {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: var(--md-sys-shape-corner-full);
-  background: var(--md-sys-color-error);
-  color: var(--md-sys-color-on-error);
-  font-size: 10px;
-  font-weight: 700;
-  display: grid;
-  place-items: center;
-  line-height: 1;
-}
-
 .menu-wrap {
   position: relative;
 }
@@ -799,47 +718,6 @@ button {
 .drop-panel {
   right: 0;
   width: 320px;
-}
-
-.drop-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-}
-
-.drop-head strong {
-  font-size: 14px;
-}
-
-.drop-head button {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  border: 0;
-  background: transparent;
-  color: var(--md-sys-color-primary);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.notif-row {
-  padding: 8px 10px;
-  border-radius: var(--md-sys-shape-corner-sm);
-}
-
-.notif-row.unread {
-  background: var(--md-sys-color-secondary-container);
-}
-
-.notif-row strong {
-  display: block;
-  font-size: 13px;
-}
-
-.notif-row small {
-  color: var(--md-sys-color-on-surface-variant);
-  font-size: 11px;
 }
 
 .profile-btn {
@@ -1213,8 +1091,7 @@ button.stat-clickable:focus-visible {
 .pill.low,
 .pill.medium,
 .pill.sev3,
-.connection-state.not-provisioned,
-.mock-badge {
+.connection-state.not-provisioned {
   background: var(--md-sys-color-neutral-container);
   color: var(--md-sys-color-neutral-on-container);
   border: 1px solid var(--md-sys-color-neutral-outline);
@@ -1231,16 +1108,6 @@ button.stat-clickable:focus-visible {
   font-weight: 600;
   letter-spacing: 0.02em;
   white-space: nowrap;
-}
-
-.mock-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: var(--md-sys-shape-corner-sm);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
 }
 
 /* v2.1.0: the Live Workspace badge — same shape as the sample badge,
@@ -2790,7 +2657,6 @@ button.stat-clickable:focus-visible {
   color: var(--md-sys-color-on-surface-variant);
 }
 
-.overview-view .view-head .mock-badge,
 .overview-view .view-head .live-badge {
   flex-shrink: 0;
 }

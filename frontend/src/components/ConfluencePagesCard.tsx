@@ -100,7 +100,7 @@ export default function ConfluencePagesCard({
           </div>
         ))}
       </div>
-      <p className="source-footnote">Live records only. No sample pages are mixed into this list.</p>
+      <p className="source-footnote">Live records only.</p>
     </Card>
   );
 }

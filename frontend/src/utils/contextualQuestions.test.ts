@@ -12,8 +12,8 @@ import {
 
 // The contextual question is the prompt sent to the Forge LLM, so it must
 // stay inside the resolver's 1–1500 character limit, name the view's topics
-// (not its numbers — Overview stats are sample data), and never mention
-// demo/sample data as something to analyze.
+// (not its numbers), and never mention demo/sample data as something to
+// analyze.
 test('overview contextual question names every overview topic', () => {
   const q = contextualQuestionFor('overview');
   assert.equal(q, CONTEXTUAL_QUESTIONS.overview);

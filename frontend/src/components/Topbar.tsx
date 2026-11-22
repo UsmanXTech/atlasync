@@ -1,35 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  AlertTriangle,
-  Bell,
-  Check,
-  ChevronDown,
-  CircleDot,
-  FileText,
-  FolderKanban,
-  GitPullRequest,
-  LifeBuoy,
-  Menu,
-  RefreshCw,
-  Search,
-} from 'lucide-react';
-import {
-  ACTIVITY,
-  BLOCKERS,
-  DOCS,
-  INCIDENTS,
-  NOTIFICATIONS,
-  PROJECTS,
-  PULL_REQUESTS,
-} from '../data/mock';
-import type { LiveConfluencePage, LiveIssue, LiveJsmRequest, Workspace } from '../data/types';
+import { ChevronDown, CircleDot, FileText, LifeBuoy, Menu, RefreshCw, Search } from 'lucide-react';
+import type { LiveConfluencePage, LiveIssue, LiveJsmRequest } from '../data/types';
 import type { ViewId } from './Sidebar';
 import { fetchLiveJiraIssues } from '../services/jira';
 import { fetchConfluencePages } from '../services/confluence';
 import { fetchJsmRequests } from '../services/jsm';
 import { LIVE_FETCH_LIMITS } from '../utils/liveSnapshot';
 import { LiveSearchLoader, type LiveSearchSnapshot, type LiveSourceFetchers, type LiveSourceKey } from '../utils/liveSearch';
-import { DATA_MODE_LABELS, type DataMode } from '../utils/dataMode';
 import { useSiteUrl } from '../hooks/useSiteUrl';
 import { openRecordUrl, recordUrl, type SearchRecordIdentity } from '../utils/recordLinks';
 
@@ -40,7 +17,7 @@ interface SearchResult {
   kind: string;
   title: string;
   detail: string;
-  source: 'live' | 'demo';
+  source: 'live';
   view: ViewId;
   // Live results carry the record's identity so a click can open the
   // ORIGINAL record (router.open) instead of just navigating to a view.
@@ -49,13 +26,8 @@ interface SearchResult {
 }
 
 interface TopbarProps {
-  workspaces: Workspace[];
-  workspace: Workspace;
-  onWorkspace: (id: string) => void;
   onNavigate: (view: ViewId) => void;
   forgeMode: ForgeMode;
-  dataMode: DataMode;
-  onDataMode: (mode: DataMode) => void;
   onMenu: () => void;
   // Fix #9: fired after a Sync Portfolio run with whether every
   // source refreshed cleanly. App bumps its refresh counter (cards +
@@ -63,12 +35,11 @@ interface TopbarProps {
   onSync?: (ok: boolean) => void;
 }
 
+// Live search results only ever carry these three kinds now that
+// the demo results (Project / PR / Incident) are deleted.
 const KIND_ICONS: Record<string, typeof CircleDot> = {
-  Project: FolderKanban,
   Issue: CircleDot,
-  PR: GitPullRequest,
   Doc: FileText,
-  Incident: AlertTriangle,
   Request: LifeBuoy,
 };
 
@@ -102,16 +73,13 @@ function liveSourceFetchers(): LiveSourceFetchers {
  * Material Design 3 Small Top App Bar (Specification #5 & #11)
  * - Exactly 64dp tall, surface-container (#f3ebf7), no shadow
  * - Contained 56dp search bar with ⌘K keycap
- * - Bell icon button with 16dp badge
  * - Exactly ONE filled primary button (SYNC PORTFOLIO, 40dp, pill)
  * - 30dp circular user avatar
  */
-export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate, forgeMode, dataMode, onDataMode, onMenu, onSync }: TopbarProps) {
+export default function Topbar({ onNavigate, forgeMode, onMenu, onSync }: TopbarProps) {
   const [query, setQuery] = useState('');
   const [searchFocus, setSearchFocus] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [notes, setNotes] = useState(NOTIFICATIONS);
   const [syncing, setSyncing] = useState(false);
   const siteUrl = useSiteUrl();
   // Fix #9: small success/failure notice for the Sync Portfolio run.
@@ -170,50 +138,15 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
   }, [query, forgeMode, startLiveFetch]);
 
   useEffect(() => {
-    if (!notifOpen && !profileOpen) return;
+    if (!profileOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setNotifOpen(false);
         setProfileOpen(false);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [notifOpen, profileOpen]);
-
-  const unread = notes.filter((n) => n.unread).length;
-
-  const results = useMemo<SearchResult[]>(() => {
-    const q = query.trim().toLowerCase();
-    if (q.length < 2) return [];
-    const out: SearchResult[] = [];
-    for (const p of PROJECTS) {
-      if (`${p.key} ${p.name}`.toLowerCase().includes(q)) {
-        out.push({ id: p.id, kind: 'Project', title: `${p.key} · ${p.name}`, detail: `Owner: ${p.owner}`, source: 'demo', view: 'projects' });
-      }
-    }
-    for (const b of BLOCKERS) {
-      if (`${b.key} ${b.title}`.toLowerCase().includes(q)) {
-        out.push({ id: b.id, kind: 'Issue', title: `${b.key} · ${b.title}`, detail: `Severity: ${b.severity}`, source: 'demo', view: 'overview' });
-      }
-    }
-    for (const pr of PULL_REQUESTS) {
-      if (`${pr.title} ${pr.repo}`.toLowerCase().includes(q)) {
-        out.push({ id: pr.id, kind: 'PR', title: pr.title, detail: `${pr.repo} · ${pr.author}`, source: 'demo', view: 'overview' });
-      }
-    }
-    for (const d of DOCS) {
-      if (d.title.toLowerCase().includes(q)) {
-        out.push({ id: d.id, kind: 'Doc', title: d.title, detail: `${d.space} · ${d.editor}`, source: 'demo', view: 'overview' });
-      }
-    }
-    for (const inc of INCIDENTS) {
-      if (inc.title.toLowerCase().includes(q)) {
-        out.push({ id: inc.id, kind: 'Incident', title: inc.title, detail: `${inc.service} · ${inc.severity}`, source: 'demo', view: 'overview' });
-      }
-    }
-    return out.slice(0, 8);
-  }, [query]);
+  }, [profileOpen]);
 
   const liveResults = useMemo<SearchResult[]>(() => {
     const q = query.trim().toLowerCase();
@@ -253,11 +186,6 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
     return out.slice(0, 8);
   }, [query, liveState, liveIssues, livePages, liveRequests]);
 
-  const activityHits = useMemo(
-    () => ACTIVITY.filter((a) => a.title.toLowerCase().includes(query.trim().toLowerCase())).length,
-    [query],
-  );
-
   // Fix #9: the old handler fired startLiveFetch() (ensure — a no-op
   // once loaded) and cleared the spinner on a fixed 900ms timer, so
   // Sync did zero network traffic and reported success regardless.
@@ -289,24 +217,6 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
         <Menu size={20} />
       </button>
 
-      <label className="workspace-select" title="Demo data grouping — does not scope live Jira, Confluence or JSM data.">
-        <span>Workspace</span>
-        <span className="select-wrap">
-          <select
-            value={workspace.id}
-            onChange={(e) => onWorkspace(e.target.value)}
-            aria-label="Workspace selector"
-          >
-            {workspaces.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
-          </select>
-          <ChevronDown size={14} />
-        </span>
-      </label>
-
       <div className="search">
         <Search size={18} />
         <input
@@ -317,7 +227,7 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
           onKeyDown={(e) => {
             if (e.key === 'Escape') setQuery('');
           }}
-          placeholder="Search issues, agents, pull requests…"
+          placeholder="Search issues, pages, requests…"
           aria-label="Global search"
         />
         <span className="search-shortcut">⌘K</span>
@@ -386,97 +296,20 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
                 })}
               </>
             )}
-            <p className="drop-section">Demo</p>
-            {results.length === 0 ? (
-              <p className="drop-empty">
-                No demo matches. {activityHits > 0 ? `${activityHits} activity item(s) mention this.` : ''}
-              </p>
-            ) : (
-              results.map((r) => {
-                const Icon = KIND_ICONS[r.kind] ?? CircleDot;
-                return (
-                  <button
-                    key={r.id}
-                    className="drop-row"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      onNavigate(r.view);
-                      setQuery('');
-                    }}
-                  >
-                    <Icon size={15} />
-                    <span>
-                      <strong>{r.title}</strong>
-                      <small>{r.detail}</small>
-                    </span>
-                    <em>{r.kind}</em>
-                  </button>
-                );
-              })
-            )}
             {forgeMode !== 'forge' && <p className="drop-note">Live results appear when installed in Forge.</p>}
           </div>
         )}
       </div>
 
       <div className="topbar-right">
-        {/* v2.1.0 data-mode toggle: the old status pill ("Preview mode" /
-            "Forge connected") is now the explicit Sample Dataset vs Live
-            Workspace switch. The dot still signals Forge connectivity
-            (green = installed, amber = preview); the label is the mode.
-            While connecting, the pill is not interactive yet. */}
-        {forgeMode === 'loading' ? (
-          <span className={`forge-badge ${forgeMode}`}>
-            <i />
-            Connecting…
-          </span>
-        ) : (
-          <button
-            type="button"
-            className={`forge-badge ${forgeMode} mode-toggle`}
-            onClick={() => onDataMode(dataMode === 'sample' ? 'live' : 'sample')}
-            aria-pressed={dataMode === 'live'}
-            title={
-              dataMode === 'sample'
-                ? 'Sample Dataset — showing demo data. Click to switch to Live Workspace.'
-                : 'Live Workspace — showing live Atlassian data. Click to switch to Sample Dataset.'
-            }
-          >
-            <i />
-            {DATA_MODE_LABELS[dataMode]}
-          </button>
-        )}
-
-        <div className="menu-wrap">
-          <button
-            className="icon-btn bell"
-            onClick={() => {
-              setNotifOpen((v) => !v);
-              setProfileOpen(false);
-            }}
-            aria-label="Notifications"
-          >
-            <Bell size={18} />
-            {unread > 0 && <span className="bell-count">{unread}</span>}
-          </button>
-          {notifOpen && (
-            <div className="drop-panel notif-panel">
-              <div className="drop-head">
-                <strong>Notifications</strong>
-                <button onClick={() => setNotes(notes.map((n) => ({ ...n, unread: false })))}>
-                  <Check size={14} /> Mark all read
-                </button>
-              </div>
-              <p className="drop-note">Sample notifications — read state is local only.</p>
-              {notes.map((n) => (
-                <div key={n.id} className={`notif-row ${n.unread ? 'unread' : ''}`}>
-                  <strong>{n.title}</strong>
-                  <small>{n.detail}</small>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Connectivity badge only — the Sample Dataset / Live
+            Workspace toggle was deleted with the demo data. The dot
+            signals Forge connectivity (green = installed, amber =
+            preview); the label is the connection state. */}
+        <span className={`forge-badge ${forgeMode}`}>
+          <i />
+          {forgeMode === 'loading' ? 'Connecting…' : forgeMode === 'forge' ? 'Forge connected' : 'Preview'}
+        </span>
 
         {/* M3 Primary Top App Bar Action — Exactly ONE 40dp filled pill button */}
         <button
@@ -499,7 +332,6 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
             className="profile-btn"
             onClick={() => {
               setProfileOpen((v) => !v);
-              setNotifOpen(false);
             }}
             aria-label="User profile"
           >
@@ -513,8 +345,7 @@ export default function Topbar({ workspaces, workspace, onWorkspace, onNavigate,
           {profileOpen && (
             <div className="drop-panel profile-panel">
               <strong>Usman Hassan</strong>
-              <small>Workspace admin · {workspace.plan}</small>
-              <p>Preview account — sample data only.</p>
+              <small>Workspace admin</small>
             </div>
           )}
         </div>
