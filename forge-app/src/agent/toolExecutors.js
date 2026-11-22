@@ -14,7 +14,7 @@ import api, { route } from '@forge/api';
 import { buildSearchBody, parseJiraSearchResponse } from '../jira.js';
 import { parseDevStatusResponse } from '../devstatus.js';
 import { parseJsmRequests } from '../jsm.js';
-import { countStalePrs, isOpenPrStatus, selectCriticalBlockers } from '../readiness.js';
+import { countStalePrs, isOpenJsmRequest, isOpenPrStatus, selectCriticalBlockers } from '../readiness.js';
 
 const apiError = (message) => ({ ok: false, error: { kind: 'API_ERROR', message } });
 const MAX_ROWS = 10;
@@ -110,6 +110,39 @@ async function fetchBlockerIssues(projectKey) {
   return parseJiraSearchResponse(await response.json());
 }
 
+// Shape the get_jsm_incidents result (pure, so unit tests can pin the
+// exact JSON the model sees). The output always states the severity
+// filter and the open-request total across ALL priorities — a zero at
+// one severity must never read as "no requests at all". That exact
+// over-generalization shipped in a stored answer ("Zero open JSM
+// requests at every priority level") when the Highest filter returned
+// zero while AS-1 was open at High (live review 2026-11-21).
+export function shapeJsmIncidentsResult(severity, allRequests) {
+  const list = Array.isArray(allRequests) ? allRequests : [];
+  const totalOpen = list.filter(isOpenJsmRequest).length;
+  const rows = list
+    .filter((r) => r.priority === severity)
+    .slice(0, MAX_ROWS)
+    .map((r) => ({ key: r.key, summary: r.summary, status: r.status, priority: r.priority }));
+  const records = rows.map((r) => ({
+    kind: 'jsm',
+    key: r.key,
+    title: r.summary,
+    path: `/browse/${r.key}`,
+  }));
+  const note =
+    rows.length === 0 && totalOpen > 0
+      ? `Filter: priority = ${severity}. No requests at this priority in the returned snapshot — this does NOT mean there are no open requests at all: ${totalOpen} open request(s) exist at other priorities.`
+      : rows.length === 0
+        ? `Filter: priority = ${severity}. No requests at this priority, and no open requests at any priority, in the returned snapshot (max 50).`
+        : `Filter: priority = ${severity}. ${rows.length} request(s) at this priority in the returned snapshot (max 50); ${totalOpen} open request(s) at all priorities.`;
+  return {
+    ok: true,
+    output: JSON.stringify({ severity, count: rows.length, totalOpen, requests: rows, note }),
+    records,
+  };
+}
+
 // --- READ tools (auto-execute) -------------------------------------------
 
 export async function executeReadTool(name, args) {
@@ -145,22 +178,7 @@ export async function executeReadTool(name, args) {
           headers: { Accept: 'application/json' },
         });
         if (response.status >= 400) throw new Error('JSM unavailable or permission denied');
-        const all = parseJsmRequests(await response.json());
-        const rows = all
-          .filter((r) => r.priority === args.severity)
-          .slice(0, MAX_ROWS)
-          .map((r) => ({ key: r.key, summary: r.summary, status: r.status, priority: r.priority }));
-        const records = rows.map((r) => ({
-          kind: 'jsm',
-          key: r.key,
-          title: r.summary,
-          path: `/browse/${r.key}`,
-        }));
-        return {
-          ok: true,
-          output: JSON.stringify({ severity: args.severity, count: rows.length, requests: rows }),
-          records,
-        };
+        return shapeJsmIncidentsResult(args.severity, parseJsmRequests(await response.json()));
       }
       case 'search_confluence_runbooks': {
         const cql = `text ~ "${args.query.replaceAll('"', '')}" AND type = page`;

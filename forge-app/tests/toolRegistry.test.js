@@ -217,4 +217,10 @@ describe('buildAgentSystemPrompt', () => {
   it('says so plainly when no project list is available', () => {
     assert.match(buildAgentSystemPrompt({}), /No Jira project list is available/);
   });
+
+  it('forbids generalizing a per-filter zero into a total', () => {
+    const prompt = buildAgentSystemPrompt({});
+    assert.match(prompt, /zero at THAT filter only/);
+    assert.match(prompt, /Never report a filtered zero as zero records overall/);
+  });
 });
