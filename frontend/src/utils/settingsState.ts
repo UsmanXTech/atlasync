@@ -61,6 +61,15 @@ export interface SettingsSnapshot {
 // no demo workspace exists to prefill it), the default timezone, and the
 // default toggles. A fresh toggles object is returned every call, so
 // mutating one snapshot never leaks into the next.
+// The sidebar heading for a settings workspace name: a typed name
+// wins (trimmed), an empty/blank name falls back to 'Atlasync'.
+// The name is session-only by design (see the Settings copy) —
+// this is the display value, not a persisted rename.
+export function displayWorkspaceName(name: string): string {
+  const clean = name.trim();
+  return clean === '' ? 'Atlasync' : clean;
+}
+
 export function defaultSettings(): SettingsSnapshot {
   return { name: '', timezone: DEFAULT_TIMEZONE, toggles: { ...DEFAULT_TOGGLES } };
 }

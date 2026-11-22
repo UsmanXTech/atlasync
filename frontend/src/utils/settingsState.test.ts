@@ -5,6 +5,7 @@ import {
   DEFAULT_TOGGLES,
   SETTINGS_ROWS,
   defaultSettings,
+  displayWorkspaceName,
 } from './settingsState.ts';
 
 // Settings defaults (Run 17): the "Save preview" promise is only honest
@@ -31,6 +32,15 @@ describe('defaultSettings', () => {
     a.toggles.weeklyDigest = true;
     const b = defaultSettings();
     assert.equal(b.toggles.weeklyDigest, false, 'mutating one snapshot must not leak');
+  });
+});
+
+describe('displayWorkspaceName', () => {
+  it('uses the typed name, trimmed, and falls back to Atlasync when blank', () => {
+    assert.equal(displayWorkspaceName('Platform'), 'Platform');
+    assert.equal(displayWorkspaceName('  Platform  '), 'Platform');
+    assert.equal(displayWorkspaceName(''), 'Atlasync');
+    assert.equal(displayWorkspaceName('   '), 'Atlasync');
   });
 });
 
