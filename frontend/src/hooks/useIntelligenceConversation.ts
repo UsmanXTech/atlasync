@@ -295,14 +295,19 @@ export function useIntelligenceConversation(): IntelligenceConversation {
   // next ask creates a conversation on demand.
   const reset = () => {
     // Also invalidates any in-flight response, so it cannot repopulate
-    // the cleared conversation.
-    generations.invalidate();
+    // the cleared conversation. The generation is captured: a late
+    // create must not yank the selection back off a conversation the
+    // user switched to (or a second reset) while it was in flight.
+    const generation = generations.next();
     clearAnswerState();
     setLoading(false);
     setPrompt(INTELLIGENCE_PRESETS[0]);
     setApproving(false);
     setActiveConversationId(null);
     void createConversation().then((r) => {
+      // Superseded while the create was in flight: the late result
+      // applies to nothing — not even its error.
+      if (!generations.isCurrent(generation)) return;
       if (!r.ok) {
         if (r.error.kind !== 'BACKEND_UNREACHABLE') setError(r.error.message);
         return;
@@ -326,13 +331,25 @@ export function useIntelligenceConversation(): IntelligenceConversation {
   };
 
   const selectConversation = (conversationId: string) => {
-    if (conversationId === activeConversationId || loading || pendingAction) return;
-    generations.invalidate();
+    // Only the same-id click is a no-op. The old guard also blocked
+    // switching while loading or while a proposal was pending — which
+    // silently froze the switcher exactly when the user most needs to
+    // move away (live review 2026-11-22: the "current" marker never
+    // moved off the first conversation while the AT-1 escalation was
+    // pending). The generation guard below already discards a stale
+    // in-flight response, and the pending proposal survives the
+    // switch by design (see clearAnswerState) — ask() stays blocked
+    // until it is decided, but looking at another conversation is not.
+    if (conversationId === activeConversationId) return;
+    const generation = generations.next();
     clearAnswerState();
     setLoading(false);
     setPrompt(INTELLIGENCE_PRESETS[0]);
     setActiveConversationId(conversationId);
     void getConversation(conversationId).then((r) => {
+      // Superseded by a newer switch: a late fetch must not repaint
+      // the newly selected conversation with the old one's turns.
+      if (!generations.isCurrent(generation)) return;
       if (!r.ok) {
         setError(r.error.message);
         return;
