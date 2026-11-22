@@ -1,7 +1,7 @@
 import { backendUnreachableError, serviceUnreachableMessage, UNEXPECTED_RESPONSE_MESSAGE } from './errors.ts';
 export interface TraceEntry { step: number; tool: string; args: string; status: string; durationMs: number }
 export interface PendingActionPreview { tool: string; target: string; params: Record<string, unknown> }
-export interface PendingAction { actionId: string; threadId: string; preview: PendingActionPreview }
+export interface PendingAction { actionId: string; threadId: string; preview: PendingActionPreview; createdAt?: string; trace?: TraceEntry[]; citations?: Citation[] }
 // Phase 1 citation: a record the agent actually read (never invented).
 // `path` is site-relative (/browse/AT-1, /wiki/...) and is prefixed with
 // the Jira site URL from getSiteInfo; `url` is already absolute (e.g. a
@@ -55,9 +55,32 @@ function isPendingAction(value: unknown): value is PendingAction {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const v = value as Record<string, unknown>;
   const p = v.preview as Record<string, unknown> | undefined;
-  return typeof v.actionId === 'string' && typeof v.threadId === 'string'
+  return typeof v.actionId === 'string' && v.actionId !== '' && typeof v.threadId === 'string'
     && !!p && typeof p.tool === 'string' && typeof p.target === 'string'
     && !!p.params && typeof p.params === 'object' && !Array.isArray(p.params);
+}
+// Validate the listPendingActions payload: malformed entries are
+// dropped, never rendered as an approval card.
+export function toPendingActions(value: unknown): PendingAction[] {
+  if (!Array.isArray(value)) return [];
+  return (value as unknown[]).filter(isPendingAction).map((v) => {
+    const p = v as PendingAction;
+    const out: PendingAction = { actionId: p.actionId, threadId: p.threadId, preview: p.preview };
+    if (typeof p.createdAt === 'string' && p.createdAt !== '') out.createdAt = p.createdAt;
+    if (Array.isArray(p.trace)) out.trace = isTrace(p.trace) ? (p.trace as TraceEntry[]) : [];
+    if (Array.isArray(p.citations)) out.citations = toCitations(p.citations);
+    return out;
+  });
+}
+export async function listPendingActions(): Promise<{ ok: true; pendingActions: PendingAction[] } | { ok: false; error: { kind: string; message: string } }> {
+  try {
+    const { invoke } = await import('@forge/bridge');
+    const result: unknown = await invoke('listPendingActions', {});
+    if (!result || typeof result !== 'object' || Array.isArray(result)) return { ok: false, error: { kind: 'API_ERROR', message: UNEXPECTED_RESPONSE_MESSAGE } };
+    const value = result as Record<string, unknown>;
+    if (value.ok !== true) return { ok: false, error: toError(value) };
+    return { ok: true, pendingActions: toPendingActions(value.pendingActions) };
+  } catch { return { ok: false, error: backendUnreachableError('Intelligence') }; }
 }
 export async function invokeAgent(prompt: string, conversationId?: string): Promise<AgentResult> {
   try {

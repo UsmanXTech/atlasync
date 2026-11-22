@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { approveAgentAction, invokeAgent, toCitations, toSourceCounts, type Citation, type PendingAction, type SourceCounts, type TraceEntry } from '../services/agent';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { approveAgentAction, invokeAgent, listPendingActions, toCitations, toSourceCounts, type Citation, type PendingAction, type SourceCounts, type TraceEntry } from '../services/agent';
 import type { IntelligenceSources } from '../services/intelligence';
 import {
   createConversation,
@@ -37,6 +37,7 @@ export interface IntelligenceConversation {
   cancel: () => void;
   reset: () => void;
   approvePending: (approved: boolean) => void;
+  refreshPendingActions: () => void;
   selectConversation: (conversationId: string) => void;
   newConversation: () => void;
   renameConversation: (conversationId: string, title: string) => void;
@@ -131,6 +132,27 @@ export function useIntelligenceConversation(): IntelligenceConversation {
     if (r.ok) setConversations(r.conversations);
   };
 
+  // Read the pending approvals back from KVS (phantom-approval fix):
+  // the proposal survives in the backend even when this tab's React
+  // state is gone (reload/remount). Newest first; a failure stays
+  // silent and keeps whatever the card currently shows.
+  const refreshPendingActions = useCallback(async () => {
+    const r = await listPendingActions();
+    if (!r.ok) return;
+    const [first] = r.pendingActions;
+    if (!first) {
+      // Nothing pending server-side: clear a stale local card (e.g. the
+      // 10-min TTL expired it while this tab was open).
+      setPendingAction(null);
+      return;
+    }
+    setPendingAction(first);
+    setTrace(first.trace ?? []);
+    const restoredCitations = toCitations(first.citations ?? []);
+    setCitations(restoredCitations);
+    setSources(sourcesFromCitations(restoredCitations));
+  }, []);
+
   // Phase 1: restore the most recent conversation on mount. In the
   // preview there is no backend (BACKEND_UNREACHABLE) — expected, stays
   // silent; the list just stays empty until a backend is reachable.
@@ -141,6 +163,10 @@ export function useIntelligenceConversation(): IntelligenceConversation {
     void getSiteInfo().then((r) => {
       if (r.ok) setSiteUrl(r.siteUrl);
     });
+    // A proposal awaiting approval is restored from KVS, not from
+    // volatile state: after a reload the card is back instead of the
+    // Intelligence/Agents views disagreeing about it.
+    void refreshPendingActions();
     void listConversations().then(async (r) => {
       setConversationsLoading(false);
       if (!r.ok || r.conversations.length === 0) return;
@@ -169,7 +195,11 @@ export function useIntelligenceConversation(): IntelligenceConversation {
     setTrace([]);
     setCitations([]);
     setGeneratedAt(null);
-    setPendingAction(null);
+    // Deliberately NOT cleared: a proposal awaiting approval survives
+    // "New analysis" and conversation switches — it lives in KVS until
+    // the user approves/rejects it or its 10-min TTL expires. Clearing
+    // it here orphaned the KVS record (phantom approval) while ask()
+    // stayed blocked on the invisible proposal.
     setRestored(false);
     setThreadTurns(0);
   };
@@ -410,6 +440,7 @@ export function useIntelligenceConversation(): IntelligenceConversation {
     cancel,
     reset,
     approvePending,
+    refreshPendingActions,
     selectConversation,
     newConversation,
     renameConversation,

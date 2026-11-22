@@ -33,6 +33,7 @@ import {
   deleteConversation,
   listConversations,
   listExecutionRuns,
+  listPendingActions,
   listSnapshots,
   loadConversation,
   loadSettings,
@@ -877,6 +878,33 @@ resolver.define('listExecutionHistory', async ({ context }) => {
   } catch (error) {
     console.error('[atlasync] listExecutionHistory failed:', error instanceof Error ? error.name : typeof error);
     return { ok: false, error: { kind: 'API_ERROR', message: 'Execution history could not be loaded. Try again shortly.' } };
+  }
+});
+
+// Read side of the approval flow (phantom-approval fix): the pending
+// proposals persisted in KVS, newest first, shaped for the frontend
+// approval card. Expired records never reach the UI — the server
+// enforces the 10-min TTL here, not the client.
+resolver.define('listPendingActions', async ({ context }) => {
+  const { cloudId, accountId } = resolveScope(context);
+  try {
+    const records = await listPendingActions(kvs, cloudId, accountId);
+    const pendingActions = records.map((r) => ({
+      actionId: r.actionId,
+      threadId: typeof r.threadId === 'string' ? r.threadId : '',
+      preview: {
+        tool: r.preview.tool,
+        target: r.preview.target,
+        params: r.preview.params && typeof r.preview.params === 'object' && !Array.isArray(r.preview.params) ? r.preview.params : {},
+      },
+      createdAt: typeof r.createdAt === 'string' ? r.createdAt : '',
+      trace: Array.isArray(r.trace) ? r.trace : [],
+      citations: Array.isArray(r.citations) ? r.citations : [],
+    }));
+    return { ok: true, pendingActions };
+  } catch (error) {
+    console.error('[atlasync] listPendingActions failed:', error instanceof Error ? error.name : typeof error);
+    return { ok: false, error: { kind: 'API_ERROR', message: 'Pending approvals could not be loaded. Try again shortly.' } };
   }
 });
 

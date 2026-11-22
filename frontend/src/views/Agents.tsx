@@ -36,7 +36,7 @@ export default function Agents({
   // Intelligence; the backend record is the authority either way).
   const history = useExecutionHistory();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const { pendingAction, approving, approvePending } = conversation;
+  const { pendingAction, approving, approvePending, refreshPendingActions } = conversation;
   // Refresh the history when an approval decision completes (the
   // pending action clearing is the decision-done signal; the backend
   // records the run before the resolver returns). Depend on the
@@ -46,6 +46,12 @@ export default function Agents({
   useEffect(() => {
     if (!pendingAction) void refreshHistory();
   }, [pendingAction, refreshHistory]);
+  // Re-read pending approvals from KVS when this view mounts: the
+  // proposal may predate this tab (reload), so the card must not trust
+  // React state alone.
+  useEffect(() => {
+    void refreshPendingActions();
+  }, [refreshPendingActions]);
 
   return (
     <div className="view workspace-view">
