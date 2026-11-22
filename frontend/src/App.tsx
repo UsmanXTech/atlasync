@@ -43,6 +43,18 @@ export default function App() {
   // navigating away and back (the view unmounts on switch).
   const intelligence = useIntelligenceConversation();
 
+  // Fix #13: ONE shared ask path. Every button that asks Intelligence
+  // submits the question AND opens the view — before this, three
+  // independent call sites disagreed: stat cards submitted+navigated,
+  // "Ask Intelligence" / "Full briefing" navigated only, and preset
+  // chips filled only. The question is passed explicitly as ask(p):
+  // calling setPrompt(p) then ask() in one handler would submit the
+  // STALE prompt (ask defaults to the current prompt state).
+  const askInIntelligence = (question: string) => {
+    void intelligence.ask(question);
+    setView('intelligence');
+  };
+
   // Same pattern as Intelligence: the briefing card's LLM summary is a
   // metered call, so it must survive navigating away and back instead
   // of being discarded (and re-paid for) on every view switch.
@@ -127,11 +139,11 @@ export default function App() {
         />
         <main id="main-content" tabIndex={-1}>
           <ErrorBoundary key={view}>
-            {view === 'overview' && <Overview workspaceId={workspace.id} onNavigate={setView} conversation={intelligence} briefingSummary={briefingSummary} dataMode={dataMode} onDataMode={handleDataMode} refreshTick={refreshTick} />}
+            {view === 'overview' && <Overview workspaceId={workspace.id} askInIntelligence={askInIntelligence} briefingSummary={briefingSummary} dataMode={dataMode} onDataMode={handleDataMode} refreshTick={refreshTick} />}
             {view === 'intelligence' && <Intelligence conversation={intelligence} briefing={briefing} />}
-            {view === 'projects' && <Projects onNavigate={setView} conversation={intelligence} />}
+            {view === 'projects' && <Projects askInIntelligence={askInIntelligence} />}
             {view === 'integrations' && <Integrations />}
-            {view === 'agents' && <Agents onNavigate={setView} conversation={intelligence} />}
+            {view === 'agents' && <Agents onNavigate={setView} conversation={intelligence} askInIntelligence={askInIntelligence} />}
             {view === 'insights' && <Insights />}
             {view === 'settings' && <Settings settings={settings} />}
           </ErrorBoundary>

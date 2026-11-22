@@ -29,13 +29,16 @@ import {
   PULL_REQUESTS,
 } from '../data/mock';
 import { overviewStatContext } from '../utils/overviewStats';
-import { contextualQuestionFor, overviewStatQuestionFor, type OverviewStatKey } from '../utils/contextualQuestions';
-import type { IntelligenceConversation } from '../hooks/useIntelligenceConversation';
+import {
+  contextualQuestionFor,
+  overviewStatQuestionFor,
+  READINESS_QUESTION,
+  type OverviewStatKey,
+} from '../utils/contextualQuestions';
 import type { BriefingSummary } from '../hooks/useBriefingSummary';
 import { fetchLiveReadiness, type LiveReadiness } from '../services/readiness';
 import type { DataMode } from '../utils/dataMode';
 import type { ActivityKind, PrStatus, WorkspaceId } from '../data/types';
-import type { ViewId } from '../components/Sidebar';
 
 const KIND_ICONS: Record<ActivityKind, typeof CircleDot> = {
   jira: CircleDot,
@@ -68,8 +71,9 @@ type LiveReadinessState =
  */
 export default function Overview({
   workspaceId,
-  onNavigate,
-  conversation,
+  // Fix #13: the one shared ask path (App) — every button below asks
+  // Intelligence AND opens the view through it.
+  askInIntelligence,
   briefingSummary,
   dataMode,
   onDataMode,
@@ -78,8 +82,7 @@ export default function Overview({
   refreshTick,
 }: {
   workspaceId: WorkspaceId;
-  onNavigate: (view: ViewId) => void;
-  conversation: IntelligenceConversation;
+  askInIntelligence: (question: string) => void;
   briefingSummary: BriefingSummary;
   dataMode: DataMode;
   onDataMode: (mode: DataMode) => void;
@@ -106,16 +109,14 @@ export default function Overview({
   }, [dataMode, liveRefresh, refreshTick]);
 
   const askAboutThis = () => {
-    conversation.ask(contextualQuestionFor('overview'));
-    onNavigate('intelligence');
+    askInIntelligence(contextualQuestionFor('overview'));
   };
 
   // Phase 3.1 — a live stat is a button: clicking it asks
   // Intelligence about that metric's topic (never its number) and
   // opens the answer. Sample-mode stats have no onClick and stay inert.
   const askStat = (stat: OverviewStatKey) => {
-    conversation.ask(overviewStatQuestionFor(stat));
-    onNavigate('intelligence');
+    askInIntelligence(overviewStatQuestionFor(stat));
   };
 
   const projects = useMemo(() => PROJECTS.filter((p) => p.workspace === workspaceId), [workspaceId]);
@@ -267,7 +268,7 @@ export default function Overview({
                         <p className="source-error">{live.unavailable.join(' · ')}</p>
                       )}
                       <div className="row-actions">
-                        <button className="btn btn-filled" onClick={() => onNavigate('intelligence')}>
+                        <button className="btn btn-filled" onClick={() => askInIntelligence(READINESS_QUESTION)}>
                           <span>Ask Intelligence</span> <ArrowRight size={14} />
                         </button>
                         <button className="btn" onClick={() => setLiveRefresh((v) => v + 1)}>
@@ -307,16 +308,16 @@ export default function Overview({
           {/* Column 2: Live Feeds (Briefing, Jira, Confluence, JSM) */}
           <section className="overview-column">
             <Card className="overview-live-card" title="Today’s briefing" subtitle="Live blocker + stale watch">
-              <OverviewBriefingCard onNavigate={onNavigate} briefingSummary={briefingSummary} />
+              <OverviewBriefingCard askInIntelligence={askInIntelligence} briefingSummary={briefingSummary} />
             </Card>
             <Card className="overview-live-card" title="Jira issues" subtitle="Read-only · switch demo or live data">
               <JiraIssuesCard dataMode={dataMode} refreshTick={refreshTick} />
             </Card>
             <Card className="overview-live-card" title="Confluence pages">
-              <ConfluencePagesCard conversation={conversation} onNavigate={onNavigate} refreshTick={refreshTick} />
+              <ConfluencePagesCard askInIntelligence={askInIntelligence} refreshTick={refreshTick} />
             </Card>
             <Card className="overview-live-card" title="JSM requests">
-              <JsmRequestsCard conversation={conversation} onNavigate={onNavigate} refreshTick={refreshTick} />
+              <JsmRequestsCard askInIntelligence={askInIntelligence} refreshTick={refreshTick} />
             </Card>
           </section>
 
@@ -421,7 +422,7 @@ export default function Overview({
                   <strong>Demo-only estimate.</strong> Not calculated from live records.
                 </p>
                 <div className="row-actions">
-                  <button className="btn btn-filled" onClick={() => onNavigate('intelligence')}>
+                  <button className="btn btn-filled" onClick={() => askInIntelligence(READINESS_QUESTION)}>
                     <span>Ask Intelligence</span> <ArrowRight size={14} />
                   </button>
                   <button className="btn" onClick={() => onDataMode('live')}>

@@ -4,8 +4,10 @@ import {
   CONTEXTUAL_QUESTIONS,
   OVERVIEW_STAT_QUESTIONS,
   contextualQuestionFor,
+  FULL_BRIEFING_QUESTION,
   overviewStatQuestionFor,
   questionForProject,
+  READINESS_QUESTION,
 } from './contextualQuestions.ts';
 
 // The contextual question is the prompt sent to the Forge LLM, so it must
@@ -81,4 +83,12 @@ test('contextual questions stay inside the resolver prompt limit and carry no in
     assert.ok(!/\d/.test(q), 'question must not contain numbers (no demo counts as facts)');
     assert.ok(!/sample|demo/i.test(q), 'question must not ask about sample/demo data');
   }
+});
+
+test('fix #13: the two navigate-only buttons have their decided questions', () => {
+  assert.equal(READINESS_QUESTION, 'Are we ready to release?');
+  assert.equal(
+    FULL_BRIEFING_QUESTION,
+    "Summarize today's briefing, including readiness, top blockers, and stale work.",
+  );
 });

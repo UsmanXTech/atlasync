@@ -23,13 +23,16 @@ const RUN_STATUS: Record<ExecutionRunStatus, { label: string; pill: string }> = 
 export default function Agents({
   onNavigate,
   conversation,
+  // Fix #13: the one shared ask path (App). "Open Intelligence" below
+  // stays pure navigation — it is a view switch, not an ask button.
+  askInIntelligence,
 }: {
   onNavigate: (view: ViewId) => void;
   conversation: IntelligenceConversation;
+  askInIntelligence: (question: string) => void;
 }) {
   const tryExample = (question: string) => {
-    conversation.ask(question);
-    onNavigate('intelligence');
+    askInIntelligence(question);
   };
   // Phase 2 — persistent execution history + the pending approval
   // queue live here (the approval card itself is the same markup as

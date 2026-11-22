@@ -54,7 +54,7 @@ export default function Intelligence({
 
           <div className="prompt-chips">
             {INTELLIGENCE_PRESETS.map((p) => (
-              <button key={p} className="chip" onClick={() => setPrompt(p)}>
+              <button key={p} className="chip" onClick={() => void conversation.ask(p)}>
                 <span>{p}</span>
               </button>
             ))}

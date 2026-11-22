@@ -7,8 +7,8 @@ import { computeBriefingDigest } from '../utils/briefing';
 import { pickBriefingTeaser, STALE_THRESHOLD_DAYS, type BriefingTeaser } from '../utils/overviewBriefing';
 import { briefingSummarySnapshotLabel } from '../utils/briefingSummary';
 import { LIVE_FETCH_LIMITS } from '../utils/liveSnapshot';
+import { FULL_BRIEFING_QUESTION } from '../utils/contextualQuestions';
 import type { BriefingSummary } from '../hooks/useBriefingSummary';
-import type { ViewId } from './Sidebar';
 
 type BriefingState =
   | { status: 'loading' }
@@ -42,10 +42,11 @@ function TeaserRow({
  * Live blocker + stale watch proactive teaser with optional LLM summary
  */
 export default function OverviewBriefingCard({
-  onNavigate,
+  // Fix #13: the one shared ask path (App).
+  askInIntelligence,
   briefingSummary,
 }: {
-  onNavigate: (view: ViewId) => void;
+  askInIntelligence: (question: string) => void;
   briefingSummary: BriefingSummary;
 }) {
   const [state, setState] = useState<BriefingState>({ status: 'loading' });
@@ -130,7 +131,7 @@ export default function OverviewBriefingCard({
           )}
           <p className="source-footnote">
             Rules-based · latest {LIVE_FETCH_LIMITS.teaser.jira} Jira issues ·{' '}
-            <button className="briefing-link" onClick={() => onNavigate('intelligence')}>
+            <button className="briefing-link" onClick={() => askInIntelligence(FULL_BRIEFING_QUESTION)}>
               Full briefing in Intelligence <ArrowRight size={12} />
             </button>
           </p>
