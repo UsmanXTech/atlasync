@@ -68,6 +68,51 @@ describe('runAgentLoop', () => {
     assert.match(toolMessage.content, /ATLAS-482/);
   });
 
+  it('records the direct blockers ask: 3 read calls, jira coverage 2, citations AT-1 + AT-2', async () => {
+    // Live review 2026-11-22 (deploy #42): the direct question "What
+    // are the current blockers?" ran get_jira_blockers:AS (0 rows),
+    // get_jira_blockers:AT (AT-1 + AT-2) and get_pr_bottlenecks:AT (0
+    // rows), and its answer cited AT-1/AT-2 — yet Source coverage
+    // showed 0 records and history recorded 0 tool calls. The loop
+    // must carry the trace, the per-source row counts and the
+    // citations for exactly this shape, so a 0 can only ever mean
+    // "the tools really returned nothing".
+    const calls = [
+      { id: 'c1', type: 'function', index: 0, function: { name: 'get_jira_blockers', arguments: '{"projectKey":"AS"}' } },
+      { id: 'c2', type: 'function', index: 1, function: { name: 'get_jira_blockers', arguments: '{"projectKey":"AT"}' } },
+      { id: 'c3', type: 'function', index: 2, function: { name: 'get_pr_bottlenecks', arguments: '{"projectKey":"AT"}' } },
+    ];
+    const chat = fakeChat([
+      { choices: [{ message: { role: 'assistant', content: '', tool_calls: calls } }] },
+      textAnswer('Two blockers: [AT-1] Checkout timeout and [AT-2] Payment retry loop.'),
+    ]);
+    const executeRead = async (name, args) => {
+      if (name === 'get_jira_blockers' && args.projectKey === 'AT') {
+        return {
+          ok: true,
+          output: '{"count":2}',
+          records: [
+            { kind: 'jira', key: 'AT-1', title: 'Checkout timeout' },
+            { kind: 'jira', key: 'AT-2', title: 'Payment retry loop' },
+          ],
+          count: 2,
+        };
+      }
+      return { ok: true, output: '{"count":0}', records: [], count: 0 };
+    };
+    const result = await runAgentLoop({ chat, prompt: 'What are the current blockers?', executeRead });
+    assert.equal(result.status, 'COMPLETE');
+    assert.deepEqual(
+      result.trace.map((t) => t.tool),
+      ['get_jira_blockers', 'get_jira_blockers', 'get_pr_bottlenecks'],
+    );
+    assert.deepEqual(result.sourceCounts, { jira: 2, confluence: 0, jsm: 0, bitbucket: 0 });
+    assert.deepEqual(
+      result.citations.map((c) => c.key),
+      ['AT-1', 'AT-2'],
+    );
+  });
+
   it('never sends an empty text block after a tool call with no text', async () => {
     // Regression: the real Forge LLM rejects empty text content
     // blocks, and a pure tool-call response carries content ''. The
