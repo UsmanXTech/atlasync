@@ -1,6 +1,10 @@
-import { backendUnreachableError, serviceUnreachableMessage, UNEXPECTED_RESPONSE_MESSAGE } from './errors';
+import { backendUnreachableError, serviceUnreachableMessage, UNEXPECTED_RESPONSE_MESSAGE } from './errors.ts';
+import { toCitations, type Citation } from './agent.ts';
 export interface ConversationSummary { id: string; title: string; createdAt: string; updatedAt: string; turnCount: number }
-export interface ConversationTurn { question: string; answer: string; at: string }
+// Citations ride on the turn (backend memory.js sanitizeCitations), so
+// a restored answer keeps its Sources links. Absent on turns stored
+// before this change — callers treat missing as [].
+export interface ConversationTurn { question: string; answer: string; at: string; citations?: Citation[] }
 export interface ConversationLastReadiness { score: number | null; breakdown: { Bcrit: number; Isev: number; Pstale: number; Dmissing: number }; generatedAt: string }
 export interface Conversation { id: string; title: string; turns: ConversationTurn[]; lastReadiness: ConversationLastReadiness | null; createdAt: string; updatedAt: string }
 export type ConversationsResult = { ok: true; conversations: ConversationSummary[] } | { ok: false; error: { kind: string; message: string } };
@@ -20,7 +24,18 @@ function isSummary(value: unknown): value is ConversationSummary {
 function isTurn(value: unknown): value is ConversationTurn {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const v = value as Record<string, unknown>;
-  return typeof v.question === 'string' && typeof v.answer === 'string' && typeof v.at === 'string';
+  return typeof v.question === 'string' && typeof v.answer === 'string' && typeof v.at === 'string'
+    && (v.citations === undefined || Array.isArray(v.citations));
+}
+// Drop malformed citations from a stored turn (the backend already
+// sanitizes on write; this is defense in depth for older records).
+export function sanitizeConversationTurn(value: ConversationTurn): ConversationTurn {
+  if (value.citations === undefined) return value;
+  const citations = toCitations(value.citations);
+  return citations.length > 0 ? { ...value, citations } : { question: value.question, answer: value.answer, at: value.at };
+}
+function cleanConversation(value: Conversation): Conversation {
+  return { ...value, turns: value.turns.map(sanitizeConversationTurn) };
 }
 function isLastReadiness(value: unknown): value is ConversationLastReadiness {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -84,13 +99,26 @@ export async function getConversation(conversationId: string): Promise<Conversat
   if (value.ok !== true || !isConversation(value.conversation)) {
     return { ok: false, error: value.ok === true ? { kind: 'API_ERROR', message: UNEXPECTED_RESPONSE_MESSAGE } : toError(value) };
   }
-  return { ok: true, conversation: value.conversation as Conversation };
+  return { ok: true, conversation: cleanConversation(value.conversation as Conversation) };
 }
+// The site URL is fetched once per session and shared by every record
+// link (cards, search, Intelligence citations): the promise is cached
+// so ten components do not fire ten identical resolver calls.
+let siteInfoPromise: Promise<SiteInfoResult> | null = null;
+
 export async function getSiteInfo(): Promise<SiteInfoResult> {
-  const value = await callResolver('getSiteInfo', {});
-  if (!value) return { ok: false, error: backendUnreachableError('Intelligence') };
-  if (value.ok !== true || typeof value.siteUrl !== 'string' || value.siteUrl === '') {
-    return { ok: false, error: value.ok === true ? { kind: 'API_ERROR', message: UNEXPECTED_RESPONSE_MESSAGE } : toError(value) };
-  }
-  return { ok: true, siteUrl: value.siteUrl as string };
+  if (siteInfoPromise) return siteInfoPromise;
+  siteInfoPromise = (async () => {
+    const value = await callResolver('getSiteInfo', {});
+    if (!value) return { ok: false, error: backendUnreachableError('Intelligence') } as SiteInfoResult;
+    if (value.ok !== true || typeof value.siteUrl !== 'string' || value.siteUrl === '') {
+      return { ok: false, error: value.ok === true ? { kind: 'API_ERROR', message: UNEXPECTED_RESPONSE_MESSAGE } : toError(value) } as SiteInfoResult;
+    }
+    return { ok: true, siteUrl: value.siteUrl as string } as SiteInfoResult;
+  })();
+  const result = await siteInfoPromise;
+  // Cache only successes: a failed fetch clears so a later call retries
+  // instead of serving the failure for the whole session.
+  if (!result.ok) siteInfoPromise = null;
+  return result;
 }

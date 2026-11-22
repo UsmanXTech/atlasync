@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { approveAgentAction, invokeAgent, type Citation, type PendingAction, type TraceEntry } from '../services/agent';
+import { approveAgentAction, invokeAgent, toCitations, type Citation, type PendingAction, type TraceEntry } from '../services/agent';
 import type { IntelligenceSources } from '../services/intelligence';
 import {
   createConversation,
@@ -124,7 +124,11 @@ export function useIntelligenceConversation(): IntelligenceConversation {
       const last = full.conversation.turns[full.conversation.turns.length - 1];
       setPrompt(last.question);
       setAnswer(last.answer);
-      setSources(null);
+      // Citations persist with the turn, so a restored answer keeps its
+      // Sources links instead of rendering plain text (dead links).
+      const restoredCitations = toCitations(last.citations ?? []);
+      setCitations(restoredCitations);
+      setSources(sourcesFromCitations(restoredCitations));
       setRestored(true);
       setThreadTurns(full.conversation.turns.length);
     });
@@ -311,7 +315,10 @@ export function useIntelligenceConversation(): IntelligenceConversation {
       const last = r.conversation.turns[r.conversation.turns.length - 1];
       setPrompt(last.question);
       setAnswer(last.answer);
-      setSources(null);
+      // Citations persist with the turn — see the mount restore above.
+      const restoredCitations = toCitations(last.citations ?? []);
+      setCitations(restoredCitations);
+      setSources(sourcesFromCitations(restoredCitations));
       setRestored(true);
       setThreadTurns(r.conversation.turns.length);
     });

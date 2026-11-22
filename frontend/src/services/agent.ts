@@ -1,4 +1,4 @@
-import { backendUnreachableError, serviceUnreachableMessage, UNEXPECTED_RESPONSE_MESSAGE } from './errors';
+import { backendUnreachableError, serviceUnreachableMessage, UNEXPECTED_RESPONSE_MESSAGE } from './errors.ts';
 export interface TraceEntry { step: number; tool: string; args: string; status: string; durationMs: number }
 export interface PendingActionPreview { tool: string; target: string; params: Record<string, unknown> }
 export interface PendingAction { actionId: string; threadId: string; preview: PendingActionPreview }
@@ -21,7 +21,7 @@ function isCitation(value: unknown): value is Citation {
   return ['jira', 'jsm', 'confluence', 'bitbucket'].includes(v.kind as string)
     && typeof v.key === 'string' && v.key !== '' && typeof v.title === 'string';
 }
-function toCitations(value: unknown): Citation[] {
+export function toCitations(value: unknown): Citation[] {
   if (!Array.isArray(value)) return [];
   return (value as unknown[]).filter(isCitation).map((c) => {
     const out: Citation = { kind: c.kind, key: c.key, title: c.title };

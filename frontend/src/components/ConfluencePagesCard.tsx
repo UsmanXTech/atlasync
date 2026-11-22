@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshCw, Sparkles } from 'lucide-react';
 import Card from './Card';
+import RecordLink from './RecordLink';
 import { fetchConfluencePages } from '../services/confluence';
 import type { LiveConfluencePage } from '../data/types';
+import { useSiteUrl } from '../hooks/useSiteUrl';
 import { formatUpdated } from '../utils/formatUpdated';
+import { confluencePageUrl } from '../utils/recordLinks';
 import { confluenceStatusTone } from '../utils/confluenceStatus';
 import { contextualQuestionFor } from '../utils/contextualQuestions';
 import type { IntelligenceConversation } from '../hooks/useIntelligenceConversation';
@@ -20,6 +23,7 @@ export default function ConfluencePagesCard({
   conversation: IntelligenceConversation;
   onNavigate: (view: ViewId) => void;
 }) {
+  const siteUrl = useSiteUrl();
   const [pages, setPages] = useState<LiveConfluencePage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +87,11 @@ export default function ConfluencePagesCard({
         {pages.map((page) => (
           <div className="data-row" key={page.id}>
             <div className="row-main">
-              <strong>{page.title}</strong>
+              <strong>
+                <RecordLink url={confluencePageUrl(siteUrl, page)} label={`Open ${page.title} in Confluence`}>
+                  {page.title}
+                </RecordLink>
+              </strong>
               {page.updated && <small>Updated {formatUpdated(page.updated)}</small>}
             </div>
             <span className={`pill ${confluenceStatusTone(page.status)}`}>{page.status}</span>

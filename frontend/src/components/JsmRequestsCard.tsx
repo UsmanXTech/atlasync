@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshCw, Sparkles } from 'lucide-react';
 import Card from './Card';
+import RecordLink from './RecordLink';
 import { fetchJsmRequests } from '../services/jsm';
 import type { LiveJsmRequest } from '../data/types';
+import { useSiteUrl } from '../hooks/useSiteUrl';
+import { jsmRequestUrl } from '../utils/recordLinks';
 import { contextualQuestionFor } from '../utils/contextualQuestions';
 import type { IntelligenceConversation } from '../hooks/useIntelligenceConversation';
 import type { ViewId } from './Sidebar';
@@ -18,6 +21,7 @@ export default function JsmRequestsCard({
   conversation: IntelligenceConversation;
   onNavigate: (view: ViewId) => void;
 }) {
+  const siteUrl = useSiteUrl();
   const [requests, setRequests] = useState<LiveJsmRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +86,10 @@ export default function JsmRequestsCard({
           <div className="data-row" key={request.key}>
             <div className="row-main">
               <strong>
-                <span className="issue-key">{request.key}</span> · {request.summary}
+                <RecordLink url={jsmRequestUrl(siteUrl, request.key)} label={`Open ${request.key} in Jira`}>
+                  <span className="issue-key">{request.key}</span>
+                </RecordLink>{' '}
+                · {request.summary}
               </strong>
               <small>
                 {request.requestType}

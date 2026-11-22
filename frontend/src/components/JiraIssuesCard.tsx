@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import Card from './Card';
+import RecordLink from './RecordLink';
 import SegmentedButton from './SegmentedButton';
 import { SAMPLE_JIRA_ISSUES } from '../data/mock';
 import type { LiveIssue } from '../data/types';
+import { useSiteUrl } from '../hooks/useSiteUrl';
 import { fetchIssueDevStatus, fetchLiveJiraIssues, type JiraError, type LinkedPullRequest } from '../services/jira';
 import { formatUpdated } from '../utils/formatUpdated';
+import { jiraIssueUrl } from '../utils/recordLinks';
 
 type Mode = 'demo' | 'live';
 type LiveState =
@@ -15,12 +18,15 @@ type LiveState =
   | { status: 'error'; error: JiraError };
 
 function IssueRow({ issue }: { issue: LiveIssue }) {
+  const siteUrl = useSiteUrl();
   return (
     <div className="data-row">
       <div className="row-main">
         <strong>{issue.summary}</strong>
         <small>
-          <span className="issue-key">{issue.key}</span>
+          <RecordLink url={jiraIssueUrl(siteUrl, issue.key)} label={`Open ${issue.key} in Jira`}>
+            <span className="issue-key">{issue.key}</span>
+          </RecordLink>
           {' · '}
           {issue.assignee ?? 'Unassigned'}
           {' · '}
