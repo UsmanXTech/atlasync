@@ -75,14 +75,33 @@ export function markdownToStorage(markdown) {
   return out.join('') || '<p>(empty summary)</p>';
 }
 
+// The blocker JQL, built by a pure helper so unit tests can pin the
+// exact string the agent sends to Jira. The project key is QUOTED:
+// `AS` is a JQL reserved word, so the unquoted `project = AS` is an
+// HTTP 400 from Jira (live incident 2026-11-21: the AS project query
+// failed on every ask and the failure surfaced as a permission error).
+// Any `"` in the key is stripped — the PROJECT_KEY validator in
+// toolRegistry.js already restricts keys to [A-Z0-9], so this is
+// defense-in-depth for unvalidated callers.
+export function buildBlockerJql(projectKey) {
+  const key = String(projectKey ?? '').replaceAll('"', '');
+  return `project = "${key}" AND priority IN (Highest, Critical) AND status NOT IN (Done, Closed, Resolved) ORDER BY updated DESC`;
+}
+
 async function fetchBlockerIssues(projectKey) {
-  const jql = `project = ${projectKey} AND priority IN (Highest, Critical) AND status NOT IN (Done, Closed, Resolved) ORDER BY updated DESC`;
+  const jql = buildBlockerJql(projectKey);
   const response = await api.asUser().requestJira(route`/rest/api/3/search/jql`, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify(buildSearchBody({ jql, maxResults: MAX_ROWS })),
   });
-  if (response.status >= 400) throw new Error('Jira unavailable or permission denied');
+  if (response.status >= 400) {
+    // Log the real status to Forge logs: a 400 (bad JQL) must never
+    // again masquerade as a permission error. The user-facing message
+    // stays generic — response bodies are never read into messages.
+    console.error(`[atlasync] get_jira_blockers Jira search failed: HTTP ${response.status} for project ${projectKey}`);
+    throw new Error('Jira unavailable or permission denied');
+  }
   return parseJiraSearchResponse(await response.json());
 }
 
