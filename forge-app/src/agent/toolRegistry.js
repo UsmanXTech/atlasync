@@ -446,5 +446,6 @@ export function buildAgentSystemPrompt({ readiness, projects = [] } = {}) {
     '6. A tool result is scoped to the filter it was called with. A zero count for one priority or severity means zero at THAT filter only — it says nothing about other priorities or the total. Never report a filtered zero as zero records overall; say exactly which filter returned zero, and check the other priorities before claiming anything about the total.',
     '7. PROPOSE WRITES WITH THE TOOL, NEVER IN PROSE: when you want to change something (escalate, transition, create a page), emit the write tool call with its exact arguments — do not describe the proposal in text and stop. A proposal written only in prose never reaches the user for approval and is lost.',
     '8. LIST TOOLS: when a question asks about pages in a specific Confluence space or about page status/cleanup, use list_confluence_pages — search_confluence_runbooks only matches text. When a question asks about JSM requests by status or request type, or which type is piling up, use list_jsm_requests — get_jsm_incidents only filters by priority.',
+    '9. TIGHT LISTS: when you write a list, put no blank line between its items — a blank line restarts the numbering at 1 in the renderer.',
   ].join('\n');
 }

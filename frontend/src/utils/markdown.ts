@@ -231,7 +231,21 @@ export function parseMarkdown(input: string): BlockNode[] {
       const items: InlineNode[][] = [];
       while (i < lines.length) {
         const item = /^([-*]|\d+[.)])\s+(.*)$/.exec(lines[i].trim());
-        if (!item) break;
+        if (!item) {
+          // Loose lists (fix #12): a blank line between items — the
+          // LLM's usual style — must not split the list into one
+          // single-item <ol> per item, each rendering "1.". Peek past
+          // the blanks; only break when the next non-blank line is not
+          // a same-kind list item.
+          let j = i;
+          while (j < lines.length && lines[j].trim() === '') j += 1;
+          const next = j < lines.length ? /^([-*]|\d+[.)])\s+(.*)$/.exec(lines[j].trim()) : null;
+          if (next && /^\d/.test(next[1]) === ordered) {
+            i = j;
+            continue;
+          }
+          break;
+        }
         if (/^\d/.test(item[1]) !== ordered) break;
         items.push(parseInline(item[2]));
         i += 1;
@@ -258,5 +272,18 @@ export function parseMarkdown(input: string): BlockNode[] {
     blocks.push({ type: 'paragraph', children: parseInline(para.join(' ')) });
   }
 
-  return blocks;
+  // Belt-and-braces (fix #12): adjacent same-kind list blocks render
+  // as one list so numbering continues instead of restarting at 1 —
+  // a blank line never separates two lists in Markdown, so merging
+  // them is the correct reading, not a guess.
+  const merged: BlockNode[] = [];
+  for (const block of blocks) {
+    const prev = merged[merged.length - 1];
+    if (block.type === 'list' && prev?.type === 'list' && prev.ordered === block.ordered) {
+      prev.items.push(...block.items);
+    } else {
+      merged.push(block);
+    }
+  }
+  return merged;
 }

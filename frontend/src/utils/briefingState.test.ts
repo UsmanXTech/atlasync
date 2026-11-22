@@ -80,6 +80,20 @@ test('partial failure → ready from what loaded, failed source named in warning
   }
 });
 
+test('ready state stamps the fetch time for the sidebar footer (fix #8)', () => {
+  const state = reduceBriefingResults({
+    jira: { ok: true, issues: [issue('ATL-1', 'Highest', 'In Progress', '2026-11-09T12:00:00.000Z')] },
+    confluence: { ok: true, pages: [] },
+    jsm: { ok: true, requests: [] },
+    readiness: readinessOk(78, { Bcrit: 1, Isev: 0, Pstale: 0, Dmissing: 1 }),
+  });
+  assert.equal(state.status, 'ready');
+  if (state.status !== 'ready') return;
+  const generatedAt = Date.parse(state.generatedAt);
+  assert.ok(!Number.isNaN(generatedAt), 'generatedAt must be a valid ISO timestamp');
+  assert.ok(Date.now() - generatedAt < 60_000, 'generatedAt must be stamped at reduce time');
+});
+
 test('all sources ok → ready with exact counts, no warnings, backend readiness surfaced verbatim', () => {
   const state = reduceBriefingResults({
     jira: { ok: true, issues: [issue('ATL-1', 'Highest', 'In Progress', '2026-11-09T12:00:00.000Z')] },

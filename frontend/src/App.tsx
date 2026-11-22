@@ -84,7 +84,14 @@ export default function App() {
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
-      <Sidebar view={view} onNavigate={setView} open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <Sidebar
+        view={view}
+        onNavigate={setView}
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        workspaceName={workspace.name}
+        lastSyncedAt={briefing.state.status === 'ready' ? briefing.state.generatedAt : null}
+      />
       <div className="main">
         <Topbar
           workspaces={WORKSPACES}

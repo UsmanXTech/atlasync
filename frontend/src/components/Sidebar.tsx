@@ -1,4 +1,6 @@
 import { BarChart3, Bot, FolderKanban, LayoutDashboard, Plug, Settings, Sparkles, X, Zap } from 'lucide-react';
+import { APP_VERSION } from '../utils/appInfo';
+import { formatSyncTime } from '../utils/lastSync';
 
 export type ViewId =
   | 'overview'
@@ -24,6 +26,13 @@ interface SidebarProps {
   onNavigate: (view: ViewId) => void;
   open: boolean;
   onClose: () => void;
+  // Fix #10: the section label tracks the active workspace instead of
+  // a stuck literal — the old "Platform Navigation" never changed when
+  // the workspace did (the default workspace is Atlasync HQ).
+  workspaceName: string;
+  // Fix #8: ISO timestamp of the last successful live fetch (the
+  // briefing load), or null while nothing has synced yet.
+  lastSyncedAt: string | null;
 }
 
 /**
@@ -33,7 +42,7 @@ interface SidebarProps {
  * - 56dp full stadium active pill items, 24dp icons, Label Large typography
  * - Pinned live sync status footer in code-md (JetBrains Mono)
  */
-export default function Sidebar({ view, onNavigate, open, onClose }: SidebarProps) {
+export default function Sidebar({ view, onNavigate, open, onClose, workspaceName, lastSyncedAt }: SidebarProps) {
   return (
     <>
       {open && <div className="sidebar-scrim" onClick={onClose} aria-hidden="true" />}
@@ -56,9 +65,9 @@ export default function Sidebar({ view, onNavigate, open, onClose }: SidebarProp
           </button>
         </div>
 
-        <div className="drawer-section-label">Platform Navigation</div>
+        <div className="drawer-section-label">{workspaceName} Navigation</div>
 
-        <nav className="nav" aria-label="Platform destinations">
+        <nav className="nav" aria-label={`${workspaceName} destinations`}>
           {ITEMS.map((item) => {
             const isActive = view === item.id;
             return (
@@ -81,7 +90,11 @@ export default function Sidebar({ view, onNavigate, open, onClose }: SidebarProp
         <div className="sidebar-foot">
           <div className="sidebar-foot-meta">
             <i aria-hidden="true" />
-            <span>Jira Live: Synced 14:32 · v2.1.0</span>
+            <span>
+              {lastSyncedAt
+                ? `Jira Live: Synced ${formatSyncTime(lastSyncedAt)} · ${APP_VERSION}`
+                : `Jira Live: Not synced yet · ${APP_VERSION}`}
+            </span>
           </div>
         </div>
       </aside>

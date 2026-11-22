@@ -15,6 +15,7 @@ export type BriefingState =
       confluenceCount: number;
       jsmCount: number;
       warnings: string[];
+      generatedAt: string;
     }
   | { status: 'unavailable'; message: string };
 
@@ -60,5 +61,8 @@ export function reduceBriefingResults({ jira, confluence, jsm, readiness }: Brie
     confluenceCount: confluence.ok ? confluence.pages.length : 0,
     jsmCount: jsm.ok ? jsm.requests.length : 0,
     warnings,
+    // Fix #8: stamped when the fetches resolve — App lifts this into
+    // the sidebar footer as the last successful live sync.
+    generatedAt: new Date().toISOString(),
   };
 }
