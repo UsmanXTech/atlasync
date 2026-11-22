@@ -102,3 +102,13 @@ export function contextualQuestionFor(view: ContextualView): string {
 export function questionForProject(projectKey: string): string {
   return `From the live Jira snapshot — looking at project ${projectKey}, what open issues and blockers does it carry, and what needs attention first? If the snapshot has no evidence for this project, say so rather than guessing.`;
 }
+
+// Fix #13 — the two navigate-only buttons, given their questions.
+// Before this, "Ask Intelligence" and "Full briefing in Intelligence"
+// navigated to the view without asking anything, so the user landed on
+// an empty composer and had to type the obvious question themselves.
+// The wording is the decided question for each button (visual-behaviour
+// test fix #13), pinned by the test below.
+export const READINESS_QUESTION = 'Are we ready to release?';
+export const FULL_BRIEFING_QUESTION =
+  "Summarize today's briefing, including readiness, top blockers, and stale work.";

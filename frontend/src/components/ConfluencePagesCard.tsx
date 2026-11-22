@@ -10,21 +10,18 @@ import { formatUpdated } from '../utils/formatUpdated';
 import { confluencePageUrl } from '../utils/recordLinks';
 import { confluenceStatusTone } from '../utils/confluenceStatus';
 import { contextualQuestionFor } from '../utils/contextualQuestions';
-import type { IntelligenceConversation } from '../hooks/useIntelligenceConversation';
-import type { ViewId } from './Sidebar';
 
 /**
  * Confluence Pages Card (M3 restyled)
  * Live pages loaded through Forge backend, read-only
  */
 export default function ConfluencePagesCard({
-  conversation,
-  onNavigate,
+  // Fix #13: the one shared ask path (App).
+  askInIntelligence,
   // Fix #9: App's Sync Portfolio counter — a bump refetches the pages.
   refreshTick = 0,
 }: {
-  conversation: IntelligenceConversation;
-  onNavigate: (view: ViewId) => void;
+  askInIntelligence: (question: string) => void;
   refreshTick?: number;
 }) {
   const siteUrl = useSiteUrl();
@@ -48,8 +45,7 @@ export default function ConfluencePagesCard({
   }, [load, refreshTick]);
 
   const askAboutThis = () => {
-    conversation.ask(contextualQuestionFor('confluence'));
-    onNavigate('intelligence');
+    askInIntelligence(contextualQuestionFor('confluence'));
   };
 
   return (

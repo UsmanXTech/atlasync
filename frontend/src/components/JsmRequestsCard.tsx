@@ -8,21 +8,18 @@ import type { LiveJsmRequest } from '../data/types';
 import { useSiteUrl } from '../hooks/useSiteUrl';
 import { jsmRequestUrl } from '../utils/recordLinks';
 import { contextualQuestionFor } from '../utils/contextualQuestions';
-import type { IntelligenceConversation } from '../hooks/useIntelligenceConversation';
-import type { ViewId } from './Sidebar';
 
 /**
  * JSM Requests Card (M3 restyled)
  * Live customer and service desk requests through Forge backend, read-only
  */
 export default function JsmRequestsCard({
-  conversation,
-  onNavigate,
+  // Fix #13: the one shared ask path (App).
+  askInIntelligence,
   // Fix #9: App's Sync Portfolio counter — a bump refetches the requests.
   refreshTick = 0,
 }: {
-  conversation: IntelligenceConversation;
-  onNavigate: (view: ViewId) => void;
+  askInIntelligence: (question: string) => void;
   refreshTick?: number;
 }) {
   const siteUrl = useSiteUrl();
@@ -46,8 +43,7 @@ export default function JsmRequestsCard({
   }, [load, refreshTick]);
 
   const askAboutThis = () => {
-    conversation.ask(contextualQuestionFor('jsm'));
-    onNavigate('intelligence');
+    askInIntelligence(contextualQuestionFor('jsm'));
   };
 
   return (

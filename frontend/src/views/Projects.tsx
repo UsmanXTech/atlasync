@@ -8,19 +8,16 @@ import { useSiteUrl } from '../hooks/useSiteUrl';
 import { contextualQuestionFor, questionForProject } from '../utils/contextualQuestions';
 import { countIssuesByProject } from '../utils/projectIssueCounts';
 import { jiraProjectUrl } from '../utils/recordLinks';
-import type { IntelligenceConversation } from '../hooks/useIntelligenceConversation';
-import type { ViewId } from '../components/Sidebar';
 
 /**
  * Screen 3: Projects (Portfolio Initiatives & Health)
  * Aligned with Stitch M3 Redesign & M3 alignment brief
  */
 export default function Projects({
-  onNavigate,
-  conversation,
+  // Fix #13: the one shared ask path (App).
+  askInIntelligence,
 }: {
-  onNavigate: (view: ViewId) => void;
-  conversation: IntelligenceConversation;
+  askInIntelligence: (question: string) => void;
 }) {
   const [projects, setProjects] = useState<LiveJiraProject[]>([]);
   const [issues, setIssues] = useState<LiveIssue[]>([]);
@@ -81,16 +78,14 @@ export default function Projects({
   const loadFailed = error !== null && projects.length === 0;
 
   const askAboutThis = () => {
-    conversation.ask(contextualQuestionFor('projects'));
-    onNavigate('intelligence');
+    askInIntelligence(contextualQuestionFor('projects'));
   };
 
   // Phase 3.2 — per-project ask: the agent answers from its
   // 10-issue snapshot and says so when it has no evidence for the
   // project; the tile counts never enter the prompt.
   const askProject = (projectKey: string) => {
-    conversation.ask(questionForProject(projectKey));
-    onNavigate('intelligence');
+    askInIntelligence(questionForProject(projectKey));
   };
 
   return (
