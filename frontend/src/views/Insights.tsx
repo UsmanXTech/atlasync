@@ -236,8 +236,9 @@ export default function Insights() {
                       {s.date} · {s.score === null ? 'no score' : `${s.score}% ready`}
                     </strong>
                     <small>
-                      Bcrit {s.breakdown.Bcrit} · Isev {s.breakdown.Isev} · Pstale {s.breakdown.Pstale} · Dmissing{' '}
-                      {s.breakdown.Dmissing}
+                      {s.breakdown.Bcrit} critical blocker{s.breakdown.Bcrit === 1 ? '' : 's'} ·{' '}
+                      {s.breakdown.Isev} SEV-1/2 incident{s.breakdown.Isev === 1 ? '' : 's'} · {s.breakdown.Pstale}{' '}
+                      stale PR{s.breakdown.Pstale === 1 ? '' : 's'} · {s.breakdown.Dmissing} unassigned
                     </small>
                     <div
                       className="linear-progress"

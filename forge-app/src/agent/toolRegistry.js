@@ -416,10 +416,21 @@ export function extractToolCalls(message) {
 // the model must NEVER claim to have changed anything. The "read-only"
 // sentence from askAtlasync is deliberately absent here — this path
 // can propose writes, but only through the approval flow.
+//
+// Readiness factors are named in PLAIN WORDS here, never by their
+// internal code names (Bcrit/Isev/Pstale/Dmissing): the model quotes
+// whatever the prompt names, and the codes leaked into live answers
+// and into a proposed escalation comment as the garbled tokens
+// "Bcrit" and "Dmissing" (live review 2026-11-22). Code names stay in
+// code; model-facing text uses words only.
+function plural(n, one, many) {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
 export function buildAgentSystemPrompt({ readiness, projects = [] } = {}) {
   const readinessLine =
     readiness && typeof readiness.score === 'number'
-      ? `Latest readiness score: ${readiness.score}% (Bcrit ${readiness.breakdown?.Bcrit ?? 0}, Isev ${readiness.breakdown?.Isev ?? 0}, Pstale ${readiness.breakdown?.Pstale ?? 0}, Dmissing ${readiness.breakdown?.Dmissing ?? 0}; computed ${readiness.generatedAt ?? 'unknown time'}). Bcrit counts open Highest/Critical Jira issues, Isev counts open Highest/Critical JSM requests (priority is the SEV-1/2 proxy — JSM has no SEV field), Pstale counts open linked pull requests on critical issues, Dmissing counts unassigned Highest/Critical blockers.`
+      ? `Latest readiness score: ${readiness.score}% (${plural(readiness.breakdown?.Bcrit ?? 0, 'critical blocker', 'critical blockers')}, ${plural(readiness.breakdown?.Isev ?? 0, 'SEV-1/2 incident', 'SEV-1/2 incidents')}, ${plural(readiness.breakdown?.Pstale ?? 0, 'stale PR', 'stale PRs')}, ${plural(readiness.breakdown?.Dmissing ?? 0, 'unassigned blocker', 'unassigned blockers')}; computed ${readiness.generatedAt ?? 'unknown time'}). Critical blockers are open Highest/Critical Jira issues, SEV-1/2 incidents are open Highest/Critical JSM requests (priority is the SEV-1/2 proxy — JSM has no SEV field), stale PRs are open linked pull requests on critical issues, unassigned blockers are open Highest/Critical blockers with no assignee.`
       : 'No readiness score is available for this workspace yet.';
   // Project keys are injected server-side (invokeAgent fetches them
   // with the same getJiraProjects call) so the model never has to
@@ -447,5 +458,6 @@ export function buildAgentSystemPrompt({ readiness, projects = [] } = {}) {
     '7. PROPOSE WRITES WITH THE TOOL, NEVER IN PROSE: when you want to change something (escalate, transition, create a page), emit the write tool call with its exact arguments — do not describe the proposal in text and stop. A proposal written only in prose never reaches the user for approval and is lost.',
     '8. LIST TOOLS: when a question asks about pages in a specific Confluence space or about page status/cleanup, use list_confluence_pages — search_confluence_runbooks only matches text. When a question asks about JSM requests by status or request type, or which type is piling up, use list_jsm_requests — get_jsm_incidents only filters by priority.',
     '9. TIGHT LISTS: when you write a list, put no blank line between its items — a blank line restarts the numbering at 1 in the renderer.',
+    '10. PLAIN WORDS FOR READINESS FACTORS: describe the readiness score with plain words — critical blockers, SEV-1/2 incidents, stale PRs, unassigned blockers. Never use abbreviated factor codes in answers or proposed comments; the factors have plain-word names, use those.',
   ].join('\n');
 }

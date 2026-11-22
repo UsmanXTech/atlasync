@@ -215,12 +215,18 @@ describe('buildAgentSystemPrompt', () => {
     assert.match(prompt, /PROPOSE WRITES WITH THE TOOL, NEVER IN PROSE/);
   });
 
-  it('includes the exact readiness breakdown when available', () => {
+  it('includes the exact readiness breakdown when available, in plain words only', () => {
     const prompt = buildAgentSystemPrompt({
       readiness: { score: 41, breakdown: { Bcrit: 2, Isev: 1, Pstale: 2, Dmissing: 1 }, generatedAt: '2026-11-21T00:00:00.000Z' },
     });
     assert.match(prompt, /Latest readiness score: 41%/);
-    assert.match(prompt, /Bcrit 2, Isev 1, Pstale 2, Dmissing 1/);
+    assert.match(prompt, /2 critical blockers, 1 SEV-1\/2 incident, 2 stale PRs, 1 unassigned blocker/);
+    // Live review 2026-11-22: the model quoted the internal factor
+    // codes straight out of the prompt ("Bcrit"/"Dmissing" in answers
+    // and in a proposed comment). No code name may appear in
+    // model-facing text — only plain words.
+    assert.doesNotMatch(prompt, /Bcrit|Isev|Pstale|Dmissing/);
+    assert.match(prompt, /PLAIN WORDS FOR READINESS FACTORS/);
   });
 
   it('injects the available project keys so the model never has to ask for one', () => {
