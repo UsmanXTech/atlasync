@@ -49,9 +49,9 @@ test('jsm contextual question names every jsm topic', () => {
 // prompt as if the agent had seen it.
 test('overview stat questions name their metric topic and carry no numbers', () => {
   const topics: Record<keyof typeof OVERVIEW_STAT_QUESTIONS, string[]> = {
-    openIssues: ['open Jira issues', 'live snapshot', 'tackle first'],
+    openIssues: ['open Jira issues', 'tackle first'],
     blockers: ['Highest and Critical Jira blockers', 'blocking delivery', 'unblock first'],
-    stalePrs: ['pull requests on critical issues', 'stale or blocking', 'move first'],
+    stalePrs: ['pull requests on critical issues', 'least recently updated', 'blocking', 'move first'],
     incidents: ['Highest and Critical JSM incidents', 'attention first', 'impact'],
   };
   for (const [key, words] of Object.entries(topics) as [keyof typeof OVERVIEW_STAT_QUESTIONS, string[]][]) {

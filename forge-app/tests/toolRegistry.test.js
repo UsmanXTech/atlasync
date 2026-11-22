@@ -19,11 +19,11 @@ import {
 } from '../src/agent/toolRegistry.js';
 
 describe('tool sets', () => {
-  it('declares 4 read + 3 write tools, no overlap', () => {
-    assert.equal(READ_TOOLS.length, 4);
+  it('declares 6 read + 3 write tools, no overlap', () => {
+    assert.equal(READ_TOOLS.length, 6);
     assert.equal(WRITE_TOOLS.length, 3);
-    assert.equal(TOOL_DEFINITIONS.length, 7);
-    assert.deepEqual(new Set([...READ_TOOLS, ...WRITE_TOOLS]).size, 7);
+    assert.equal(TOOL_DEFINITIONS.length, 9);
+    assert.deepEqual(new Set([...READ_TOOLS, ...WRITE_TOOLS]).size, 9);
     for (const def of TOOL_DEFINITIONS) {
       assert.equal(def.type, 'function');
       assert.equal(typeof def.function.name, 'string');
@@ -52,6 +52,23 @@ describe('validateToolArgs', () => {
     assert.deepEqual(validateToolArgs('get_jsm_incidents', { severity: 'Highest' }), { ok: true, args: { severity: 'Highest' } });
     assert.deepEqual(validateToolArgs('search_confluence_runbooks', { query: 'release runbook' }), { ok: true, args: { query: 'release runbook' } });
     assert.deepEqual(validateToolArgs('get_pr_bottlenecks', { projectKey: 'atlas' }), { ok: true, args: { projectKey: 'ATLAS' } });
+    assert.deepEqual(validateToolArgs('list_confluence_pages', {}), { ok: true, args: {} });
+    assert.deepEqual(validateToolArgs('list_confluence_pages', { spaceKey: 'at', status: 'Archived' }), { ok: true, args: { spaceKey: 'AT', status: 'archived' } });
+    assert.deepEqual(validateToolArgs('list_jsm_requests', {}), { ok: true, args: {} });
+    assert.deepEqual(validateToolArgs('list_jsm_requests', { status: 'Open', requestType: 'Incident', limit: 5 }), { ok: true, args: { status: 'Open', requestType: 'Incident', limit: 5 } });
+  });
+
+  it('rejects malformed args for the new list tools', () => {
+    assert.equal(validateToolArgs('list_confluence_pages', { spaceKey: 'at las' }).ok, false);
+    assert.equal(validateToolArgs('list_confluence_pages', { spaceKey: 'A'.repeat(11) }).ok, false);
+    assert.equal(validateToolArgs('list_confluence_pages', { status: 'deleted' }).ok, false);
+    assert.equal(validateToolArgs('list_confluence_pages', { spaceKey: 'AT', bogus: 1 }).ok, false);
+    assert.equal(validateToolArgs('list_jsm_requests', { status: '' }).ok, false);
+    assert.equal(validateToolArgs('list_jsm_requests', { status: 'x'.repeat(51) }).ok, false);
+    assert.equal(validateToolArgs('list_jsm_requests', { limit: 0 }).ok, false);
+    assert.equal(validateToolArgs('list_jsm_requests', { limit: 11 }).ok, false);
+    assert.equal(validateToolArgs('list_jsm_requests', { limit: 2.5 }).ok, false);
+    assert.equal(validateToolArgs('list_jsm_requests', { limit: '5' }).ok, false);
   });
 
   it('accepts valid args for every write tool', () => {
@@ -225,5 +242,11 @@ describe('buildAgentSystemPrompt', () => {
     const prompt = buildAgentSystemPrompt({});
     assert.match(prompt, /zero at THAT filter only/);
     assert.match(prompt, /Never report a filtered zero as zero records overall/);
+  });
+  it('tells the model to use the list tools for space/status questions', () => {
+    const prompt = buildAgentSystemPrompt({});
+    assert.match(prompt, /list_confluence_pages/);
+    assert.match(prompt, /list_jsm_requests/);
+    assert.match(prompt, /only filters by priority/);
   });
 });

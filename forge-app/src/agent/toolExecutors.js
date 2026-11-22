@@ -12,8 +12,9 @@
 
 import api, { route } from '@forge/api';
 import { buildSearchBody, parseJiraSearchResponse } from '../jira.js';
+import { buildConfluencePagesUrl, parseConfluencePages } from '../confluence.js';
 import { parseDevStatusResponse } from '../devstatus.js';
-import { parseJsmRequests } from '../jsm.js';
+import { parseJsmRequests, summarizeJsmRequests } from '../jsm.js';
 import { countStalePrs, isOpenJsmRequest, isOpenPrStatus, selectCriticalBlockers } from '../readiness.js';
 
 const apiError = (message) => ({ ok: false, error: { kind: 'API_ERROR', message } });
@@ -156,6 +157,10 @@ export async function executeReadTool(name, args) {
           status: i.status,
           priority: i.priority,
           assignee: i.assignee ?? 'Unassigned',
+          // Fix #11: the stale-work question asks for the least recently
+          // updated critical issues — without `updated` the model could
+          // not prove recency at all.
+          updated: i.updated ?? '',
         }));
         // Phase 1 citations: the same rows the model sees, as structured
         // records — the loop collects them so answers can link back to
@@ -181,10 +186,46 @@ export async function executeReadTool(name, args) {
         if (response.status >= 400) throw new Error('JSM unavailable or permission denied');
         return shapeJsmIncidentsResult(args.severity, parseJsmRequests(await response.json()));
       }
+      case 'list_jsm_requests': {
+        const response = await api.asUser().requestJira(route`/rest/servicedeskapi/request?limit=50`, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        });
+        if (response.status >= 400) throw new Error('JSM unavailable or permission denied');
+        const all = parseJsmRequests(await response.json());
+        // Pure helper (jsm.js): filters by status/type, slices to the
+        // limit, and counts the full fetched set by type and status.
+        const { total, countsByType, countsByStatus, count, requests: rows } = summarizeJsmRequests(all, {
+          status: args.status,
+          requestType: args.requestType,
+          limit: args.limit,
+        });
+        const records = rows.map((r) => ({
+          kind: 'jsm',
+          key: r.key,
+          title: r.summary,
+          path: `/browse/${r.key}`,
+        }));
+        return {
+          ok: true,
+          output: JSON.stringify({
+            status: args.status ?? null,
+            requestType: args.requestType ?? null,
+            limit: args.limit ?? 10,
+            total,
+            count,
+            countsByType,
+            countsByStatus,
+            requests: rows,
+          }),
+          records,
+          count,
+        };
+      }
       case 'search_confluence_runbooks': {
         const cql = `text ~ "${args.query.replaceAll('"', '')}" AND type = page`;
         const response = await api.asUser().requestConfluence(
-          route`/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&limit=${MAX_ROWS}`,
+          route`/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&limit=${MAX_ROWS}&expand=space`,
           { method: 'GET', headers: { Accept: 'application/json' } },
         );
         if (response.status >= 400) throw new Error('Confluence unavailable or permission denied');
@@ -194,6 +235,10 @@ export async function executeReadTool(name, args) {
           id: String(p?.id ?? ''),
           title: String(p?.title ?? '(untitled)'),
           url: p?._links?.webui ? `/wiki${p._links.webui}` : null,
+          // Fix #11: the space a hit belongs to — without it the agent
+          // could not tell which space a result came from, or scope a
+          // follow-up list_confluence_pages call to that space.
+          spaceId: p?.space?.id !== undefined && p?.space?.id !== null ? String(p.space.id) : null,
         }));
         const records = rows
           .filter((r) => r.id !== '')
@@ -201,6 +246,51 @@ export async function executeReadTool(name, args) {
         return {
           ok: true,
           output: JSON.stringify({ query: args.query, count: rows.length, pages: rows }),
+          records,
+          count: rows.length,
+        };
+      }
+      case 'list_confluence_pages': {
+        // The v2 pages endpoint scopes by space ID, not key — resolve
+        // the key first (one extra read). An unknown key is an honest
+        // empty answer with the reason, not a silent zero.
+        let spaceId = null;
+        if (args.spaceKey) {
+          const spaceResponse = await api.asUser().requestConfluence(route`/wiki/api/v2/spaces?keys=${args.spaceKey}`, {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+          });
+          if (spaceResponse.status >= 400) throw new Error('Confluence unavailable or permission denied');
+          const spaceData = await spaceResponse.json();
+          const found = Array.isArray(spaceData?.results) ? spaceData.results[0] : null;
+          if (!found || found.id === undefined || found.id === null) {
+            return { ok: false, error: { kind: 'API_ERROR', message: `No Confluence space matches key ${args.spaceKey}.` } };
+          }
+          spaceId = String(found.id);
+        }
+        const url = buildConfluencePagesUrl({ spaceId, status: args.status, limit: MAX_ROWS });
+        const response = await api.asUser().requestConfluence(route`${url}`, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        });
+        if (response.status >= 400) throw new Error('Confluence unavailable or permission denied');
+        const pages = parseConfluencePages(await response.json()).slice(0, MAX_ROWS);
+        const rows = pages.map((p) => ({
+          id: p.id,
+          title: p.title,
+          status: p.status,
+          spaceId: p.spaceId,
+          updated: p.updated,
+        }));
+        const records = pages.map((p) => ({
+          kind: 'confluence',
+          key: p.id,
+          title: p.title,
+          ...(p.webui ? { path: `/wiki${p.webui}` } : {}),
+        }));
+        return {
+          ok: true,
+          output: JSON.stringify({ spaceKey: args.spaceKey ?? null, status: args.status ?? null, count: rows.length, pages: rows }),
           records,
           count: rows.length,
         };

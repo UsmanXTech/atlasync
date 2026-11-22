@@ -43,7 +43,7 @@ describe('runAgentLoop', () => {
     assert.deepEqual(result.trace, []);
     assert.equal(chat.requests.length, 1);
     assert.equal(chat.requests[0].model, 'claude-sonnet-5');
-    assert.equal(chat.requests[0].tools.length, 7);
+    assert.equal(chat.requests[0].tools.length, 9);
     assert.equal(chat.requests[0].tool_choice, 'auto');
   });
 

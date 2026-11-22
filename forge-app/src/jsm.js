@@ -82,3 +82,36 @@ export function parseJsmRequests(data) {
   const rows = Array.isArray(data?.values) ? data.values : Array.isArray(data?.requests) ? data.requests : [];
   return rows.map(normalizeJsmRequest).filter(Boolean).slice(0, MAX_JSM_LIMIT);
 }
+
+// Filter + summarize helper for list_jsm_requests (fix #11). The
+// executor fetches the desk's requests once (limit 50) and this pure
+// function applies the status/requestType filters, slices to the
+// limit, and counts the FULL fetched set grouped by type and status —
+// so the model sees both the slice and the shape of the desk (which
+// type is piling up) in one call. Counts are over the unfiltered set
+// on purpose: filtering by status would make the status counts
+// trivial. Exact matches only — JSM status/type names are free-form
+// per project, so no enum is enforced here.
+export function summarizeJsmRequests(requests, { status, requestType, limit = 10 } = {}) {
+  const all = Array.isArray(requests) ? requests : [];
+  const countsByType = {};
+  const countsByStatus = {};
+  for (const r of all) {
+    const type = typeof r?.requestType === 'string' && r.requestType !== '' ? r.requestType : 'Service request';
+    const st = typeof r?.status === 'string' && r.status !== '' ? r.status : 'Unknown';
+    countsByType[type] = (countsByType[type] ?? 0) + 1;
+    countsByStatus[st] = (countsByStatus[st] ?? 0) + 1;
+  }
+  const filtered = all.filter(
+    (r) => (status === undefined || status === null ? true : r?.status === status) && (requestType === undefined || requestType === null ? true : r?.requestType === requestType),
+  );
+  const capped = Math.max(1, Math.min(10, Number.isInteger(limit) ? limit : 10));
+  const rows = filtered.slice(0, capped).map((r) => ({
+    key: r.key,
+    summary: r.summary,
+    status: r.status,
+    requestType: r.requestType,
+    priority: r.priority ?? null,
+  }));
+  return { total: all.length, countsByType, countsByStatus, count: rows.length, requests: rows };
+}
